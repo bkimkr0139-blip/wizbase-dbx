@@ -31,6 +31,7 @@ async function cmd(type, payload = {}, quiet) {
 }
 function summarize(r) { const e = r?.error || r?.result?.error; return e ? `${e.code}: ${e.message}` : (r?.stderr || "") }
 function toast(m) { log("⚠ " + m, true) }
+const fmtIso = t => { if (!t) return "-"; const d = new Date(t); return isNaN(d) ? String(t).slice(0, 16).replace("T", " ") : d.toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }).slice(0, 16) };
 const fmtKst = t => t ? new Date(t * 1000).toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }).slice(0, 16) : "-";
 const badge = (t, c) => `<span class="b ${c || ""}">${esc(t)}</span>`;
 const lv = l => badge(l, l === "LOCAL_EXECUTED" ? "ok" : "w");
@@ -52,7 +53,7 @@ const staff = () => ["instructor", "admin", "reviewer"].includes(ME?.role);
 const err = e => `<div class="bad">${esc(e.message || e)}</div>`;
 
 /* ------------------------------------------------------------ shell */
-let GUIDE = null, AI_OPEN = ls.get("ai") !== "0", PANEL = ls.get("panel") || "help", AI_TAB = "chat", PREFILL = null, CHAT = [], BUSY = false;
+let GUIDE = null, AI_OPEN = ls.get("ai") !== "0" && !(typeof matchMedia === "function" && matchMedia("(max-width: 820px)").matches), PANEL = ls.get("panel") || "help", AI_TAB = "chat", PREFILL = null, CHAT = [], BUSY = false;
 const VIEW_STEPS = { env: ["env"], req: ["req"], sql: ["perm", "recon"], conn: ["conn"], pipe: ["pipe"], jobs: ["job"], genie: ["genie"], agent: ["order", "safety"], bundle: ["bundle", "iso"], nb: ["nb"], trace: ["eval"], evid: ["wrap"] };
 const ICON = {
   help: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M9.2 9.3a2.9 2.9 0 1 1 4.3 2.5c-.9.5-1.5 1-1.5 2"/><circle cx="12" cy="17.2" r=".6" fill="currentColor"/></svg>',
@@ -105,12 +106,12 @@ async function render(soft) {
   const mode = ST ? ST.session.mode : null;
   const title = (NAV.flatMap(g => g[1]).find(n => n[0] === VIEW) || ["", ""])[1];
   app.className = AI_OPEN ? "ai-open" : "";
-  app.innerHTML = `<header class="top"><div class="brand"><span class="logochip"><img class="logo-l" src="/static/logo.png" alt="wizbase"><img class="logo-d" src="/static/logo-white.png" alt="" aria-hidden="true"></span><div><span>DBX Project Rehearsal</span></div></div>
+  app.innerHTML = `<header class="top"><div class="brand"><span class="logochip"><img class="logo-w" src="/static/logo-white.png" alt="wizbase"></span><div><span>DBX Project Rehearsal</span></div></div>
     <div class="crumb">${esc(title)}</div>
     <div class="chips">${GUIDE ? `<span class="chip" title="전체 진행"><i></i>진행 ${GUIDE.percent}%</span>` : ""}${mode ? `<span class="chip ${mode === "B" ? "ok" : "w"}"><i></i>모드 ${mode} · ${mode === "A" ? "SIMULATED" : "LOCAL_EXECUTED"}</span>` : ""}<span class="chip" title="${esc(META.profile.profile_id)}">${esc(META.profile.cloud.toUpperCase())} · ${esc(META.profile.region)}</span><span class="chip w" title="문서 확인만 완료, 워크스페이스 실측·SA 검토 없음">${esc(META.profile.evidence_status)}</span>${ST ? `<span class="chip" title="실행 신원">${esc(ST.principal.split("@")[0])}</span><span class="chip mono">${esc(ST.clock.slice(0, 16).replace("T", " "))}</span>` : ""}</div>
     <div class="user"><span class="av">${esc(ME.name.slice(0, 1))}</span><div><b>${esc(ME.name)}</b><small>${ME.role === "admin" ? "admin · 수퍼유저" : ME.role}</small></div><button class="ghost" data-a="logout">로그아웃</button></div></header>
     <div class="strip">WIZBASE(Databricks 파트너)의 실제 PoC 준비와 파트너 레벨 상향을 위한 인증 시험 준비를 지원하는 교육·훈련 환경입니다. Databricks 공식 제품·인증·교육과정이 아니며 합성 데이터만 사용합니다. 모의 결과와 실제 DBX 검증 결과는 구분해 표시됩니다.</div>
-    ${menubarHtml()}${nextBar()}${sysPop()}
+    ${menubarHtml()}${mobileBar()}${nextBar()}${sysPop()}
     <div class="wrap">
     <main id="main"></main></div>
     <button class="aitab helptab ${AI_OPEN && PANEL === "help" ? "on" : ""}" data-a="helptoggle" aria-label="도움말 열기">${ICON.help}<span>HELP</span></button>
@@ -133,7 +134,7 @@ async function render(soft) {
 
 /* ------------------------------------------------------------ 메뉴 바 (Windows 표준 앱 스타일: 드롭다운 목록 + 단축키) */
 const UA_APP = /DBXDesktop\/([\d.]+)/.exec(navigator.userAgent || "");
-const IS_APP = !!UA_APP, APP_VER = UA_APP ? UA_APP[1] : "", IS_MACOS = /Mac/.test(navigator.platform || "") && !/iPhone|iPad/.test(navigator.userAgent || ""), IS_SA = /DBXDesktop\/[\d.]+ Standalone/.test(navigator.userAgent || "");
+const IS_APP = !!UA_APP, APP_VER = UA_APP ? UA_APP[1] : "", IS_PHONE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || ""), IS_MACOS = /Mac/.test(navigator.platform || "") && !/iPhone|iPad/.test(navigator.userAgent || ""), IS_SA = /DBXDesktop\/[\d.]+ Standalone/.test(navigator.userAgent || "");
 let MENUOPEN = -1, UPD_SHOWN = "", POLL = null;
 function menuModel() {
   const stf = staff(), adm = ME?.role === "admin";
@@ -162,6 +163,12 @@ function menubarHtml() {
     <button class="mt" role="menuitem" aria-haspopup="true" aria-expanded="false" data-a="mopen" data-n="${n}" title="Alt+${n + 1}">${esc(m.title)}<u>${n + 1}</u></button>
     <div class="mdrop" role="menu">${m.items.map((i, k) => i.sep ? `<div class="msep"></div>` : `<button class="mi ${i.v && VIEW === i.v ? "on" : ""}" role="menuitem" data-a="mpick" data-n="${n}" data-k="${k}" title="${esc(i.tip || "")}"><span class="mnum">${i.no <= 9 ? i.no : ""}</span><span class="ml">${esc(i.label)}</span><span class="mk">${esc(i.key || "")}</span></button>`).join("")}</div></div>`).join("")}
     <span class="rsp"></span><span class="rver" title="빌드 ${esc(SYS.build)}">v${esc(SYS.version)}${IS_APP ? " · PC 앱 " + esc(APP_VER) : ""}</span></div>`;
+}
+function mobileBar() {
+  if (!SYS) return "";
+  const t = viewLabel(VIEW).replace(/^.*> /, "");
+  return `<div class="mobbar"><button class="mb-menu" data-a="mnavopen" aria-label="메뉴 열기">☰ <span>메뉴</span></button><span class="mb-title">${esc(t)}</span><button class="mb-ic" data-a="helptoggle" aria-label="도움말">${ICON.help}</button><button class="mb-ic" data-a="aitoggle" aria-label="AI 지원">${ICON.spark}${GUIDE && GUIDE.next ? '<i class="pulse"></i>' : ""}</button><button class="mb-ic" data-a="axostoggle" aria-label="피드백(AXOS)">${ICON.axos}${FB_UNSEEN ? '<i class="pulse"></i>' : ""}</button></div>
+  <div class="mnav" id="mnav" role="dialog" aria-label="전체 메뉴"><div class="mnh"><b>전체 메뉴</b><button class="ghost" data-a="mnavclose">닫기 ✕</button></div><div class="mnb">${menuModel().map((m, n) => `<details ${m.items.some(i => i.v === VIEW) ? "open" : ""}><summary>${esc(m.title)}</summary>${m.items.map((i, k) => i.sep ? "" : `<button class="mnitem ${i.v && VIEW === i.v ? "on" : ""}" data-a="mnavpick" data-n="${n}" data-k="${k}">${esc(i.label)}</button>`).join("")}</details>`).join("")}</div></div>`;
 }
 function menuSet(n) {
   MENUOPEN = n;
@@ -236,7 +243,7 @@ async function download(path, fallback) {
 /* ------------------------------------------------------------ AXOS 탭 (피드백 폐루프 · 도메인 신청) */
 const FB_FLOW = ["RECEIVED", "APPROVED", "QUEUED", "IN_DEV", "DONE"], FB_LBL = { RECEIVED: "접수", APPROVED: "검토·승인", QUEUED: "개발큐", IN_DEV: "개발중", DONE: "반영완료", REJECTED: "반려", ON_HOLD: "보류" };
 const FB_KINDS = { CONNECT_REQUEST: "실제 환경 연결 신청", FEATURE: "기능 추가 요청", UI_BUG: "화면 버그", IMPROVE: "기능 개선", DBX_MISMATCH: "DBX와 맞지 않는 오류", CONTENT: "문항·자료 오류", OTHER: "기타" };
-let FBMETA = null, FB = { kind: "UI_BUG", title: "", text: "", images: [] }, DOM = { domain: "", purpose: "", data: "", issues: "", when: "", text: "" }, AXTAB = "fb", MINE = null, FB_UNSEEN = 0, FBQ = { status: "", sel: null };
+let FBMETA = null, FB = { kind: "UI_BUG", title: "", text: "", images: [] }, DOM = { domain: "", purpose: "", data: "", issues: "", when: "", text: "" }, AXTAB = "fb", MINE = null, FB_UNSEEN = 0, FBQ = { status: "", sel: null, checked: new Set(), edit: false, page: 0, size: 25, q: "", ids: [] };
 const viewLabel = v => { for (const t of (SYS?.menu || [])) { const i = t.items.find(x => x.view === v); if (i) return t.tab + " > " + i.label } return v };
 const fbBadge = s => badge(FB_LBL[s] || s, s === "DONE" ? "ok" : s === "REJECTED" ? "bad" : s === "ON_HOLD" ? "w" : "");
 function fbSteps(s) {
@@ -264,7 +271,7 @@ function axosHtml() {
       ${f("domain", "도메인(산업)", "예: 물류·창고, 의료 청구, 금융 거래")}${f("purpose", "훈련 목적", "어떤 역량을 연습하고 싶은지", 2)}${f("data", "필요한 데이터·테이블", "예: 입출고 이벤트, 재고, 거래처", 2)}${f("issues", "심어 둘 데이터 문제", "예: 중복, 역순 도착, 이상치", 2)}${f("when", "희망 시기", "예: 12월 중")}
       <label>추가 설명</label><textarea rows="3" maxlength="2000" oninput="DOM.text=this.value">${esc(DOM.text)}</textarea><button class="primary wide" style="margin-top:10px" data-a="domsubmit">도메인 신청</button>`;
   } else {
-    body = !MINE ? `<div class="mute">불러오는 중…</div>` : !MINE.items.length ? `<div class="empty small">제출한 피드백이 없습니다.</div>` : MINE.items.map(f => `<div class="fbitem"><div><b>${esc(f.title)}</b></div><div class="sub">${esc(f.id)} · ${esc(f.kind_label)} · ${esc(f.created.slice(0, 10))}${f.priority ? " · " + esc(f.priority) : ""}</div>${fbSteps(f.status)}
+    body = !MINE ? `<div class="mute">불러오는 중…</div>` : !MINE.items.length ? `<div class="empty small">제출한 피드백이 없습니다.</div>` : MINE.items.map(f => `<div class="fbitem"><div><b>${esc(f.title)}</b></div><div class="sub">${esc(f.id)} · ${esc(f.kind_label)} · ${esc(fmtIso(f.created))}${f.priority ? " · " + esc(f.priority) : ""}</div>${fbSteps(f.status)}
       ${IS_SA ? `<div class="mute">운영자 서버 전달: ${f.remote_state === "SENT" ? "전달됨" : "대기 중(인터넷 연결 시 자동 전송)"}</div>` : ""}${f.status === "DONE" ? `<div class="okbox">반영 완료 — v${esc(f.released_version || "")}${f.resolution ? "<br>" + esc(f.resolution) : ""}</div>` : ""}${f.status === "REJECTED" || f.status === "ON_HOLD" ? `<div class="warnbox">${esc(FB_LBL[f.status])} 사유: ${esc(f.resolution)}</div>` : ""}
       </div>`).join("");
   }
@@ -344,11 +351,12 @@ function renderLogin(app) {
   app.innerHTML = `<div class="loginwrap"><div class="hero"><div class="brand big"><img class="logobig logo-l" src="/static/logo.png" alt="wizbase"><img class="logobig logo-d" src="/static/logo-white.png" alt="" aria-hidden="true"><div><span>DBX Project Rehearsal</span></div></div><h1>Databricks 현장 PoC,<br>실전 전에 리허설하다.</h1><p>권한·데이터·파이프라인·승인·배포까지 실제 작업 순서대로 훈련하고, 모든 결과를 증거로 남기는 글로벌 AX 프로젝트용 시뮬레이터.</p>
     <ul><li>단계별 AI 지원과 바로가기</li><li>입력에 따라 달라지는 실행 결과 (고정 성공 없음)</li><li>모의·로컬 실행·실제 검증을 구분하는 증거 보고서</li></ul></div>
     <div class="lcard"><h2>로그인</h2><div class="sub">교육 역할과 DBX 권한은 별도 모델입니다.</div><label>이름 <small>(필수 · 실명)</small></label><input id="ln" maxlength="40" placeholder="실명을 입력하세요 (예: 홍길동)" autocomplete="name" onkeydown="if(event.key==='Enter')H.login()"><label>역할</label><select id="lr"><option value="learner">학습자 — 코드 불필요</option><option value="admin">admin — 수퍼유저 (UC 관리자·시스템 문서·피드백 관리)</option><option value="reviewer">리뷰어 / 승인자</option><option value="instructor">강사</option></select><label>접근 코드 <small>(admin·검토자·강사 — 역할별 별도 코드)</small></label><input id="lc" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')H.login()"><button class="primary wide" data-a="login">시작하기</button><div id="lerr" class="bad"></div>
-    ${IS_APP ? "" : `<div class="dlbox" id="dlbox"><b>${IS_MACOS ? "Mac" : "Windows"} 설치형 앱 (권장)</b><div class="mute">내 PC에서 단독으로 실행됩니다. 서버가 앱 안에 들어 있어 접속자가 많아도 느려지지 않고, 운영자 PC가 꺼져 있어도 학습할 수 있습니다. 학습 데이터는 내 PC에만 저장됩니다.</div>${IS_MACOS ? `<button class="primary" data-a="appdl" data-k="mac-arm64">Apple Silicon 용 다운로드 (M1 이상)</button> <button data-a="appdl" data-k="mac-x64">Intel Mac 용</button>` : `<button class="primary" data-a="appdl" data-k="standalone">단독 설치형 다운로드 (.exe)</button>`}<div class="mute" id="dlinfo"></div><div class="mute" style="margin-top:8px">${IS_MACOS ? "Windows용은 Windows PC에서 같은 주소로 받으세요. " : "Mac용은 Mac에서 같은 주소로 받으세요. "}설치가 어렵다면 위 로그인으로 웹에서 체험할 수도 있습니다(운영자 PC 상태에 따라 느리거나 접속이 안 될 수 있음).</div></div>`}<div class="fine">WIZBASE 교육 환경 · Databricks 공식 제품·인증·교육과정이 아님 · 합성 데이터 전용</div></div></div>`;
-  if (!IS_APP) fetch("/api/app/manifest").then(r => r.json()).then(m => { const e = $("#dlinfo"), b = $("#dlbox"); const L = IS_MACOS ? [["Apple Silicon", m.mac_arm64], ["Intel", m.mac_x64]] : [["Windows", m.standalone]];
+    ${IS_APP ? "" : IS_PHONE ? `<div class="dlbox"><b>모바일에서도 바로 이용할 수 있어요</b><div class="mute">설치 없이 이 화면에서 로그인해 모든 작업을 해 볼 수 있습니다. 화면이 좁으면 왼쪽 위 ☰ 메뉴로 이동하고, 오른쪽 위 아이콘으로 도움말·AI 지원·피드백을 엽니다. (PC에서는 설치형 앱을 권장합니다.)</div></div>` : `<div class="dlbox" id="dlbox"><b>${IS_MACOS ? "Mac" : "Windows"} 설치형 앱 (권장)</b><div class="mute">내 PC에서 단독으로 실행됩니다. 서버가 앱 안에 들어 있어 접속자가 많아도 느려지지 않고, 운영자 PC가 꺼져 있어도 학습할 수 있습니다. 학습 데이터는 내 PC에만 저장됩니다.</div>${IS_MACOS ? `<button class="primary" data-a="appdl" data-k="mac-arm64">Apple Silicon 용 다운로드 (M1 이상)</button> <button data-a="appdl" data-k="mac-x64">Intel Mac 용</button>` : `<button class="primary" data-a="appdl" data-k="standalone">단독 설치형 다운로드 (.exe)</button>`}<div class="mute" id="dlinfo"></div><div class="mute" style="margin-top:8px">${IS_MACOS ? "Windows용은 Windows PC에서 같은 주소로 받으세요. " : "Mac용은 Mac에서 같은 주소로 받으세요. "}설치가 어렵다면 위 로그인으로 웹에서 체험할 수도 있습니다(운영자 PC 상태에 따라 느리거나 접속이 안 될 수 있음).</div></div>`}<div class="fine">WIZBASE 교육 환경 · Databricks 공식 제품·인증·교육과정이 아님 · 합성 데이터 전용</div></div></div>`;
+  if (!IS_APP && !IS_PHONE) fetch("/api/app/manifest").then(r => r.json()).then(m => { const e = $("#dlinfo"), b = $("#dlbox"); const L = IS_MACOS ? [["Apple Silicon", m.mac_arm64], ["Intel", m.mac_x64]] : [["Windows", m.standalone]];
     const ok = L.filter(([, x]) => x && x.available); if (!ok.length && b) { b.querySelectorAll("button").forEach(x => x.disabled = true); if (e) e.textContent = "설치 파일을 준비 중입니다." }
     else if (e) e.textContent = ok.map(([n, x]) => `${n}: 버전 ${x.version} · ${(x.size / 1048576).toFixed(0)} MB`).join(" / ") + (IS_MACOS ? " · 코드 서명이 없어 처음 실행 시 우클릭 > 열기가 필요합니다." : " · Windows 10/11 64비트 · 코드 서명이 없어 처음 실행 시 SmartScreen 경고가 표시될 수 있습니다.") }).catch(() => { });
 }
+document.addEventListener("change", ev => { const t = ev.target; if (t && t.classList && t.classList.contains("fbchk")) { t.checked ? FBQ.checked.add(t.dataset.id) : FBQ.checked.delete(t.dataset.id) } });
 document.addEventListener("click", async ev => {
   if (MENUOPEN >= 0 && !ev.target.closest(".menubar")) menuSet(-1);
   if (ev.target.classList && ev.target.classList.contains("syspop")) { SYSPOP = ""; REMEDY_POP = null; render(true); return }
@@ -372,9 +380,18 @@ window.H = {
   },
   realgo() { const f = $("#realform"); if (f && f.scrollIntoView) f.scrollIntoView({ behavior: "smooth" }) },
   usagerefresh() { USG.at = 0; render(true) },
-  usagedays(d) { USG.days = +d.n; USG.page = 0; render(true) },
+  mnavopen() { const e = document.querySelector("#mnav"); if (e) e.classList.add("open") },
+  mnavclose() { const e = document.querySelector("#mnav"); if (e) e.classList.remove("open") },
+  mnavpick(d) { H.mnavclose(); menuPick(+d.n, +d.k) },
+  usagedays(d) { USG.days = +d.n; USG.page = 0; USG.upage = 0; render(true) },
   usagefilter() { USG.kind = val("uskind") || ""; USG.q = val("usq") || ""; USG.page = 0; render(true) },
-  usagepage(d) { USG.page = Math.max(0, USG.page + +d.d); render(true) },
+  usagepage(d) { USG.page = Math.max(0, +d.p); render(true) },
+  usagepagesize(v) { USG.size = +v; USG.page = 0; render(true) },
+  usageclear() { USG.kind = ""; USG.q = ""; USG.page = 0; render(true) },
+  usersearch() { USG.uq = (val("usuq") || "").trim(); USG.upage = 0; render(true) },
+  usersearchclear() { USG.uq = ""; USG.upage = 0; render(true) },
+  userpage(d) { USG.upage = Math.max(0, +d.p); render(true) },
+  userpagesize(v) { USG.usize = +v; USG.upage = 0; render(true) },
   sesssel() { const l = [...document.querySelectorAll(".sesschk")]; const all = l.every(x => x.checked); l.forEach(x => x.checked = !all) },
   sessdel() {
     const ids = [...document.querySelectorAll(".sesschk")].filter(x => x.checked).map(x => x.dataset.id);
@@ -406,9 +423,33 @@ window.H = {
     const r = await api("/api/feedback", { body: { kind: "DOMAIN_REQUEST", title: "도메인 신청: " + DOM.domain.trim(), text: DOM.text.trim() || DOM.purpose.trim() || "(상세 미기재)", view: VIEW, context: fbCtx(), domain: { domain: DOM.domain, purpose: DOM.purpose, data: DOM.data, issues: DOM.issues, when: DOM.when } } });
     log(`도메인 신청 접수 ${r.id} — 진행 상태는 AXOS > 내 피드백에서 확인`); DOM = { domain: "", purpose: "", data: "", issues: "", when: "", text: "" }; await H.axtab({ t: "mine" })
   },
-  fbfilter(d) { FBQ.status = d.s || ""; FBQ.sel = null; render(true) },
+  fbfilter(d) { FBQ.status = d.s || ""; FBQ.sel = null; FBQ.page = 0; render(true) },
+  fbsearch() { FBQ.q = (val("fbqq") || "").trim(); FBQ.page = 0; render(true) },
+  fbsearchclear() { FBQ.q = ""; FBQ.page = 0; render(true) },
+  fbpage(d) { FBQ.page = Math.max(0, +d.p); render(true) },
+  fbpagesize(v) { FBQ.size = +v; FBQ.page = 0; render(true) },
+  fbselresult() { FBQ.checked = new Set([...FBQ.checked, ...FBQ.ids]); render(true) },
   fbopen(d) { FBQ.sel = d.id; render(true) },
-  fbclose() { FBQ.sel = null; render(true) },
+  fbclose() { FBQ.sel = null; FBQ.edit = false; render(true) },
+  fbselall() { const l = [...document.querySelectorAll(".fbchk")]; const all = l.length && l.every(x => x.checked); l.forEach(x => { x.checked = !all; all ? FBQ.checked.delete(x.dataset.id) : FBQ.checked.add(x.dataset.id) }); render(true) },
+  fbediton() { FBQ.edit = true; render(true) },
+  fbeditoff() { FBQ.edit = false; render(true) },
+  async fbsaveedit() {
+    try { await api(`/api/feedback/${FBQ.sel}/edit`, { body: { title: val("fbet"), text: val("fbex"), kind: val("fbek"), priority: val("fbep") || null } }); log(`${FBQ.sel} 수정했습니다.`); FBQ.edit = false; render(true) } catch (e) { log("수정 ✗ " + e.message, true, e.data); toast(e.message) }
+  },
+  fbdelone(d) { FBQ.checked = new Set([d.id]); H.fbdel() },
+  fbdel() {
+    const ids = [...document.querySelectorAll(".fbchk")].filter(x => x.checked).map(x => x.dataset.id); const sel = ids.length ? ids : [...FBQ.checked];
+    if (!sel.length) { toast("삭제할 피드백을 선택하세요."); return }
+    FBQ.checked = new Set(sel); SYSPOP = `<h3 style="margin-top:0">피드백 삭제</h3><p><b>${sel.length}건</b>을 삭제합니다. 첨부 이미지까지 함께 지워지며 <b>되돌릴 수 없습니다</b>. 제출자의 '내 피드백'에서도 사라집니다.</p><div class="sub">${sel.map(esc).join(", ")}</div><p><button class="danger" data-a="fbdelok">삭제</button> <button data-a="syspopclose">취소</button></p>`; render(true)
+  },
+  async fbdelok() { const ids = [...FBQ.checked]; SYSPOP = ""; try { const r = await api("/api/feedback/delete", { body: { ids } }); FBQ.checked = new Set(); if (r.deleted.includes(FBQ.sel)) FBQ.sel = null; log(`피드백 ${r.deleted.length}건 삭제` + (r.missing.length ? ` · 없는 건 ${r.missing.length}건` : "")) } catch (e) { log("삭제 ✗ " + e.message, true, e.data) } render(true) },
+  async fbbulk() {
+    const ids = [...document.querySelectorAll(".fbchk")].filter(x => x.checked).map(x => x.dataset.id), to = val("fbbto");
+    if (!ids.length) { toast("변경할 피드백을 선택하세요."); return } if (!to) { toast("바꿀 상태를 고르세요."); return }
+    try { const r = await api("/api/feedback/bulk", { body: { ids, to, note: val("fbbnote") || "", released_version: val("fbbrel") || null } }); FBQ.checked = new Set(r.failed.map(x => x.id)); log(`일괄 변경: 성공 ${r.ok.length}건` + (r.failed.length ? ` · 건너뜀 ${r.failed.length}건(${r.failed.slice(0, 3).map(x => x.id + ": " + x.message).join(" / ")})` : ""), r.failed.length > 0) } catch (e) { log("일괄 변경 ✗ " + e.message, true, e.data) }
+    render(true)
+  },
   async fbmove(d) {
     const r = await api(`/api/feedback/${FBQ.sel}/transition`, { body: { to: d.to, note: val("fbnote") || "", priority: val("fbprio") || null, released_version: val("fbrel") || null } });
     log(`${r.id} → ${FB_LBL[r.status]}${r.status === "QUEUED" ? " (개발 지시서 생성됨)" : ""}`); render(true)
@@ -730,10 +771,11 @@ function heatmap(m) {
 /* 툴팁(이벤트 위임) */
 (function () {
   let tip = null; const get = () => tip || (tip = (() => { const d = document.createElement("div"); d.className = "vtip"; d.style.display = "none"; document.body.appendChild(d); return d })());
-  document.addEventListener("mouseover", e => { const t = e.target.closest && e.target.closest("[data-tip]"); if (!t) { if (tip) tip.style.display = "none"; return } const d = get(); d.innerHTML = t.getAttribute("data-tip"); d.style.display = "block" });
+  document.addEventListener("mouseover", e => { const t = e.target.closest && e.target.closest("[data-tip]"); if (!t) { if (tip) tip.style.display = "none"; return } const d = get(); d.innerHTML = t.getAttribute("data-tip"); d.style.display = "block"; d.style.left = Math.max(4, Math.min(innerWidth - d.offsetWidth - 8, e.clientX + 14)) + "px"; d.style.top = (e.clientY + 16 + d.offsetHeight > innerHeight ? e.clientY - d.offsetHeight - 10 : e.clientY + 16) + "px" });
+  document.addEventListener("touchstart", e => { if (tip && !(e.target.closest && e.target.closest("[data-tip]"))) tip.style.display = "none" }, { passive: true });
   document.addEventListener("mousemove", e => { if (tip && tip.style.display === "block") { tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 14) + "px"; tip.style.top = (e.clientY + 16 + tip.offsetHeight > innerHeight ? e.clientY - tip.offsetHeight - 10 : e.clientY + 16) + "px" } });
 })();
-let USG = { days: 30, kind: "", q: "", page: 0, fp: "", at: 0, auto: true, timer: null };
+let USG = { days: 30, kind: "", q: "", page: 0, size: 25, upage: 0, usize: 15, uq: "", fp: "", at: 0, auto: true, timer: null };
 function usageWatch() {
   if (USG.timer) return;
   USG.timer = setInterval(async () => {
@@ -746,6 +788,11 @@ const DLL = { windows_standalone: "Windows 단독형", windows_shell: "Windows �
 function kpiTile(label, v, prev, o = {}) {
   const d = prev ? Math.round((v - prev) / prev * 100) : null;
   return `<div class="kpi"><div class="kl">${esc(label)}</div><div class="kv">${nf(v)}${o.unit ? `<small>${o.unit}</small>` : ""}</div><div class="kd">${d === null ? "이전 기간 기록 없음" : `${d > 0 ? "▲" : d < 0 ? "▼" : "–"} ${Math.abs(d)}% (이전 ${USG.days}일 ${nf(prev)})`}</div></div>`;
+}
+function pagerHtml(total, page, size, act) {
+  const pages = Math.max(1, Math.ceil(total / size)), b = (label, p, dis) => `<button class="ghost" data-a="${act}" data-p="${p}" ${dis ? "disabled" : ""}>${label}</button>`;
+  const st = Math.max(0, Math.min(page - 2, pages - 5)), nums = []; for (let i = st; i < Math.min(pages, st + 5); i++) nums.push(`<button class="${i === page ? "primary" : "ghost"}" data-a="${act}" data-p="${i}" ${i === page ? 'aria-current="page"' : ""}>${i + 1}</button>`);
+  return `<div class="pager">${b("« 처음", 0, page <= 0)}${b("‹ 이전", page - 1, page <= 0)}${nums.join("")}${b("다음 ›", page + 1, page >= pages - 1)}${b("마지막 »", pages - 1, page >= pages - 1)}<span class="mute">${nf(total)}건 · ${page + 1}/${pages}쪽</span><label class="mute" style="margin-left:auto">쪽당 <select onchange="H.${act}size(this.value)">${[10, 25, 50, 100].map(n => `<option ${n === size ? "selected" : ""}>${n}</option>`).join("")}</select>건</label></div>`;
 }
 function resBox(ex) {
   if (!ex) return ""; const r = ex.result || ex; const e = r.error;
@@ -781,7 +828,7 @@ const V = {
   async usage() {
     if (ME.role !== "admin") return `<div class="empty"><h2>admin(수퍼유저) 전용 화면입니다</h2><p>접속·사용 기록은 admin 계정으로 로그인한 경우에만 볼 수 있습니다.</p></div>`;
     usageWatch();
-    const [d, ev, pl] = await Promise.all([api(`/api/usage/summary?days=${USG.days}`), api(`/api/usage/events?limit=25&offset=${USG.page * 25}&kind=${encodeURIComponent(USG.kind)}&q=${encodeURIComponent(USG.q)}`), api("/api/usage/pulse")]);
+    const [d, ev, pl, us] = await Promise.all([api(`/api/usage/summary?days=${USG.days}`), api(`/api/usage/events?limit=${USG.size}&offset=${USG.page * USG.size}&kind=${encodeURIComponent(USG.kind)}&q=${encodeURIComponent(USG.q)}&days=${USG.days}`), api("/api/usage/pulse"), api(`/api/usage/users?days=${USG.days}&q=${encodeURIComponent(USG.uq)}&offset=${USG.upage * USG.usize}&limit=${USG.usize}`)]);
     USG.fp = pl.fp; USG.at = Date.now();
     const k = d.kpi, p = d.prev, dates = d.daily.map(r => r.date);
     const okc = d.daily.map(r => r.cmds - r.cmd_fail), failc = d.daily.map(r => r.cmd_fail);
@@ -789,7 +836,6 @@ const V = {
     const cmdOk = d.cmds.reduce((a, r) => a + r[1], 0), cmdBad = d.cmds.reduce((a, r) => a + r[2], 0);
     const vlabel = v => (NAV.flatMap(g => g[1]).find(n => n[0] === v) || [v, v])[1].replace(/^UI-\d+b?\s*/, "");
     const kindOpts = [["", "전체"], ...Object.entries(d.kinds)].map(([v, l]) => `<option value="${v}" ${USG.kind === v ? "selected" : ""}>${esc(l)}</option>`).join("");
-    const pages = Math.max(1, Math.ceil(ev.total / 25));
     return `<h2>접속·사용 기록 <span class="mute" style="font-size:12px">admin 전용</span></h2>
     <div class="sub">웹 서버에 접속한 사용자의 로그인·화면 이동·명령 실행·오류·세션·피드백·다운로드 기록입니다. 이름·역할·화면/명령 종류·결과만 기록하고 <b>접근 코드, SQL·입력 본문, 피드백 내용은 저장하지 않으며</b> IP는 일부만 저장합니다. 최대 ${d.retention_days}일 보관 후 자동 삭제됩니다. 단독 설치형 앱 안의 사용은 사용자 PC에만 있어 포함되지 않습니다(다운로드·업데이트 요청만 기록).</div>
     <div class="vfilters"><span class="mute">기간</span>${[7, 30, 90].map(n => `<button class="${USG.days === n ? "primary" : ""}" data-a="usagedays" data-n="${n}">최근 ${n}일</button>`).join("")}<button data-a="usagerefresh" title="최신 기록으로 다시 불러오기">↻ 새로고침</button><label class="mute"><input type="checkbox" id="usauto" ${USG.auto ? "checked" : ""} onchange="USG.auto=this.checked"> 자동 갱신(새 기록이 있을 때만, 30초마다 확인)</label><span class="mute" style="margin-left:auto">집계 ${esc(d.generated)} (KST) · 이벤트 ${nf(d.total_events)}건 · 마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")}</span></div>
@@ -805,17 +851,19 @@ const V = {
     <div class="card vc"><b>앱 다운로드</b>${segBar(Object.entries(d.downloads).map(([r, n]) => [DLL[r] || r, n]))}</div></div>
     <div class="vgrid2"><div class="card vc"><b>AI 지원 질문 종류</b><div class="sub">질문 내용은 저장하지 않고 분류만 기록</div>${hbars(d.chat)}</div>
     <div class="card vc"><b>API 오류 코드</b><div class="sub">서버가 거절·실패로 응답한 요청(인증 만료 제외)</div>${hbars(d.errors, { color: "var(--vbad)" })}${d.login_fail_ips.length ? `<div class="sub" style="margin-top:8px">로그인 실패 많은 IP(일부 마스킹): ${d.login_fail_ips.map(([ip, n]) => `${esc(ip)} ${n}회`).join(" · ")}</div>` : ""}</div></div>
-    <div class="card"><b>활동이 많은 사용자</b> <span class="mute">이름 기준 상위 15명</span>${table(["이름", "역할", "이벤트", "로그인", "명령", "최근", "단말"], d.top_users.map(u => [u.name, ROLEL[u.role] || u.role, u.events, u.logins, u.cmds, u.last, CLIL[u.client] || u.client || "-"]), true)}</div>
+    <div class="card"><b>사용자별 활동</b> <span class="mute">이름 기준 · 이벤트 많은 순 · 최근 ${USG.days}일</span>
+      <div class="vfilters"><input id="usuq" value="${esc(USG.uq)}" placeholder="이름·역할 검색" style="width:220px" onkeydown="if(event.key==='Enter')H.usersearch()"><button data-a="usersearch">검색</button>${USG.uq ? `<button class="ghost" data-a="usersearchclear">검색 지우기</button>` : ""}</div>
+      ${table(["이름", "역할", "이벤트", "로그인", "명령", "명령 실패", "최근", "단말"], us.items.map(u => [u.name, ROLEL[u.role] || u.role, u.events, u.logins, u.cmds, u.cmd_fail, u.last, CLIL[u.client] || u.client || "-"]), true)}${pagerHtml(us.total, USG.upage, USG.usize, "userpage")}</div>
     <div class="card"><b>최근 기록</b>
-      <div class="vfilters"><select id="uskind" data-a="usagefilter">${kindOpts}</select><input id="usq" value="${esc(USG.q)}" placeholder="이름·내용·IP 검색" style="width:200px" onkeydown="if(event.key==='Enter')H.usagefilter()"><button data-a="usagefilter">검색</button><span class="mute" style="margin-left:auto">${nf(ev.total)}건 · ${USG.page + 1}/${pages}쪽</span></div>
+      <div class="vfilters"><select id="uskind" onchange="H.usagefilter()">${kindOpts}</select><input id="usq" value="${esc(USG.q)}" placeholder="이름·내용·IP 검색" style="width:200px" onkeydown="if(event.key==='Enter')H.usagefilter()"><button data-a="usagefilter">검색</button>${USG.q || USG.kind ? `<button class="ghost" data-a="usageclear">조건 지우기</button>` : ""}<span class="mute" style="margin-left:auto">최근 ${USG.days}일 · 조건에 맞는 ${nf(ev.total)}건</span></div>
       ${table(["시각(KST)", "종류", "이름", "역할", "내용", "단말", "IP"], ev.items.map(e => [e.time, e.kind_label, e.name || "-", ROLEL[e.role] || e.role || "-", Object.entries(e.detail).map(([a, b]) => `${a}=${b}`).join(" · "), CLIL[e.client] || "-", e.ip || "-"]), true)}
-      <div style="margin-top:8px;display:flex;gap:6px"><button class="ghost" data-a="usagepage" data-d="-1" ${USG.page <= 0 ? "disabled" : ""}>이전</button><button class="ghost" data-a="usagepage" data-d="1" ${USG.page + 1 >= pages ? "disabled" : ""}>다음</button></div></div>`;
+      ${pagerHtml(ev.total, USG.page, USG.size, "usagepage")}</div>`;
   },
   async fbq() {
     if (ME.role !== "admin") return `<div class="empty"><h2>admin(수퍼유저) 전용 화면입니다</h2><p>피드백 관리와 개발큐는 admin 계정으로 로그인한 경우에만 사용할 수 있습니다.</p></div>`;
-    const d = await api("/api/feedback/admin" + (FBQ.status ? "?status=" + FBQ.status : ""));
+    const d = await api(`/api/feedback/admin?status=${FBQ.status}&q=${encodeURIComponent(FBQ.q)}&page=${FBQ.page}&size=${FBQ.size}`); FBQ.page = d.page; FBQ.ids = d.ids;
     const chips = [["", "전체", Object.values(d.counts).reduce((a, b) => a + b, 0)], ...Object.entries(d.status_labels).map(([k, l]) => [k, l, d.counts[k] || 0])].map(([k, l, n]) => `<button class="${FBQ.status === k ? "primary" : ""}" data-a="fbfilter" data-s="${k}">${esc(l)} ${n}</button>`).join(" ");
-    const rows = d.items.map(f => `<tr><td>${esc(f.id)}</td><td>${esc(f.kind_label)}</td><td>${esc(f.title)}</td><td>${esc(f.view)}</td><td>${esc(f.submitted_by_name)}</td><td>${esc(f.created.slice(0, 10))}</td><td>${esc(f.priority || "")}</td><td>${fbBadge(f.status)}</td><td><button data-a="fbopen" data-id="${esc(f.id)}">열기</button></td></tr>`).join("");
+    const rows = d.items.map(f => `<tr><td><input type="checkbox" class="fbchk" data-id="${esc(f.id)}" ${FBQ.checked.has(f.id) ? "checked" : ""} aria-label="${esc(f.id)} 선택"></td><td>${esc(f.id)}</td><td>${esc(f.kind_label)}</td><td>${esc(f.title)}</td><td>${esc(f.view)}</td><td>${esc(f.submitted_by_name)}</td><td>${esc(fmtIso(f.created))}</td><td>${esc(f.priority || "")}</td><td>${fbBadge(f.status)}</td><td><button data-a="fbopen" data-id="${esc(f.id)}">열기</button></td></tr>`).join("");
     let det = "";
     if (FBQ.sel) {
       try {
@@ -823,19 +871,23 @@ const V = {
         const imgs = await Promise.all(f.images.map(async im => { const r = await fetch(`/api/feedback/${f.id}/image/${im.n}`, { headers: { Authorization: "Bearer " + TOKEN } }); return r.ok ? URL.createObjectURL(await r.blob()) : "" }));
         const nxt = d.flow[f.status] || [];
         det = `<div class="card"><div style="display:flex;justify-content:space-between"><b>${esc(f.id)} · ${esc(f.title)}</b><button class="ghost" data-a="fbclose">닫기</button></div>
-          <div class="sub">${esc(f.kind_label)} · ${fbBadge(f.status)} · 제출 ${esc(f.submitted_by_name)} (${esc(f.role)}) · ${esc(f.created)}<br>화면 <code>${esc(f.view)}</code> · ${esc(f.context.view_label || "")} · v${esc(f.context.version || "")} · 빌드 ${esc(f.context.build || "")} · ${esc(f.context.client || "")} · ${esc(f.context.viewport || "")}</div>
+          <div class="sub">${esc(f.kind_label)} · ${fbBadge(f.status)} · 제출 ${esc(f.submitted_by_name)} (${esc(f.role)}) · 접수 ${esc(fmtIso(f.created))}${f.edited_at ? " · 수정 " + esc(fmtIso(f.edited_at)) : ""}<br>화면 <code>${esc(f.view)}</code> · ${esc(f.context.view_label || "")} · v${esc(f.context.version || "")} · 빌드 ${esc(f.context.build || "")} · ${esc(f.context.client || "")} · ${esc(f.context.viewport || "")}</div>
           <pre style="white-space:pre-wrap">${esc(f.text)}</pre>
           ${f.domain ? `<div class="sub"><b>도메인 신청</b>: ${esc(f.domain.domain)} · 목적 ${esc(f.domain.purpose)} · 데이터 ${esc(f.domain.data)} · 문제 ${esc(f.domain.issues)} · 시기 ${esc(f.domain.when)}</div>` : ""}
           <div class="fbthumbs">${imgs.map(u => u ? `<a href="${u}" target="_blank" rel="noopener"><img src="${u}" alt="첨부" style="max-width:220px;max-height:160px"></a>` : "").join("")}</div>
-          <div class="sub"><b>이력</b>: ${f.history.map(h => `${esc(FB_LBL[h.to])}(${esc(h.at.slice(5, 16).replace("T", " "))}${h.note ? " · " + esc(h.note) : ""})`).join(" → ")}</div>
+          <div class="sub"><b>이력</b>: ${f.history.map(h => `${esc(FB_LBL[h.to])}(${esc(fmtIso(h.at))}${h.note ? " · " + esc(h.note) : ""})`).join(" → ")}</div>
           ${nxt.length ? `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:end"><div><label>우선순위</label><select id="fbprio"><option>P1</option><option selected>P2</option><option>P3</option></select></div><div><label>반영 버전 <small>(반영완료 시)</small></label><input id="fbrel" value="${esc(SYS.version)}" style="width:90px"></div><div style="flex:1;min-width:200px"><label>메모·사유 <small>(반려/보류는 필수 · 제출자에게 표시)</small></label><input id="fbnote" maxlength="500"></div></div>
             <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${nxt.map(t => `<button class="${t === "REJECTED" ? "" : "primary"}" data-a="fbmove" data-to="${t}">→ ${esc(d.status_labels[t])}</button>`).join("")}</div>` : `<div class="mute">종결된 항목입니다.</div>`}
+          ${FBQ.edit ? `<div class="card" style="margin-top:8px"><b>피드백 수정</b> <span class="mute">(수정 이력이 남고, 개발큐·개발중이면 개발 지시서가 다시 만들어집니다)</span><label>제목</label><input id="fbet" value="${esc(f.title)}" maxlength="120"><label>내용</label><textarea id="fbex" rows="5" maxlength="4000">${esc(f.text)}</textarea><div class="row" style="gap:8px;align-items:end"><div><label>유형</label><select id="fbek" ${f.kind === "DOMAIN_REQUEST" ? "disabled" : ""}>${Object.entries(f.kind === "DOMAIN_REQUEST" ? { DOMAIN_REQUEST: "전이 도메인 신청" } : FB_KINDS).map(([k, l]) => `<option value="${k}" ${f.kind === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div><div><label>우선순위</label><select id="fbep">${["", "P1", "P2", "P3"].map(x => `<option value="${x}" ${(f.priority || "") === x ? "selected" : ""}>${x || "(없음)"}</option>`).join("")}</select></div></div><div style="margin-top:8px"><button class="primary" data-a="fbsaveedit">수정 저장</button> <button class="ghost" data-a="fbeditoff">취소</button></div></div>` : ""}
+          <div style="margin-top:8px;display:flex;gap:6px"><button data-a="fbediton">수정</button><button class="danger" data-a="fbdelone" data-id="${esc(f.id)}">이 건 삭제</button></div>
           ${f.ticket_md ? `<details ${f.status === "QUEUED" || f.status === "IN_DEV" ? "open" : ""}><summary><b>개발 지시서</b></summary><pre style="white-space:pre-wrap">${esc(f.ticket_md)}</pre></details>` : ""}</div>`;
       } catch (e) { det = err(e) }
     }
     return `<h2>피드백 관리 · 개발큐 <span class="mute" style="font-size:12px">admin 전용</span></h2><div class="sub">AXOS 폐루프: 접수 → 검토·승인 → <b>개발큐</b> → 개발중 → 반영완료. 개발큐로 옮기면 개발 지시서가 자동 생성되며, <b>개발큐.md</b>를 내려받아 개발 입력으로 씁니다.</div>
-      <div style="margin:8px 0;display:flex;gap:6px;flex-wrap:wrap">${chips} <span style="flex:1"></span><button data-a="fbqueue">개발큐.md 다운로드</button></div>${det}
-      <div class="tw"><table><tr>${["번호", "유형", "제목", "화면", "제출자", "일자", "우선", "상태", ""].map(c => `<th>${c}</th>`).join("")}</tr>${rows || `<tr><td colspan="9" class="mute">(없음)</td></tr>`}</table></div>`;
+      <div style="margin:8px 0;display:flex;gap:6px;flex-wrap:wrap">${chips} <span style="flex:1"></span><button data-a="fbqueue">개발큐.md 다운로드</button></div>
+      <div class="vfilters"><input id="fbqq" value="${esc(FBQ.q)}" placeholder="번호·제목·내용·제출자·유형·화면·우선순위 검색" style="width:340px" onkeydown="if(event.key==='Enter')H.fbsearch()"><button data-a="fbsearch">검색</button>${FBQ.q ? `<button class="ghost" data-a="fbsearchclear">검색 지우기</button>` : ""}<span class="mute">${FBQ.q || FBQ.status ? `조건에 맞는 ${nf(d.total)}건` : `전체 ${nf(d.total)}건`}</span></div>
+      <div class="fbbar"><button data-a="fbselall">이 쪽 전체 선택/해제</button><button data-a="fbselresult" title="검색·상태 조건에 맞는 모든 건(최대 500건)을 선택">조건에 맞는 ${nf(Math.min(d.total, 500))}건 모두 선택</button><span class="mute">선택 <b>${FBQ.checked.size}</b>건(다른 쪽 포함)</span><select id="fbbto"><option value="">상태 변경…</option>${Object.entries(d.status_labels).map(([k, l]) => `<option value="${k}">→ ${esc(l)}</option>`).join("")}</select><input id="fbbnote" placeholder="사유·메모(반려/보류 필수)" style="width:200px"><input id="fbbrel" placeholder="반영 버전(반영완료 시)" value="${esc(SYS.version)}" style="width:130px"><button data-a="fbbulk">선택 일괄 변경</button><button class="danger" data-a="fbdel">선택 삭제</button></div>${det}
+      <div class="tw"><table><tr>${["", "번호", "유형", "제목", "화면", "제출자", "접수 일시", "우선", "상태", ""].map(c => `<th>${c}</th>`).join("")}</tr>${rows || `<tr><td colspan="10" class="mute">(없음)</td></tr>`}</table></div>${pagerHtml(d.total, d.page, d.size, "fbpage")}`;
   },
   async ko() {
     const k = await api("/api/ko-guide");

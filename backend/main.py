@@ -1165,14 +1165,39 @@ def fb_seen(authorization: Optional[str] = Header(None)):
 
 
 @app.get("/api/feedback/admin")
-def fb_admin(status: str = "", authorization: Optional[str] = Header(None)):
-    return feedback.admin_list(A(authorization), status)
+def fb_admin(status: str = "", q: str = "", page: int = 0, size: int = 25, authorization: Optional[str] = Header(None)):
+    return feedback.admin_list(A(authorization), status, q, page, size)
 
 
 @app.get("/api/feedback/queue.md")
 def fb_queue(authorization: Optional[str] = Header(None)):
     from fastapi.responses import Response
     return Response(feedback.queue_md(A(authorization)), media_type="text/markdown; charset=utf-8", headers={"Content-Disposition": "attachment; filename*=UTF-8''%EA%B0%9C%EB%B0%9C%ED%81%90.md"})
+
+
+@app.post("/api/feedback/delete")
+def fb_delete(b: Free, request: Request, authorization: Optional[str] = Header(None)):
+    a = A(authorization)
+    r = feedback.delete(a, b.model_dump().get("ids") or [])
+    usage.log("feedback_admin", a, request, action="delete", count=len(r["deleted"]))
+    return r
+
+
+@app.post("/api/feedback/bulk")
+def fb_bulk(b: Free, request: Request, authorization: Optional[str] = Header(None)):
+    a = A(authorization)
+    d = b.model_dump()
+    r = feedback.bulk_transition(a, d.get("ids") or [], str(d.get("to", "")), d.get("note", ""), d.get("priority"), d.get("released_version"))
+    usage.log("feedback_admin", a, request, action="bulk", to=d.get("to"), ok=len(r["ok"]), failed=len(r["failed"]))
+    return r
+
+
+@app.post("/api/feedback/{fid}/edit")
+def fb_edit(fid: str, b: Free, request: Request, authorization: Optional[str] = Header(None)):
+    a = A(authorization)
+    r = feedback.edit(a, fid, b.model_dump())
+    usage.log("feedback_admin", a, request, action="edit")
+    return r
 
 
 @app.get("/api/feedback/{fid}")
@@ -1219,9 +1244,15 @@ def usage_pulse(authorization: Optional[str] = Header(None)):
 
 
 @app.get("/api/usage/events")
-def usage_events(limit: int = 100, offset: int = 0, kind: str = "", q: str = "", authorization: Optional[str] = Header(None)):
+def usage_events(limit: int = 100, offset: int = 0, kind: str = "", q: str = "", days: int = 0, authorization: Optional[str] = Header(None)):
     staff_only(A(authorization), "admin")
-    return usage.events(limit, offset, kind, q)
+    return usage.events(limit, offset, kind, q, days)
+
+
+@app.get("/api/usage/users")
+def usage_users(days: int = 30, q: str = "", offset: int = 0, limit: int = 15, authorization: Optional[str] = Header(None)):
+    staff_only(A(authorization), "admin")
+    return usage.users(days, q, offset, limit)
 
 
 @app.get("/api/real/status")

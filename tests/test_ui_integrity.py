@@ -61,3 +61,14 @@ def test_journey_shortcuts_point_to_real_views():
     views_in_guide = set(re.findall(r'"view":\s*"([a-z0-9]+)"', src)) | set(re.findall(r'nav\("[^"]*",\s*"([a-z0-9]+)"', src))
     bad = sorted(x for x in views_in_guide if x not in v)
     assert not bad, f"AI 지원 여정이 가리키는 화면이 없음: {bad}"
+
+
+def test_mobile_layout_is_provided():
+    css = ROOT.joinpath("static", "style.css").read_text(encoding="utf-8")
+    html = ROOT.joinpath("static", "index.html").read_text(encoding="utf-8")
+    assert "viewport" in html and "width=device-width" in html
+    assert "@media (max-width:820px)" in css and ".mobbar" in css and ".mnav" in css                 # 모바일 상단 바·전체 메뉴
+    for h in ("mnavopen", "mnavclose", "mnavpick"):
+        assert h in handlers(), h
+    assert "mobileBar()" in APP and "font-size:16px!important" in css                                  # iOS 입력 확대 방지
+    assert 'ls.get("ai") !== "0" && !(typeof matchMedia' in APP                                           # 모바일 첫 화면에서 패널을 열어 두지 않음

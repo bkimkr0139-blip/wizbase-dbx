@@ -72,6 +72,8 @@ def _save_images(fid, images):
 def _brief(f, full=False):
     d = {k: f[k] for k in ("id", "kind", "kind_label", "title", "view", "status", "status_label", "submitted_by_name", "submitted_by", "role", "created", "version", "priority", "released_version", "resolution", "images_n", "unseen_done")}
     d["source"] = f.get("source", "local")
+    if f.get("edited_at"):
+        d["edited_at"] = f["edited_at"]
     if standalone():
         d["remote_state"] = "SENT" if f.get("remote") else "PENDING"
     if full:
@@ -161,14 +163,26 @@ def image(actor, fid, n):
     return _dir() / im["file"], im["ext"]
 
 
-def admin_list(actor, status=""):
+def admin_list(actor, status="", q="", page=0, size=25):
+    """관리 목록: 상태 필터 + 검색(번호·제목·내용·제출자·유형·화면·우선순위) + 쪽 나누기. counts 는 검색과 무관한 전체 상태별 건수."""
     need_admin(actor)
+    size = max(5, min(int(size or 25), 100))
+    q = (q or "").strip().lower()
     L = [f for f in _F().values() if not status or f["status"] == status]
+    if q:
+        def hit(f):
+            hay = " ".join([f["id"], f["title"], f["text"], f["submitted_by_name"], f["kind_label"], f.get("view", ""), f.get("priority") or "", STATUS.get(f["status"], "")]).lower()
+            return q in hay
+        L = [f for f in L if hit(f)]
     L.sort(key=lambda f: f["_t"], reverse=True)
+    total = len(L)
+    pages = max(1, -(-total // size))
+    page = max(0, min(int(page or 0), pages - 1))
     cnt = {}
     for f in _F().values():
         cnt[f["status"]] = cnt.get(f["status"], 0) + 1
-    return {"items": [_brief(f) for f in L], "counts": cnt, "flow": FLOW, "status_labels": STATUS}
+    return {"items": [_brief(f) for f in L[page * size:(page + 1) * size]], "counts": cnt, "flow": FLOW, "status_labels": STATUS, "total": total, "page": page, "size": size, "pages": pages,
+            "ids": [f["id"] for f in L[:500]]}
 
 
 def _ticket(f):
@@ -212,6 +226,81 @@ def transition(actor, fid, to, note="", priority=None, released_version=None):
     v11.audit(actor, "FEEDBACK_" + to, fid, detail={"note": note})
     v11.save()
     return _brief(f, full=True)
+
+
+def delete(actor, ids):
+    """선택한 피드백(첨부 이미지 포함)을 영구 삭제한다. 되돌릴 수 없으며 감사 기록만 남는다."""
+    need_admin(actor)
+    done, missing = [], []
+    for fid in dict.fromkeys(list(ids or [])[:100]):
+        f = _F().pop(fid, None)
+        if not f:
+            missing.append(fid)
+            continue
+        for im in f.get("images", []):
+            try:
+                (_dir() / im["file"]).unlink()
+            except OSError:
+                pass
+        v11.audit(actor, "FEEDBACK_DELETE", fid, detail={"title": f["title"][:40], "status": f["status"], "by": f["submitted_by_name"]})
+        done.append(fid)
+    if done:
+        v11.save()
+    return {"deleted": done, "missing": missing}
+
+
+def edit(actor, fid, b):
+    """관리자 수정: 제목·내용·유형·우선순위. 수정 이력이 남고 개발큐/개발중이면 개발 지시서가 다시 만들어진다."""
+    need_admin(actor)
+    f = _get(fid)
+    ch = []
+    if "title" in b:
+        t = str(b["title"]).strip()[:120]
+        if not t:
+            raise ApiError(400, "EMPTY_FEEDBACK", "제목을 입력하세요.")
+        if t != f["title"]:
+            ch.append("제목")
+            f["title"] = t
+    if "text" in b:
+        t = str(b["text"]).strip()[:MAX_TEXT]
+        if len(t) < 5:
+            raise ApiError(400, "EMPTY_FEEDBACK", "내용은 5자 이상이어야 합니다.")
+        if t != f["text"]:
+            ch.append("내용")
+            f["text"] = t
+    if "kind" in b and b["kind"] != f["kind"]:
+        k = b["kind"]
+        if k not in KINDS or "DOMAIN_REQUEST" in (k, f["kind"]):
+            raise ApiError(400, "BAD_KIND", "도메인 신청과 다른 유형 사이의 변경은 할 수 없습니다.")
+        f["kind"], f["kind_label"] = k, KINDS[k]
+        ch.append("유형")
+    if "priority" in b and b["priority"] != f.get("priority"):
+        if b["priority"] not in (None, "", "P1", "P2", "P3"):
+            raise ApiError(400, "BAD_PRIORITY", "P1·P2·P3 중에서 고르세요.")
+        f["priority"] = b["priority"] or None
+        ch.append("우선순위")
+    if not ch:
+        return _brief(f, full=True)
+    f["history"].append({"at": v11._iso(), "by": actor["user_id"], "to": f["status"], "note": "관리자 수정: " + ", ".join(ch)})
+    f["edited_at"] = v11._iso()
+    if f["status"] in ("QUEUED", "IN_DEV"):
+        f["ticket_md"] = _ticket(f)
+    v11.audit(actor, "FEEDBACK_EDIT", fid, detail={"changed": ch})
+    v11.save()
+    return _brief(f, full=True)
+
+
+def bulk_transition(actor, ids, to, note="", priority=None, released_version=None):
+    """선택한 여러 건을 같은 상태로 옮긴다. 흐름에 맞지 않는 건은 건너뛰고 이유를 돌려준다."""
+    need_admin(actor)
+    ok, failed = [], []
+    for fid in dict.fromkeys(list(ids or [])[:100]):
+        try:
+            transition(actor, fid, to, note, priority, released_version)
+            ok.append(fid)
+        except ApiError as e:
+            failed.append({"id": fid, "code": e.code, "message": e.message})
+    return {"ok": ok, "failed": failed}
 
 
 def queue_md(actor):

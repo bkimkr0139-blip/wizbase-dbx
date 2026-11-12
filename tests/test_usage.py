@@ -86,3 +86,18 @@ def test_pulse_is_admin_only_cheap_and_summary_cache_refreshes_on_new_events(env
     fp2 = c.get("/api/usage/pulse", headers=env["A"]).json()["fp"]
     assert fp2 != fp1
     assert c.get("/api/usage/summary?days=7", headers=env["A"]).json()["kpi"]["logins"] == k1 + 1   # 캐시가 새 기록을 반영
+
+
+def test_usage_users_and_events_search_pagination(env):
+    c, A = env["c"], env["A"]
+    for i in range(6):
+        login(c, name=f"쪽나누기사용자{i}")
+    u = c.get("/api/usage/users?days=7&q=쪽나누기사용자&limit=5&offset=0", headers=A).json()
+    assert u["total"] >= 6 and len(u["items"]) == 5
+    u2 = c.get("/api/usage/users?days=7&q=쪽나누기사용자&limit=5&offset=5", headers=A).json()
+    assert len(u2["items"]) >= 1 and {x["name"] for x in u["items"]}.isdisjoint({x["name"] for x in u2["items"]})
+    assert all("쪽나누기사용자" in x["name"] for x in u["items"] + u2["items"])
+    e = c.get("/api/usage/events?limit=5&offset=0&days=7&q=쪽나누기사용자", headers=A).json()
+    assert e["total"] >= 6 and len(e["items"]) == 5
+    assert c.get("/api/usage/events?days=1&limit=5", headers=A).json()["total"] <= c.get("/api/usage/events?days=90&limit=5", headers=A).json()["total"]
+    assert c.get("/api/usage/users", headers=env["L"]).status_code == 403

@@ -16,7 +16,7 @@ LOCK = threading.Lock()
 RETENTION_DAYS = 180
 _LAST_PURGE = [0.0]
 KINDS = {"login_ok": "로그인 성공", "login_fail": "로그인 실패", "view": "화면 열기", "cmd": "명령 실행", "session_new": "세션 생성", "session_del": "세션 삭제", "chat": "AI 지원 질문",
-         "feedback": "피드백 제출", "download": "앱 다운로드", "api_error": "API 오류", "real_conn": "실제 연결 설정", "real_sql": "실제 연결 SQL"}
+         "feedback": "피드백 제출", "download": "앱 다운로드", "api_error": "API 오류", "real_conn": "실제 연결 설정", "real_sql": "실제 연결 SQL", "feedback_admin": "피드백 관리(수정·삭제 등)"}
 
 
 def _path():
@@ -220,8 +220,35 @@ def _summary(days: int):
             "login_fail_ips": Counter(e["ip"] for e in fails if e["ip"]).most_common(5), "total_events": len(cur), "kinds": KINDS, "retention_days": RETENTION_DAYS}
 
 
-def events(limit: int = 100, offset: int = 0, kind: str = "", q: str = ""):
-    evs = _read(time.time() - RETENTION_DAYS * 86400)
+def users(days: int = 30, q: str = "", offset: int = 0, limit: int = 15):
+    """사용자(이름 기준)별 활동 전체 목록 — 검색·쪽 나누기."""
+    days = max(1, min(int(days or 30), RETENTION_DAYS))
+    ev = _read(time.time() - days * 86400)
+    agg = {}
+    for e in ev:
+        if not (e["n"] or e["u"]) or e["e"] == "download":
+            continue
+        key = (e["n"] or e["u"]).strip().lower()
+        u = agg.setdefault(key, {"name": e["n"] or e["u"], "role": e["r"], "events": 0, "logins": 0, "cmds": 0, "cmd_fail": 0, "last_t": 0, "client": e["c"]})
+        u["events"] += 1
+        u["logins"] += 1 if e["e"] == "login_ok" else 0
+        if e["e"] == "cmd":
+            u["cmds"] += 1
+            u["cmd_fail"] += 0 if e["d"].get("status") == "ok" else 1
+        if e["t"] >= u["last_t"]:
+            u["last_t"], u["role"], u["client"] = e["t"], e["r"] or u["role"], e["c"] or u["client"]
+    L = sorted(agg.values(), key=lambda u: (-u["events"], u["name"]))
+    q = (q or "").strip().lower()
+    if q:
+        L = [u for u in L if q in u["name"].lower() or q in (u["role"] or "")]
+    total = len(L)
+    limit = max(5, min(int(limit or 15), 100))
+    out = [{**u, "last": datetime.fromtimestamp(u["last_t"], KST).strftime("%Y-%m-%d %H:%M")} for u in L[max(0, int(offset)):max(0, int(offset)) + limit]]
+    return {"total": total, "items": out}
+
+
+def events(limit: int = 100, offset: int = 0, kind: str = "", q: str = "", days: int = 0):
+    evs = _read(time.time() - (min(int(days), RETENTION_DAYS) if days else RETENTION_DAYS) * 86400)
     evs.reverse()
     q = (q or "").strip().lower()
     if kind:
