@@ -9,7 +9,7 @@ from pathlib import Path
 from . import v11
 from .core import ApiError
 
-KINDS = {"FEATURE": "기능 추가 요청", "UI_BUG": "화면 버그", "IMPROVE": "기능 개선", "DBX_MISMATCH": "DBX와 맞지 않는 오류", "CONTENT": "문항·자료 오류", "OTHER": "기타", "DOMAIN_REQUEST": "전이 도메인 신청"}
+KINDS = {"FEATURE": "기능 추가 요청", "UI_BUG": "화면 버그", "IMPROVE": "기능 개선", "DBX_MISMATCH": "DBX와 맞지 않는 오류", "CONTENT": "문항·자료 오류", "OTHER": "기타", "DOMAIN_REQUEST": "전이 도메인 신청", "CONNECT_REQUEST": "실제 환경 연결 신청"}
 STATUS = {"RECEIVED": "접수", "APPROVED": "검토·승인", "QUEUED": "개발큐", "IN_DEV": "개발중", "DONE": "반영완료", "REJECTED": "반려", "ON_HOLD": "보류"}
 FLOW = {"RECEIVED": ["APPROVED", "REJECTED", "ON_HOLD"], "APPROVED": ["QUEUED", "REJECTED", "ON_HOLD"], "QUEUED": ["IN_DEV", "ON_HOLD", "REJECTED"],
         "IN_DEV": ["DONE", "QUEUED"], "ON_HOLD": ["APPROVED", "QUEUED", "REJECTED"], "DONE": [], "REJECTED": []}

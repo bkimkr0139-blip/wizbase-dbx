@@ -73,3 +73,16 @@ def test_ip_masking_and_purge(tmp_path, monkeypatch):
     (tmp_path / "u.jsonl").write_text(json.dumps({"t": old, "e": "login_ok", "u": "x", "n": "old", "r": "learner", "d": {}, "ip": "", "c": ""}) + "\n" + json.dumps({"t": time.time(), "e": "login_ok", "u": "y", "n": "new", "r": "learner", "d": {}, "ip": "", "c": ""}) + "\n", encoding="utf-8")
     assert usage.purge(180) == 1
     assert [e["n"] for e in usage._read(0)] == ["new"]
+
+
+def test_pulse_is_admin_only_cheap_and_summary_cache_refreshes_on_new_events(env):
+    c = env["c"]
+    assert c.get("/api/usage/pulse", headers=env["L"]).status_code == 403
+    fp1 = c.get("/api/usage/pulse", headers=env["A"]).json()["fp"]
+    assert c.get("/api/usage/pulse", headers=env["A"]).json()["fp"] == fp1            # 새 기록이 없으면 같은 값
+    k1 = c.get("/api/usage/summary?days=7", headers=env["A"]).json()["kpi"]["logins"]
+    login(c, name="펄스테스트")                                                       # 새 기록 발생
+    time.sleep(1.1)                                                                   # 수정 시각(초 단위) 변화 보장
+    fp2 = c.get("/api/usage/pulse", headers=env["A"]).json()["fp"]
+    assert fp2 != fp1
+    assert c.get("/api/usage/summary?days=7", headers=env["A"]).json()["kpi"]["logins"] == k1 + 1   # 캐시가 새 기록을 반영

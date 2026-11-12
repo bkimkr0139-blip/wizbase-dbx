@@ -4,11 +4,11 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "
 const J = o => esc(JSON.stringify(o, null, 1));
 const ls = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch { } }, del(k) { try { localStorage.removeItem(k) } catch { } } };
 let TOKEN = ls.get("tok"), ME = null, SID = ls.get("sid"), ST = null, VIEW = ls.get("view") || "env", META = null, LASTLOG = "", PRINCIPAL = "", SIDE = true;
-let AI_SCROLL = "top", AI_KEEP = 0, LASTVIEW = "", PENDING_DEL = [], SYS = null, CLIENT_BUILD = null, RTAB = ls.get("rtab") || "", SYSPOP = "";
+let AI_SCROLL = "top", AI_KEEP = 0, REAL = null, LASTVIEW = "", PENDING_DEL = [], SYS = null, CLIENT_BUILD = null, RTAB = ls.get("rtab") || "", SYSPOP = "";
 const NAV = [
   ["학습 환경", [["env", "UI-01 환경 점검"], ["req", "UI-02 착수·요구·계약"], ["ws", "UI-03 Workspace"], ["cat", "UI-04 Catalog Explorer"], ["sql", "UI-05 SQL Editor"], ["nb", "UI-06 Notebook"], ["comp", "UI-07 Compute/Warehouses"], ["track", "프로젝트 트랙(8주)"], ["demo", "고객 시연 20분"]]],
   ["데이터 구축", [["conn", "UI-08 Connections/수집"], ["pipe", "UI-09 Pipelines"], ["cdc", "UI-09b CDC 재생"], ["jobs", "UI-10 Jobs"], ["genie", "UI-11 의미모델·Genie"], ["agent", "UI-12 Agent·승인"], ["trace", "UI-13 Tracing/평가"], ["bundle", "UI-14 Git/Bundle/CLI"], ["perm", "UI-15 권한·관리"]]],
-  ["운영", [["rvw", "검토 센터"], ["fbq", "피드백·개발큐"], ["usage", "접속·사용 기록"], ["ko", "한국어 가이드"], ["xfer", "전이 시드·협업"], ["inst", "UI-16 강사·수료"], ["evid", "증거 보고서"]]],
+  ["운영", [["rvw", "검토 센터"], ["fbq", "피드백·개발큐"], ["usage", "접속·사용 기록"], ["ko", "한국어 가이드"], ["xfer", "전이 시드·협업"], ["real", "실제 환경 연결"], ["inst", "UI-16 강사·수료"], ["evid", "증거 보고서"]]],
   ["전문과정 v1.1", [["prof", "UI-17 역량·등급"], ["plan", "UI-18 목표·학습계획"], ["map", "UI-19 공식 목표 지도"], ["tutor", "UI-20 AI 튜터"], ["exam", "UI-21 시험센터"], ["lab", "UI-22 실제 실습 증거함"], ["qual", "UI-23 콘텐츠 품질"], ["partner", "UI-24 파트너 인력"], ["conf", "UI-25 자료 충돌"], ["vmx", "UI-26 현장 대조표"]]]
 ];
 
@@ -86,6 +86,7 @@ async function render(soft) {
   const app = $("#app");
   if (!TOKEN) return renderLogin(app);
   if (!ME) { try { ME = await api("/api/me"); META = META || await api("/api/meta") } catch { TOKEN = null; return render() } }
+  if (!viewAllowed(VIEW)) { VIEW = "env"; ls.set("view", VIEW) }          // 역할이 볼 수 없는 화면(예: 이전에 admin이 열어 둔 화면)은 시작 화면으로
   META = META || await api("/api/meta");
   if (!SYS) {
     try {
@@ -104,7 +105,7 @@ async function render(soft) {
   const mode = ST ? ST.session.mode : null;
   const title = (NAV.flatMap(g => g[1]).find(n => n[0] === VIEW) || ["", ""])[1];
   app.className = AI_OPEN ? "ai-open" : "";
-  app.innerHTML = `<header class="top"><div class="brand"><span class="logochip"><img src="/static/logo.png" alt="wizbase"></span><div><span>DBX Project Rehearsal</span></div></div>
+  app.innerHTML = `<header class="top"><div class="brand"><span class="logochip"><img class="logo-l" src="/static/logo.png" alt="wizbase"><img class="logo-d" src="/static/logo-white.png" alt="" aria-hidden="true"></span><div><span>DBX Project Rehearsal</span></div></div>
     <div class="crumb">${esc(title)}</div>
     <div class="chips">${GUIDE ? `<span class="chip" title="전체 진행"><i></i>진행 ${GUIDE.percent}%</span>` : ""}${mode ? `<span class="chip ${mode === "B" ? "ok" : "w"}"><i></i>모드 ${mode} · ${mode === "A" ? "SIMULATED" : "LOCAL_EXECUTED"}</span>` : ""}<span class="chip" title="${esc(META.profile.profile_id)}">${esc(META.profile.cloud.toUpperCase())} · ${esc(META.profile.region)}</span><span class="chip w" title="문서 확인만 완료, 워크스페이스 실측·SA 검토 없음">${esc(META.profile.evidence_status)}</span>${ST ? `<span class="chip" title="실행 신원">${esc(ST.principal.split("@")[0])}</span><span class="chip mono">${esc(ST.clock.slice(0, 16).replace("T", " "))}</span>` : ""}</div>
     <div class="user"><span class="av">${esc(ME.name.slice(0, 1))}</span><div><b>${esc(ME.name)}</b><small>${ME.role === "admin" ? "admin · 수퍼유저" : ME.role}</small></div><button class="ghost" data-a="logout">로그아웃</button></div></header>
@@ -118,7 +119,8 @@ async function render(soft) {
     <aside id="ai" class="${AI_OPEN ? "open" : ""}">${aiHtml()}</aside>
     <div class="log" id="log">${fixBtn()}<span>${esc(LASTLOG) || "실행 로그 · 오류 · 증거 수준이 여기에 표시됩니다."}</span></div>`;
   if (VIEW !== LASTVIEW) { LASTVIEW = VIEW; api("/api/usage/view", { body: { view: VIEW } }).catch(() => { }) }
-  const needSess = !["env", "exam", "prof", "plan", "map", "tutor", "lab", "qual", "partner", "conf", "vmx", "inst", "rvw", "ko", "xfer", "fbq", "usage"].includes(VIEW);
+  if (ME && VIEW === LASTVIEW) ls.set("lv_" + ME.name.toLowerCase(), VIEW);
+  const needSess = !["env", "exam", "prof", "plan", "map", "tutor", "lab", "qual", "partner", "conf", "vmx", "inst", "rvw", "ko", "xfer", "fbq", "usage", "real"].includes(VIEW);
   const main = $("#main");
   if (needSess && !SID) { main.innerHTML = `<div class="empty"><h2>세션이 필요합니다</h2><p>먼저 <a href="#" data-a="nav" data-v="env">환경 점검</a>에서 세션을 시작하세요.</p></div>`; }
   else { try { main.innerHTML = (await (V[VIEW] || V.env)()) + viewFooter(VIEW) } catch (e) { main.innerHTML = err(e) } }
@@ -233,7 +235,7 @@ async function download(path, fallback) {
 }
 /* ------------------------------------------------------------ AXOS 탭 (피드백 폐루프 · 도메인 신청) */
 const FB_FLOW = ["RECEIVED", "APPROVED", "QUEUED", "IN_DEV", "DONE"], FB_LBL = { RECEIVED: "접수", APPROVED: "검토·승인", QUEUED: "개발큐", IN_DEV: "개발중", DONE: "반영완료", REJECTED: "반려", ON_HOLD: "보류" };
-const FB_KINDS = { FEATURE: "기능 추가 요청", UI_BUG: "화면 버그", IMPROVE: "기능 개선", DBX_MISMATCH: "DBX와 맞지 않는 오류", CONTENT: "문항·자료 오류", OTHER: "기타" };
+const FB_KINDS = { CONNECT_REQUEST: "실제 환경 연결 신청", FEATURE: "기능 추가 요청", UI_BUG: "화면 버그", IMPROVE: "기능 개선", DBX_MISMATCH: "DBX와 맞지 않는 오류", CONTENT: "문항·자료 오류", OTHER: "기타" };
 let FBMETA = null, FB = { kind: "UI_BUG", title: "", text: "", images: [] }, DOM = { domain: "", purpose: "", data: "", issues: "", when: "", text: "" }, AXTAB = "fb", MINE = null, FB_UNSEEN = 0, FBQ = { status: "", sel: null };
 const viewLabel = v => { for (const t of (SYS?.menu || [])) { const i = t.items.find(x => x.view === v); if (i) return t.tab + " > " + i.label } return v };
 const fbBadge = s => badge(FB_LBL[s] || s, s === "DONE" ? "ok" : s === "REJECTED" ? "bad" : s === "ON_HOLD" ? "w" : "");
@@ -318,7 +320,7 @@ async function runShortcut(sc) {
   if (sc.type === "ai") { REMEDY_POP = null; SYSPOP = ""; AI_OPEN = true; PANEL = "ai"; AI_TAB = "chat"; ls.set("ai", "1"); ls.set("panel", "ai"); await aiAsk(sc.q); return }
   if (sc.type === "help") { REMEDY_POP = null; SYSPOP = ""; AI_OPEN = true; PANEL = "help"; ls.set("ai", "1"); ls.set("panel", "help"); await render(true); return }
   if (sc.type === "axos") {
-    REMEDY_POP = null; SYSPOP = ""; FB.kind = sc.kind || "OTHER"; if (sc.err) { FB.title = `오류 ${sc.err.code}`; FB.text = `발생 화면: ${viewLabel(VIEW)}\n오류: ${sc.err.code} — ${sc.err.message}\n\n(기대한 동작 / 재현 절차를 적어 주세요)\n` }
+    REMEDY_POP = null; SYSPOP = ""; FB.kind = sc.kind || "OTHER"; if (sc.title) FB.title = sc.title; if (sc.text) FB.text = sc.text; if (sc.err) { FB.title = `오류 ${sc.err.code}`; FB.text = `발생 화면: ${viewLabel(VIEW)}\n오류: ${sc.err.code} — ${sc.err.message}\n\n(기대한 동작 / 재현 절차를 적어 주세요)\n` }
     AXTAB = "fb"; AI_OPEN = true; PANEL = "axos"; ls.set("ai", "1"); ls.set("panel", "axos"); await render(true); return
   }
   if (sc.type === "reload") { location.reload(); return }
@@ -339,7 +341,7 @@ async function aiAsk(q) {
 }
 function renderLogin(app) {
   app.className = "";
-  app.innerHTML = `<div class="loginwrap"><div class="hero"><div class="brand big"><img class="logobig" src="/static/logo.png" alt="wizbase"><div><span>DBX Project Rehearsal</span></div></div><h1>Databricks 현장 PoC,<br>실전 전에 리허설하다.</h1><p>권한·데이터·파이프라인·승인·배포까지 실제 작업 순서대로 훈련하고, 모든 결과를 증거로 남기는 글로벌 AX 프로젝트용 시뮬레이터.</p>
+  app.innerHTML = `<div class="loginwrap"><div class="hero"><div class="brand big"><img class="logobig logo-l" src="/static/logo.png" alt="wizbase"><img class="logobig logo-d" src="/static/logo-white.png" alt="" aria-hidden="true"><div><span>DBX Project Rehearsal</span></div></div><h1>Databricks 현장 PoC,<br>실전 전에 리허설하다.</h1><p>권한·데이터·파이프라인·승인·배포까지 실제 작업 순서대로 훈련하고, 모든 결과를 증거로 남기는 글로벌 AX 프로젝트용 시뮬레이터.</p>
     <ul><li>단계별 AI 지원과 바로가기</li><li>입력에 따라 달라지는 실행 결과 (고정 성공 없음)</li><li>모의·로컬 실행·실제 검증을 구분하는 증거 보고서</li></ul></div>
     <div class="lcard"><h2>로그인</h2><div class="sub">교육 역할과 DBX 권한은 별도 모델입니다.</div><label>이름 <small>(필수 · 실명)</small></label><input id="ln" maxlength="40" placeholder="실명을 입력하세요 (예: 홍길동)" autocomplete="name" onkeydown="if(event.key==='Enter')H.login()"><label>역할</label><select id="lr"><option value="learner">학습자 — 코드 불필요</option><option value="admin">admin — 수퍼유저 (UC 관리자·시스템 문서·피드백 관리)</option><option value="reviewer">리뷰어 / 승인자</option><option value="instructor">강사</option></select><label>접근 코드 <small>(admin·검토자·강사 — 역할별 별도 코드)</small></label><input id="lc" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')H.login()"><button class="primary wide" data-a="login">시작하기</button><div id="lerr" class="bad"></div>
     ${IS_APP ? "" : `<div class="dlbox" id="dlbox"><b>${IS_MACOS ? "Mac" : "Windows"} 설치형 앱 (권장)</b><div class="mute">내 PC에서 단독으로 실행됩니다. 서버가 앱 안에 들어 있어 접속자가 많아도 느려지지 않고, 운영자 PC가 꺼져 있어도 학습할 수 있습니다. 학습 데이터는 내 PC에만 저장됩니다.</div>${IS_MACOS ? `<button class="primary" data-a="appdl" data-k="mac-arm64">Apple Silicon 용 다운로드 (M1 이상)</button> <button data-a="appdl" data-k="mac-x64">Intel Mac 용</button>` : `<button class="primary" data-a="appdl" data-k="standalone">단독 설치형 다운로드 (.exe)</button>`}<div class="mute" id="dlinfo"></div><div class="mute" style="margin-top:8px">${IS_MACOS ? "Windows용은 Windows PC에서 같은 주소로 받으세요. " : "Mac용은 Mac에서 같은 주소로 받으세요. "}설치가 어렵다면 위 로그인으로 웹에서 체험할 수도 있습니다(운영자 PC 상태에 따라 느리거나 접속이 안 될 수 있음).</div></div>`}<div class="fine">WIZBASE 교육 환경 · Databricks 공식 제품·인증·교육과정이 아님 · 합성 데이터 전용</div></div></div>`;
@@ -357,6 +359,19 @@ document.addEventListener("click", async ev => {
 /* ------------------------------------------------------------ handlers */
 window.addEventListener("resize", () => { try { const mb = document.querySelector(".menubar"); if (mb) document.documentElement.style.setProperty("--aitop", Math.round(mb.getBoundingClientRect().bottom) + "px") } catch { } });
 window.H = {
+  async realsave() {
+    try { const r = await api("/api/real/config", { body: { host: val("rh"), warehouse_id: val("rw"), catalog: val("rc"), schema: val("rs"), token: val("rt"), consent: $("#rco")?.checked, confirm_nonprod: $("#rnp")?.checked, write_allowed: $("#rwr")?.checked } }); log("실제 연결 설정을 저장했습니다. [연결 테스트]로 내 계정을 확인하세요."); const t = $("#rt"); if (t) t.value = ""; REAL = r; render(true) }
+    catch (e) { log("실제 연결 저장 ✗ " + e.message, true, e.data); toast(e.message) }
+  },
+  async realtest() { try { await api("/api/real/test", { body: {} }); log("연결 테스트 성공 — 확인된 계정이 맞는지 보세요."); render(true) } catch (e) { log("연결 테스트 ✗ " + e.message, true, e.data); toast(e.message) } },
+  async realclear() { try { await api("/api/real/config", { method: "DELETE" }); LAST.real = null; log("연결 설정과 토큰을 삭제했습니다."); render(true) } catch (e) { log("삭제 ✗ " + e.message, true, e.data) } },
+  async realrun() {
+    LAST.realsql = val("rsql");
+    try { LAST.real = await api("/api/real/sql", { body: { sql: LAST.realsql, confirm: $("#rcf")?.checked } }); log(`실제 SQL 실행 → ${LAST.real.keyword} ${LAST.real.rows.length}행 [${LAST.real.evidence_level}]`) } catch (e) { LAST.real = null; log("실제 SQL ✗ " + e.message, true, e.data); toast(e.message) }
+    render(true)
+  },
+  realgo() { const f = $("#realform"); if (f && f.scrollIntoView) f.scrollIntoView({ behavior: "smooth" }) },
+  usagerefresh() { USG.at = 0; render(true) },
   usagedays(d) { USG.days = +d.n; USG.page = 0; render(true) },
   usagefilter() { USG.kind = val("uskind") || ""; USG.q = val("usq") || ""; USG.page = 0; render(true) },
   usagepage(d) { USG.page = Math.max(0, USG.page + +d.d); render(true) },
@@ -467,7 +482,9 @@ window.H = {
   async login() {
     const nm = (val("ln") || "").trim(), x = $("#lerr");
     if (nm.length < 2 || ["학습자", "관리자", "검토자", "강사"].includes(nm)) { if (x) x.textContent = "실명을 입력하세요 (2자 이상). 세션과 피드백 관리에 이 이름이 표시됩니다."; const i = $("#ln"); if (i) i.focus(); return }
-    const j = await api("/api/auth/login", { body: { name: nm, role: val("lr"), code: val("lc") || null } }); TOKEN = j.token; ls.set("tok", TOKEN); ME = null; ST = null; render()
+    const j = await api("/api/auth/login", { body: { name: nm, role: val("lr"), code: val("lc") || null } }); TOKEN = j.token; ls.set("tok", TOKEN); ME = null; ST = null;
+    VIEW = ls.get("lv_" + nm.toLowerCase()) || "env"; ls.set("view", VIEW);   // 처음 접속은 시작 화면, 다시 접속하면 마지막 작업 화면
+    render()
   },
   logout() { TOKEN = null; ME = null; ST = null; ls.del("tok"); render() },
   side() { SIDE = !SIDE; render(true) },
@@ -573,6 +590,19 @@ const REMEDY = {
   CELL_NOT_FOUND: e => ({ why: "노트북에서 해당 셀을 찾을 수 없습니다.", steps: ["Notebook 화면을 새로 불러와 셀 목록을 확인합니다."], actions: [SCN("Notebook으로", "nb")] }),
   REAL_HOST_BLOCKED: e => ({ why: "이 환경은 실제 외부 호스트 접속을 막습니다(안전을 위한 격리).", steps: ["합성 데이터와 내장 연결만 사용하세요.", "실제 연결이 필요하면 검토자와 별도 환경을 협의합니다."], actions: [SCN("수집 화면으로", "conn")] }),
   PYTHON_ISOLATION_NOT_CONFIGURED: e => ({ why: "Python 코드 실행용 격리 환경이 아직 구성되지 않아 실행하지 않습니다(안전 때문에 차단).", steps: ["SQL 셀로 같은 작업을 해 봅니다.", "Python 실행이 꼭 필요하면 AXOS에서 기능 추가를 요청해 주세요."], actions: [SCN("Notebook(SQL)으로", "nb"), { type: "axos", label: "기능 추가 요청하기 (AXOS)", kind: "FEATURE" }] }),
+  REAL_DISABLED: e => ({ why: "웹에서는 사용자 토큰을 서버가 맡지 않도록 실제 연결을 막아 두었습니다.", steps: ["설치형 앱을 내려받아 설치합니다.", "앱에서 [실제 환경 연결]을 열어 내 워크스페이스를 연결합니다."], actions: [SCN("실제 환경 연결 안내", "real")] }),
+  BAD_HOST: e => ({ why: "Databricks 공식 주소(…azuredatabricks.net, …cloud.databricks.com, …gcp.databricks.com)만 연결할 수 있습니다.", steps: ["워크스페이스 URL에서 https:// 를 뺀 호스트 이름을 입력합니다.", "회사 전용 도메인이면 운영자에게 허용 목록 추가를 요청합니다."], actions: [SCN("연결 설정으로", "real")] }),
+  BAD_WAREHOUSE: e => ({ why: "SQL Warehouse ID 형식이 올바르지 않습니다.", steps: ["워크스페이스 > SQL Warehouses > 사용할 Warehouse > 연결 정보에서 ID를 복사합니다."], actions: [SCN("연결 설정으로", "real")] }),
+  TOKEN_REQUIRED: e => ({ why: "액세스 토큰이 없습니다.", steps: ["워크스페이스 > 사용자 설정 > 개발자 > 액세스 토큰에서 새 토큰을 만듭니다(유효기간 짧게).", "토큰을 입력하고 저장합니다."], actions: [SCN("연결 설정으로", "real")] }),
+  LOOKS_LIKE_PROD: e => ({ why: "운영 환경으로 보이는 이름입니다. 이 도구는 교육용·비운영 환경 전용입니다.", steps: ["정말 비운영 환경이면 '비운영 환경임을 확인했습니다'에 체크하고 저장합니다.", "운영 환경이면 연결하지 마세요."], actions: [SCN("연결 설정으로", "real")] }),
+  CONSENT_REQUIRED: e => ({ why: "교육용·비운영 환경이며 고객 데이터·운영 자격증명이 아님에 동의해야 연결할 수 있습니다.", steps: ["동의 체크박스를 선택하고 다시 저장합니다."], actions: [SCN("연결 설정으로", "real")] }),
+  REAL_HTTP_401: e => ({ why: "토큰이 잘못되었거나 만료되었습니다.", steps: ["워크스페이스에서 새 토큰을 만들고 저장합니다."], actions: [SCN("연결 설정으로", "real")] }),
+  REAL_HTTP_403: e => ({ why: "토큰의 계정이 SQL Warehouse 사용(CAN USE)이나 데이터 접근 권한이 없습니다.", steps: ["워크스페이스 관리자에게 Warehouse CAN USE와 필요한 catalog/schema 권한을 요청합니다."], actions: [SCN("권한 요청 방법 보기", "perm")] }),
+  REAL_HTTP_404: e => ({ why: "주소나 Warehouse ID가 틀렸습니다.", steps: ["워크스페이스 주소와 Warehouse ID를 다시 확인합니다."], actions: [SCN("연결 설정으로", "real")] }),
+  REAL_UNREACHABLE: e => ({ why: "워크스페이스에 닿지 못했습니다(네트워크·VPN·주소).", steps: ["인터넷/VPN 연결을 확인합니다.", "주소 철자를 확인합니다.", "Warehouse가 꺼져 있다면 워크스페이스에서 시작합니다."], actions: [SCN("연결 설정으로", "real")] }),
+  READ_ONLY: e => ({ why: "읽기 전용 연결에서는 SELECT·SHOW·DESCRIBE·EXPLAIN만 실행됩니다.", steps: ["조회 문장으로 바꾸거나, 교육용 환경이라면 연결 설정에서 '쓰기 허용'을 켭니다."], actions: [SCN("연결 설정으로", "real")] }),
+  CONFIRM_REQUIRED: e => ({ why: "되돌릴 수 없거나 권한을 바꾸는 문장입니다.", steps: ["영향 범위를 확인하고, 맞다면 '되돌릴 수 없는 문장 확인'에 체크한 뒤 실행합니다."], actions: [SCN("연결 설정으로", "real")] }),
+  ONE_STATEMENT: e => ({ why: "한 번에 한 문장만 실행할 수 있습니다.", steps: ["세미콜론(;)으로 나뉜 문장을 따로 실행합니다."], actions: [SCN("연결 설정으로", "real")] }),
   REVISION_CONFLICT: e => ({ why: "다른 화면에서 같은 세션이 먼저 바뀌어 충돌했습니다.", steps: ["화면을 새로 불러온 뒤 다시 시도합니다."], actions: [{ type: "reload", label: "화면 새로 고침" }] })
 };
 function remedyOf(err) {
@@ -629,6 +659,7 @@ const prettyBox = (v, rawToo) => `<div class="pbox">${pretty(v)}</div>${rawToo ?
 const EV_NAV = [[/^(SQL|QUERY)/, "sql"], [/^WAREHOUSE/, "comp"], [/^PIPELINE/, "pipe"], [/^(JOB|RUN_|REPAIR)/, "jobs"], [/^(NOTEBOOK|CELL)/, "nb"], [/^(CONN|FOREIGN)/, "conn"], [/^(GRANT|REVOKE|PERMISSION|TICKET|UC_|PRIVILEGE)/, "perm"], [/^(ORDER|AX_|APPROVAL|PROPOSAL|POLICY|PAYLOAD)/, "agent"], [/^GENIE/, "genie"], [/^(BUNDLE|GIT|CLI|DEPLOY)/, "bundle"], [/^CDC/, "cdc"], [/^(TRACE|EVAL)/, "trace"], [/^(EXAM|ATTEMPT)/, "exam"], [/^LAB/, "lab"], [/^(SESSION|ENV|PROFILE)/, "env"], [/^(OBJECTIVE|COVERAGE)/, "map"], [/^(ITEM|QUESTION)/, "qual"]];
 const KIND_NAV = { "Notebook cell": "nb", File: "bundle", Pipeline: "pipe", Job: "jobs", Warehouse: "comp", Connection: "conn", Genie: "genie", Agent: "agent" };
 const STAFF_VIEWS = new Set(["rvw", "vmx", "inst", "partner", "conf"]);
+const viewAllowed = v => !!V[v] && canGo(v);
 const canGo = v => (v === "fbq" || v === "usage") ? ME?.role === "admin" : STAFF_VIEWS.has(v) ? staff() : true;
 const goLink = (v, label, tip) => `<a href="#" class="golink" data-a="nav" data-v="${v}" title="${esc(tip || (viewLabel(v) + " 화면으로 이동"))}">${esc(label)} ›</a>`;
 function autoLink(c) {
@@ -640,7 +671,7 @@ function autoLink(c) {
   if (!v && /^s_[0-9a-f]{8,}$/.test(c)) return `<a href="#" class="golink" data-a="opensess" data-id="${esc(c)}" title="이 세션 열기">${esc(c)} ›</a>`;
   return v && v !== VIEW && canGo(v) ? goLink(v, c) : null;
 }
-const NEXTV = { env: "req", req: "comp", ws: "cat", cat: "sql", sql: "perm", nb: "pipe", comp: "cat", conn: "pipe", pipe: "jobs", cdc: "jobs", jobs: "nb", genie: "agent", agent: "trace", trace: "bundle", bundle: "perm", perm: "sql", track: "demo", demo: "evid", xfer: "prof", prof: "plan", plan: "map", map: "tutor", ko: "tutor", tutor: "exam", exam: "lab", lab: "qual", qual: "partner", partner: "conf", conf: "vmx", vmx: "rvw", rvw: "vmx", fbq: "usage", usage: "evid", inst: "evid", evid: "prof" };
+const NEXTV = { env: "req", req: "comp", ws: "cat", cat: "sql", sql: "perm", nb: "pipe", comp: "cat", conn: "pipe", pipe: "jobs", cdc: "jobs", jobs: "nb", genie: "agent", agent: "trace", trace: "bundle", bundle: "perm", perm: "sql", track: "demo", demo: "evid", xfer: "prof", prof: "plan", plan: "map", map: "tutor", ko: "tutor", tutor: "exam", exam: "lab", lab: "qual", qual: "partner", partner: "conf", conf: "vmx", vmx: "rvw", rvw: "vmx", fbq: "usage", usage: "evid", real: "lab", inst: "evid", evid: "prof" };
 function viewFooter(v) {
   let n = NEXTV[v]; if (n && !canGo(n)) n = ["evid", "prof", "env"].find(x => x !== v && canGo(x));
   const b = [];
@@ -702,7 +733,14 @@ function heatmap(m) {
   document.addEventListener("mouseover", e => { const t = e.target.closest && e.target.closest("[data-tip]"); if (!t) { if (tip) tip.style.display = "none"; return } const d = get(); d.innerHTML = t.getAttribute("data-tip"); d.style.display = "block" });
   document.addEventListener("mousemove", e => { if (tip && tip.style.display === "block") { tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 14) + "px"; tip.style.top = (e.clientY + 16 + tip.offsetHeight > innerHeight ? e.clientY - tip.offsetHeight - 10 : e.clientY + 16) + "px" } });
 })();
-let USG = { days: 30, kind: "", q: "", page: 0 };
+let USG = { days: 30, kind: "", q: "", page: 0, fp: "", at: 0, auto: true, timer: null };
+function usageWatch() {
+  if (USG.timer) return;
+  USG.timer = setInterval(async () => {
+    if (VIEW !== "usage" || document.hidden || !USG.auto || ME?.role !== "admin") return;
+    try { const p = await api("/api/usage/pulse"); if (USG.fp && p.fp !== USG.fp && Date.now() - USG.at > 30000) render(true) } catch { }   // 새 기록이 있을 때만, 최소 30초 간격
+  }, 30000);
+}
 const ROLEL = { learner: "학습자", instructor: "강사", reviewer: "검토자", admin: "admin" }, CLIL = { web: "웹(PC)", mobile: "웹(모바일)", pc_app: "PC 앱", bot: "봇/도구", unknown: "알 수 없음" };
 const DLL = { windows_standalone: "Windows 단독형", windows_shell: "Windows 접속형", pack: "기능 업데이트 팩", mac_arm64: "Mac(Apple Silicon)", mac_x64: "Mac(Intel)" };
 function kpiTile(label, v, prev, o = {}) {
@@ -718,9 +756,33 @@ function resBox(ex) {
 
 /* ------------------------------------------------------------ views */
 const V = {
+  async real() {
+    const st = await api("/api/real/status"); REAL = st;
+    const L = LAST.real, tpl = "[연결 대상] (Databricks 교육용 워크스페이스 / 다른 DB 종류 / 파일·스토리지 중 선택)\n[목적] \n[환경 구분] 비운영(교육·테스트) 환경입니다.\n[필요한 지원] \n※ 비밀번호·토큰·접속 문자열은 절대 적지 마세요.";
+    const path = (n, t, body, act) => `<div class="pcard"><div class="pc-h"><span class="pc-n">${n}</span><b>${t}</b></div><div class="pc-s">${body}</div><div class="pc-a">${act}</div></div>`;
+    const steps = ["연결할 곳은 <b>교육용·테스트(비운영)</b> 환경이어야 합니다. 운영 환경·고객 데이터·운영 자격증명은 연결하지 마세요.", "워크스페이스에 <b>SQL Warehouse</b>를 만들고(서버리스 권장) 시작해 둡니다. Warehouse ID는 SQL Warehouses > 해당 Warehouse > 연결 정보에 있습니다.", "<b>개인 액세스 토큰(PAT)</b>을 만듭니다(사용자 설정 > 개발자 > 액세스 토큰). 유효기간을 짧게(예: 7일) 두고, 읽기만 필요하면 해당 카탈로그에 SELECT 권한만 가진 계정을 쓰세요.", "아래 연결 정보를 입력하고 [저장] → [연결 테스트]에서 <b>내 계정 이름이 맞는지</b> 확인합니다.", "SQL을 실행해 결과를 확인하고, 실습 증거로 쓸 결과는 <b>결과 해시</b>를 실습 증거함에 제출합니다."];
+    const form = !st.enabled ? `<div class="warnbox">웹에서는 보안상 직접 연결을 막아 두었습니다(사용자 토큰을 서버가 맡지 않도록). <b>설치형 앱</b>에서 내 PC에서만 연결할 수 있습니다. <p>${scBtn({ type: "reload", label: "새로고침" })} <button class="primary" data-a="appdl">설치형 앱 다운로드</button></p></div>` : `
+      ${st.configured ? `<div class="okbox"><b>연결 설정 저장됨</b> — ${esc(st.host)} · Warehouse ${esc(st.warehouse_id)}${st.catalog ? " · " + esc(st.catalog) + (st.schema ? "." + esc(st.schema) : "") : ""} · ${st.write_allowed ? "쓰기 허용" : "읽기 전용"}<br>토큰 보호: ${esc(st.protection || "-")}${st.identity ? `<br>확인된 계정: <b>${esc(st.identity.user)}</b> (현재 catalog ${esc(st.identity.catalog || "-")})` : ""}${st.last_test ? `<br>마지막 테스트: ${esc(st.last_test)}` : ""}</div>` : `<div class="mute">아직 저장된 연결이 없습니다.</div>`}
+      <div class="grid2"><div><label>워크스페이스 주소</label><input id="rh" value="${esc(st.host || "")}" placeholder="adb-1234567890.1.azuredatabricks.net 또는 xxx.cloud.databricks.com"></div><div><label>SQL Warehouse ID</label><input id="rw" value="${esc(st.warehouse_id || "")}" placeholder="예: 1a2b3c4d5e6f7a8b"></div>
+        <div><label>기본 catalog <small>(선택)</small></label><input id="rc" value="${esc(st.catalog || "")}"></div><div><label>기본 schema <small>(선택)</small></label><input id="rs" value="${esc(st.schema || "")}"></div></div>
+      <label>액세스 토큰 <small>(이 PC에만 저장 · 화면에는 다시 표시되지 않음)</small></label><input id="rt" type="password" autocomplete="off" placeholder="${st.configured ? "저장됨 — 바꾸려면 새 토큰 입력" : "dapi…"}">
+      <div class="checks"><label><input type="checkbox" id="rco" ${st.configured ? "checked" : ""}> 교육용(비운영) 환경이며 고객 데이터·운영 자격증명이 아님에 동의합니다</label><label><input type="checkbox" id="rnp"> 이름에 'prod' 등이 있어도 비운영 환경임을 확인했습니다</label><label><input type="checkbox" id="rwr" ${st.write_allowed ? "checked" : ""}> 쓰기(INSERT·CREATE 등)를 허용합니다 <small>(기본은 읽기 전용)</small></label></div>
+      <div class="row" style="margin-top:8px"><button class="primary" data-a="realsave">저장</button><button data-a="realtest" ${st.configured ? "" : "disabled"}>연결 테스트</button><button class="danger" data-a="realclear" ${st.configured ? "" : "disabled"}>연결 삭제(토큰 포함)</button></div>
+      ${st.configured ? `<h3>실제 워크스페이스에서 SQL 실행</h3><textarea id="rsql" style="min-height:90px">${esc(LAST.realsql || "SELECT current_user() AS user, current_catalog() AS catalog")}</textarea><div class="row"><button data-a="realrun">실행</button><label class="mute"><input type="checkbox" id="rcf"> 되돌릴 수 없는 문장(DROP·TRUNCATE·GRANT 등) 확인</label></div><div class="sub">한 번에 한 문장 · 최대 ${nf(st.row_limit)}행 · ${st.write_allowed ? "쓰기 허용 상태" : "읽기 전용(SELECT·SHOW·DESCRIBE·EXPLAIN)"}</div>
+        ${L ? `<div class="card">${badge("REAL_WORKSPACE_EXECUTED", "ok")} ${esc(L.keyword)} · ${nf(L.rows.length)}행${L.truncated ? " (잘림)" : ""} · ${nf(L.ms)}ms<div class="mute" style="word-break:break-all">결과 해시 <code>${esc(L.result_sha256)}</code></div>${table(L.columns, L.rows.map(r => r.map(c => c === null ? "NULL" : String(c))), true)}</div>` : ""}` : ""}`;
+    return `<h2>실제 환경 연결</h2><div class="sub">내 교육용 워크스페이스나 테스트 DB에 연결해 실제 결과로 연습하는 방법입니다. 이 앱의 모의 결과와 실제 결과는 증거 수준으로 구분됩니다.</div>
+    <div class="card"><b>연결 방법 3가지</b><div class="pgrid">
+      ${path("A", "내 PC 어댑터로 실습하고 증거 제출", "설치 없이 가능합니다. 내 PC의 어댑터가 내 워크스페이스에서 실습 팩을 실행하고 <b>결과(해시)만</b> 이 앱에 제출합니다. 토큰은 어댑터가 내 PC에서만 씁니다.", scBtn(SCN("실습 증거함으로", "lab")))}
+      ${path("B", "설치형 앱에서 직접 SQL 실행", `앱에서 내 교육용 워크스페이스의 SQL Warehouse에 직접 SQL을 보내 실제 결과를 봅니다. 읽기 전용이 기본이고 토큰은 내 PC에만 저장됩니다. ${st.enabled ? "<b>지금 사용 가능합니다.</b>" : "웹에서는 사용할 수 없습니다."}`, st.enabled ? `<a href="#" class="golink" data-a="realgo">아래 연결 설정으로 이동</a>` : `<button class="primary" data-a="appdl">설치형 앱 다운로드</button>`)}
+      ${path("C", "다른 DB·특수 환경은 연결 신청", "Postgres·Oracle 같은 다른 DB나 회사 보안 정책 때문에 A·B가 어려운 경우, 필요한 연결을 신청하면 운영자가 검토해 지원 방법을 안내합니다(AXOS 개발큐로 접수).", scBtn({ type: "axos", label: "연결 신청하기 (AXOS)", kind: "CONNECT_REQUEST", title: "실제 환경 연결 신청", text: tpl }))}</div></div>
+    <div class="card"><b>준비와 안전 수칙</b><ol class="pul">${steps.map(x => `<li>${x}</li>`).join("")}</ol><div class="sub">토큰·비밀번호를 피드백·채팅·화면 캡처에 남기지 마세요. 연결 정보는 언제든 [연결 삭제]로 지울 수 있고, 토큰은 워크스페이스에서 폐기하면 즉시 무효가 됩니다.</div></div>
+    <div class="card" id="realform"><b>방법 B · 내 워크스페이스 연결 설정</b>${form}</div>`;
+  },
   async usage() {
     if (ME.role !== "admin") return `<div class="empty"><h2>admin(수퍼유저) 전용 화면입니다</h2><p>접속·사용 기록은 admin 계정으로 로그인한 경우에만 볼 수 있습니다.</p></div>`;
-    const [d, ev] = await Promise.all([api(`/api/usage/summary?days=${USG.days}`), api(`/api/usage/events?limit=25&offset=${USG.page * 25}&kind=${encodeURIComponent(USG.kind)}&q=${encodeURIComponent(USG.q)}`)]);
+    usageWatch();
+    const [d, ev, pl] = await Promise.all([api(`/api/usage/summary?days=${USG.days}`), api(`/api/usage/events?limit=25&offset=${USG.page * 25}&kind=${encodeURIComponent(USG.kind)}&q=${encodeURIComponent(USG.q)}`), api("/api/usage/pulse")]);
+    USG.fp = pl.fp; USG.at = Date.now();
     const k = d.kpi, p = d.prev, dates = d.daily.map(r => r.date);
     const okc = d.daily.map(r => r.cmds - r.cmd_fail), failc = d.daily.map(r => r.cmd_fail);
     const hourEntries = d.hourly.map((v, h) => [h, v]);
@@ -730,7 +792,7 @@ const V = {
     const pages = Math.max(1, Math.ceil(ev.total / 25));
     return `<h2>접속·사용 기록 <span class="mute" style="font-size:12px">admin 전용</span></h2>
     <div class="sub">웹 서버에 접속한 사용자의 로그인·화면 이동·명령 실행·오류·세션·피드백·다운로드 기록입니다. 이름·역할·화면/명령 종류·결과만 기록하고 <b>접근 코드, SQL·입력 본문, 피드백 내용은 저장하지 않으며</b> IP는 일부만 저장합니다. 최대 ${d.retention_days}일 보관 후 자동 삭제됩니다. 단독 설치형 앱 안의 사용은 사용자 PC에만 있어 포함되지 않습니다(다운로드·업데이트 요청만 기록).</div>
-    <div class="vfilters"><span class="mute">기간</span>${[7, 30, 90].map(n => `<button class="${USG.days === n ? "primary" : ""}" data-a="usagedays" data-n="${n}">최근 ${n}일</button>`).join("")}<span class="mute" style="margin-left:auto">집계 ${esc(d.generated)} (KST) · 이벤트 ${nf(d.total_events)}건</span></div>
+    <div class="vfilters"><span class="mute">기간</span>${[7, 30, 90].map(n => `<button class="${USG.days === n ? "primary" : ""}" data-a="usagedays" data-n="${n}">최근 ${n}일</button>`).join("")}<button data-a="usagerefresh" title="최신 기록으로 다시 불러오기">↻ 새로고침</button><label class="mute"><input type="checkbox" id="usauto" ${USG.auto ? "checked" : ""} onchange="USG.auto=this.checked"> 자동 갱신(새 기록이 있을 때만, 30초마다 확인)</label><span class="mute" style="margin-left:auto">집계 ${esc(d.generated)} (KST) · 이벤트 ${nf(d.total_events)}건 · 마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")}</span></div>
     <div class="kpis">${kpiTile("로그인", k.logins, p.logins)}${kpiTile("고유 사용자(이름 기준)", k.users, p.users, { unit: "명" })}${kpiTile("명령 실행", k.cmds, p.cmds)}${kpiTile("명령 실패", k.cmd_fail, p.cmd_fail)}${kpiTile("세션 생성", k.sessions, p.sessions)}${kpiTile("화면 열기", k.views, p.views)}${kpiTile("AI 지원 질문", k.chats, p.chats)}${kpiTile("피드백", k.feedback, p.feedback)}${kpiTile("앱 다운로드", k.downloads, p.downloads)}${kpiTile("로그인 실패", k.login_fail, p.login_fail)}</div>
     <div class="vgrid2"><div class="card vc"><b>일별 접속</b><div class="sub">로그인 수와 고유 사용자 수</div>${lineChart(dates, [{ name: "로그인", color: SER[0], values: d.daily.map(r => r.logins) }, { name: "고유 사용자", color: SER[1], values: d.daily.map(r => r.users) }], { label: "일별 로그인과 고유 사용자" })}${tableView(["날짜", "로그인", "고유 사용자"], d.daily.map(r => [r.date, r.logins, r.users]))}</div>
     <div class="card vc"><b>일별 명령 실행</b><div class="sub">성공 / 실패</div>${barChart(dates, [{ name: "성공", icon: "✓", color: "var(--vgood)", values: okc }, { name: "실패", icon: "✕", color: "var(--vbad)", values: failc }], { fmt: x => x.slice(5), label: "일별 명령 실행 성공·실패" })}${tableView(["날짜", "성공", "실패"], d.daily.map((r, i) => [r.date, okc[i], failc[i]]))}</div></div>

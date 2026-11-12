@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from . import core, v11, v11_ext, guide, labs, transfer, ko_guide, sysinfo, feedback
 from . import pack as pack_mod
+from . import real
 from . import usage
 from . import content as C
 from .core import ApiError
@@ -1210,10 +1211,59 @@ def usage_summary(days: int = 30, authorization: Optional[str] = Header(None)):
     return usage.summary(days)
 
 
+@app.get("/api/usage/pulse")
+def usage_pulse(authorization: Optional[str] = Header(None)):
+    """새 기록이 생겼는지만 알려 주는 초경량 호출(화면이 주기적으로 확인한다)."""
+    staff_only(A(authorization), "admin")
+    return {"fp": usage.fingerprint()}
+
+
 @app.get("/api/usage/events")
 def usage_events(limit: int = 100, offset: int = 0, kind: str = "", q: str = "", authorization: Optional[str] = Header(None)):
     staff_only(A(authorization), "admin")
     return usage.events(limit, offset, kind, q)
+
+
+@app.get("/api/real/status")
+def real_status(authorization: Optional[str] = Header(None)):
+    A(authorization)
+    return real.status()
+
+
+@app.post("/api/real/config")
+def real_config(b: Free, request: Request, authorization: Optional[str] = Header(None)):
+    a = A(authorization)
+    r = real.save_config(b.model_dump())
+    usage.log("real_conn", a, request, action="save")                 # 호스트·토큰은 기록하지 않는다
+    return r
+
+
+@app.delete("/api/real/config")
+def real_clear(request: Request, authorization: Optional[str] = Header(None)):
+    a = A(authorization)
+    usage.log("real_conn", a, request, action="clear")
+    return real.clear_config()
+
+
+@app.post("/api/real/test")
+def real_test(request: Request, authorization: Optional[str] = Header(None)):
+    a = A(authorization)
+    r = real.test()
+    usage.log("real_conn", a, request, action="test")
+    return r
+
+
+@app.post("/api/real/sql")
+def real_sql(b: Free, request: Request, authorization: Optional[str] = Header(None)):
+    a = A(authorization)
+    d = b.model_dump()
+    try:
+        r = real.run_sql(str(d.get("sql", "")), bool(d.get("confirm")))
+    except ApiError as e:
+        usage.log("real_sql", a, request, ok=False, code=e.code)
+        raise
+    usage.log("real_sql", a, request, ok=True, kw=r["keyword"], ms=r["ms"])
+    return r
 
 
 @app.get("/")

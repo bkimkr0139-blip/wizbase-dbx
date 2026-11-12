@@ -16,7 +16,7 @@ LOCK = threading.Lock()
 RETENTION_DAYS = 180
 _LAST_PURGE = [0.0]
 KINDS = {"login_ok": "로그인 성공", "login_fail": "로그인 실패", "view": "화면 열기", "cmd": "명령 실행", "session_new": "세션 생성", "session_del": "세션 삭제", "chat": "AI 지원 질문",
-         "feedback": "피드백 제출", "download": "앱 다운로드", "api_error": "API 오류"}
+         "feedback": "피드백 제출", "download": "앱 다운로드", "api_error": "API 오류", "real_conn": "실제 연결 설정", "real_sql": "실제 연결 SQL"}
 
 
 def _path():
@@ -128,8 +128,30 @@ def _kpi(evs):
             "feedback": sum(1 for e in evs if e["e"] == "feedback"), "downloads": sum(1 for e in evs if e["e"] == "download"), "errors": sum(1 for e in evs if e["e"] == "api_error")}
 
 
+def fingerprint() -> str:
+    """기록 파일의 크기·수정 시각만 본다(파일을 읽지 않으므로 매우 가볍다). 값이 같으면 새 기록이 없다."""
+    try:
+        st = _path().stat()
+        return f"{st.st_size}-{int(st.st_mtime)}"
+    except OSError:
+        return "0-0"
+
+
+_SUM_CACHE: dict = {}
+
+
 def summary(days: int = 30):
     days = max(1, min(int(days or 30), RETENTION_DAYS))
+    key = (days, fingerprint())
+    hit = _SUM_CACHE.get(days)
+    if hit and hit[0] == key and time.time() - hit[2] < 300:     # 새 기록이 없고 5분 안이면 이전 집계를 그대로 쓴다
+        return hit[1]
+    out = _summary(days)
+    _SUM_CACHE[days] = (key, out, time.time())
+    return out
+
+
+def _summary(days: int):
     now = time.time()
     since = now - days * 86400
     evs = _read(now - 2 * days * 86400)

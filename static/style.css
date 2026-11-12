@@ -226,3 +226,8 @@ a.golink{color:var(--acc);font-weight:600;text-decoration:none;border-bottom:1px
 .seg{display:flex;gap:2px;height:16px;border-radius:5px;overflow:hidden}.seg span{display:block;min-width:3px}
 .vfilters{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:8px 0}.vtab{margin-top:6px;font-size:12px}.vtab summary{cursor:pointer;color:var(--mute)}
 .vtip{position:fixed;z-index:200;pointer-events:none;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;box-shadow:var(--sh2);padding:6px 10px;font-size:12px;line-height:1.5}
+
+/* ---- 로고: 라이트=검정 글자(흰 칩), 다크=흰 글자 + 어두운 바탕 */
+.logo-d{display:none!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .logo-l{display:none!important}:root:not([data-theme="light"]) .logo-d{display:block!important}:root:not([data-theme="light"]) .logochip{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12)}}
+:root[data-theme="dark"] .logo-l{display:none!important}:root[data-theme="dark"] .logo-d{display:block!important}:root[data-theme="dark"] .logochip{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12)}
