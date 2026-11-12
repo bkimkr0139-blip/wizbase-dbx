@@ -76,7 +76,8 @@ def test_system_info_document_manual_and_menu(env):
     m = c.get("/api/review/manual", headers=env["R"]); assert m.status_code == 200 and "LAB-DE-01" in m.text and "WORKSPACE_CHECKED" in m.text
     u = c.get("/api/system/update-check?build=old", headers=env["L"]).json(); assert u["update_available"]
     assert not c.get(f"/api/system/update-check?build={i['build']}", headers=env["L"]).json()["update_available"]
-    js = pathlib.Path(__file__).resolve().parent.parent.joinpath("static", "app.js").read_text(encoding="utf-8")
+    sd = pathlib.Path(__file__).resolve().parent.parent.joinpath("static")
+    js = "\n".join(f.read_text(encoding="utf-8") for f in [sd.joinpath("app.js"), *sorted(sd.glob("x_*.js"))])       # 확장 화면(x_*.js) 포함
     for t in i["menu"]:                                                                       # 메뉴의 모든 view가 화면 구현을 가진다
         for it in t["items"]:
             assert re.search(r"\b" + it["view"] + r"\(\)", js), it["view"]

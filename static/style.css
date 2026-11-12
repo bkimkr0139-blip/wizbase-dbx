@@ -295,3 +295,16 @@ a.golink{color:var(--acc);font-weight:600;text-decoration:none;border-bottom:1px
 
 .vfilters label{display:inline-flex;gap:6px;align-items:center}
 @media (max-width:820px){.mnh .ghost{color:var(--ink);background:var(--panel);border:1px solid var(--line);min-height:40px;padding:0 14px}}
+
+/* Ctrl+P 통합 검색 · 라이브러리 */
+.qsov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:flex;justify-content:center;align-items:flex-start;padding-top:12vh}
+.qsbox{background:var(--card,#fff);color:inherit;width:min(560px,92vw);border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.35);padding:12px}
+.qsbox input{width:100%;box-sizing:border-box;font-size:16px;padding:8px}
+.qsbox .qsl{max-height:50vh;overflow:auto;margin-top:8px}
+.qsbox .qsi{padding:7px 8px;border-radius:6px;cursor:pointer;display:flex;gap:8px;justify-content:space-between}
+.qsbox .qsi.on,.qsbox .qsi:hover{background:rgba(120,120,120,.18)}
+.qbar{display:flex;align-items:center;gap:8px;margin:4px 0}.qbar>span:first-child{width:130px;flex:none;font-size:13px}
+.qbar i{display:block;height:12px;border-radius:3px;background:#2f6fdb;min-width:2px}.qbar i.bad{background:#c0392b}
+
+#main .vfilters button.ghost{color:var(--ink);border-color:var(--line);background:transparent}
+.qbar>span:first-child{width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

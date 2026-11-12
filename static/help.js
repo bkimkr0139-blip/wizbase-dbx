@@ -13,7 +13,7 @@ const HELP = {
   env: {
     t: "UI-01 환경 점검", step: ["env"],
     overview: "작업을 시작하기 전에 어떤 클라우드·리전·프로필·실행 신원으로 접속했는지, 무엇이 아직 확인되지 않았는지(unknown)를 구분하는 출발 화면입니다. 세션도 여기서 만듭니다.",
-    features: ["세션 시작: 모드(A 완전 모의 / B 로컬 실행)와 학습 모드(안내·실습·실전·시연) 선택", "환경 점검: 프로필·실행 신원·entitlement·미확인 항목 기록", "기능 매니페스트: 기능별 검증 상태(DRAFT/DOC_CHECKED…)와 ‘확인 필요’ 구분", "기준 프로필: 클라우드·리전·버전 분리 표기 (모든 기능 가능하다는 보증 아님)"],
+    features: ["세션 시작: 모드(A 완전 모의 / B 로컬 실행)와 학습 모드(안내·실습·실전·시연) 선택", "환경 점검: 프로필·실행 신원·entitlement·미확인 항목 기록", "기능 매니페스트: 기능별 검증 상태(DRAFT/DOC_CHECKED…)와 ‘확인 필요’ 구분", "프로필 선택: AWS Seoul(웨어하우스 수동 시작) 또는 Free Edition 관찰 프로필(서버리스 자동 시작·웨어하우스 생성 불가·CREATE CATALOG 허용)", "기준 프로필: 클라우드·리전·버전 분리 표기 (모든 기능 가능하다는 보증 아님)"],
     status: () => [noSess() || S_("세션", ST.session.id, "ok"), ST && S_("모드", `${ST.session.mode} · ${ST.session.learning_mode}`), ST && S_("환경 점검", when(ms("env_checked"), "완료", "미실행"), when(ms("env_checked"), "ok", "w")), ST && S_("Warehouse", ST.warehouse.state, ST.warehouse.state === "RUNNING" ? "ok" : "w"), ST && S_("미확인 기능 시험", when(ms("unverified_feature_blocked"), "완료", "미실행"), when(ms("unverified_feature_blocked"), "ok", "w"))],
     todo: () => [["세션 시작", !!ST, N("세션 만들기", "env")], ["환경 점검 실행", ms("env_checked"), C("점검 실행", "env.check", {}, "env")], ["미확인 기능(oracle_cdc) 선택해 ‘확인 필요’ 확인", ms("unverified_feature_blocked"), C("선택해보기", "feature.use", { feature_id: "oracle_cdc" }, "env")], ["Warehouse 시작", ST && ST.warehouse.state === "RUNNING", C("시작", "warehouse", { action: "start" }, "comp")]],
     caution: "모드는 세션 중간에 바꿀 수 없습니다. C 모드(실제 DBX)는 이 배포에서 사용할 수 없습니다."
@@ -36,7 +36,7 @@ const HELP = {
   cat: {
     t: "UI-04 Catalog Explorer", step: [],
     overview: "catalog.schema.table 3단계 구조와 내 권한으로 보이는 범위를 탐색합니다. 테이블 미리보기·컬럼·계보도 확인합니다.",
-    features: ["스키마 잠금 표시: USE SCHEMA/CATALOG 없으면 🔒", "SELECT 불가 테이블 구분 표시", "테이블 선택 시 컬럼·미리보기·계보(lineage)", "강사/관리자는 다른 주체(analyst-b, svc-runner) 시점으로 전환"],
+    features: ["스키마 잠금 표시: USE SCHEMA/CATALOG 없으면 🔒", "SELECT 불가 테이블 구분 표시", "테이블 선택 시 개요·샘플·세부 정보·권한·이력(Delta 버전)·계보(lineage)·인사이트·데이터 품질 8개 탭(시뮬레이션)", "내 카탈로그(CREATE CATALOG)와 그 안의 스키마·테이블·Volume 탐색", "강사/관리자는 다른 주체(analyst-b, svc-runner) 시점으로 전환"],
     status: () => [noSess() || S_("조회 주체", ST.principal.split("@")[0]), ST && S_("silver USE SCHEMA", when(ST.grants.some(g => g[1] === "USE SCHEMA" && g[2].endsWith("silver")) || ST.tickets.some(t => t.status === "APPROVED" && t.privilege === "USE SCHEMA"), "부여됨", "없음(기본)"), when(ST.tickets.some(t => t.status === "APPROVED"), "ok", "w"))],
     todo: () => [["silver 스키마가 잠겨 있는지 확인", false, N("카탈로그 보기", "cat")], ["권한을 받은 뒤 테이블 미리보기", ms("select_ok_silver"), N("권한 요청서", "perm", { t_sec: "schema:food_dev.silver", t_priv: "USE SCHEMA", t_reason: "silver 조회 업무 — USE SCHEMA 최소권한 요청" })]],
     caution: "부모(USE) 권한과 SELECT는 별개입니다."
@@ -44,7 +44,7 @@ const HELP = {
   sql: {
     t: "UI-05 SQL Editor", step: ["perm", "recon"],
     overview: "SQL을 실행하는 화면입니다. 구문 분석 → 지원 범위 → UC 권한 → Warehouse 상태 → 격리 실행 → 감사 순서로 처리되며 결과는 입력에 따라 달라집니다.",
-    features: ["지원: SELECT/JOIN/GROUP BY/CTE/CASE, CREATE SCHEMA/TABLE/VIEW, INSERT, GRANT/REVOKE(관리자)", "미지원 구문은 ‘시뮬레이터 미지원’으로 표시(가짜 성공 없음)", "오류 코드·누락 권한 표시, 실행 이력", "DuckDB 로컬 실행(Spark와 의미가 다를 수 있음)"],
+    features: ["지원: SELECT/JOIN/GROUP BY/CTE/CASE, CREATE SCHEMA/TABLE/VIEW/CATALOG/VOLUME, INSERT/UPDATE/DELETE/MERGE, COPY INTO, GRANT/REVOKE(관리자)", "Delta 이력: DESCRIBE HISTORY · VERSION AS OF · RESTORE(타임 트래블 시뮬레이션)", "Genie Code 패널: 한국어 요청→SQL 생성·오류 디버그·설명(규칙 기반, LLM 아님)", "미지원 구문(SCD2·AI 함수·read_files 등)은 ‘시뮬레이터 미지원’으로 표시(가짜 성공 없음)", "오류 코드·누락 권한 표시, 실행 이력(Query History), 1회 20,000자 제한", "DuckDB 로컬 실행(Spark와 의미가 다를 수 있음)"],
     status: () => [noSess() || S_("Warehouse", ST.warehouse.state, ST.warehouse.state === "RUNNING" ? "ok" : "bad"), ST && S_("실행 신원", ST.principal.split("@")[0]), ST && S_("최근 실행", HIST.sql[0] ? `${HIST.sql[0].s} — ${HIST.sql[0].q.slice(0, 28)}…` : "없음"), ST && S_("gold 재고 뷰", when(ms("view_fixed"), "계약 일치", "계약과 다름(기본)"), when(ms("view_fixed"), "ok", "w"))],
     todo: () => [["Warehouse가 RUNNING인지 확인", ST && ST.warehouse.state === "RUNNING", C("Warehouse 시작", "warehouse", { action: "start" }, "sql")], ["silver 조회 → 권한 오류 확인", ms("sql_perm_denied"), N("SQL 채우기", "sql", { sqlbox: "SELECT * FROM food_dev.silver.orders LIMIT 5" })], ["권한 승인 후 같은 SQL 성공", ms("select_ok_silver"), N("다시 실행", "sql", { sqlbox: "SELECT * FROM food_dev.silver.orders LIMIT 5" })], ["gold 재고 뷰를 계약 산식으로 수정", ms("view_fixed"), N("수정 SQL 채우기", "sql", { sqlbox: "CREATE OR REPLACE VIEW food_dev.gold.v_available_inventory AS\nSELECT product_id, SUM(on_hand_qty - reserved_qty - damaged_qty) AS available_qty\nFROM food_dev.silver.inventory GROUP BY product_id" })]],
     caution: "자기 자신에게 GRANT 하면 금지 이벤트로 기록됩니다. 권한 요청 티켓을 사용하세요."
@@ -57,10 +57,98 @@ const HELP = {
     todo: () => [["셀 실행 후 위 셀을 수정해 STALE 확인", ms("notebook_stale_seen"), N("Notebook", "nb")], ["커널 재시작", ms("notebook_restart"), C("재시작", "notebook", { action: "restart" }, "nb")]],
     caution: "Warehouse가 꺼져 있으면 셀 실행이 실패합니다."
   },
+  adddata: {
+    t: "UI-08b Add data", step: ["conn"],
+    overview: "CSV 파일을 올려 테이블을 만들거나, COPY INTO 방식으로 같은 테이블에 증분 적재합니다. 같은 파일을 다시 적재하면 건너뜁니다(멱등).",
+    features: ["새로 만들기 / 덮어쓰기 / COPY INTO 증분 추가", "열 이름 정리·타입 추론(BIGINT·DOUBLE·DATE·VARCHAR)", "UC 권한 검사(USE SCHEMA + CREATE TABLE, 기존 테이블은 MODIFY)", "적재마다 Delta 버전 이력 기록"],
+    status: () => [noSess() || S_("세션", "활성", "ok")],
+    todo: () => [["샘플 1 → 새로 만들기, 샘플 2 → COPY INTO 증분 추가", false, N("Add data", "adddata")]],
+    caution: "합성 데이터만 사용하세요. 실제 고객 데이터를 올리지 마세요."
+  },
+  vol: {
+    t: "UI-08c Volumes", step: ["conn"],
+    overview: "Unity Catalog Volume 에 CSV 파일을 올려 두고 COPY INTO 로 테이블에 적재합니다. 경로는 /Volumes/catalog/schema/volume/… 입니다. 내가 만든 catalog(CREATE CATALOG)에서도 똑같이 동작합니다.",
+    features: ["CREATE/DROP VOLUME, LIST '/Volumes/…', SHOW VOLUMES IN", "파일 업로드(200KB·volume당 30개) 와 삭제", "COPY INTO … FROM '/Volumes/…' FILEFORMAT = CSV (같은 파일은 건너뜀, force 옵션)", "READ VOLUME / WRITE VOLUME 권한 검사(소유자·관리자 제외)"],
+    status: () => [noSess() || S_("세션", "활성", "ok")],
+    todo: () => [["내 catalog 만들기(CREATE CATALOG) → schema → volume → 파일 업로드 → COPY INTO", false, N("Volumes", "vol")]],
+    caution: "교육용 시뮬레이션입니다(실제 클라우드 저장소·Delta 엔진 아님). 합성 데이터만 올리세요."
+  },
+  dpipe: {
+    t: "UI-09c 선언형 파이프라인", step: ["sql"],
+    overview: "Spark Declarative Pipelines 문법(스트리밍 테이블, 구체화 뷰, expectations, AUTO CDC)을 SQL로 작성해 업데이트를 실행하는 화면입니다.",
+    features: ["스트리밍 테이블·구체화 뷰·expectations·AUTO CDC(SCD1) 시뮬레이션"],
+    status: () => [noSess() || S_("세션", "활성", "ok")],
+    todo: () => [["화면의 예시로 시작해 보기", false, N("선언형 파이프라인", "dpipe")]],
+    caution: "교육용 시뮬레이션입니다. 실제 Databricks 동작과 다를 수 있습니다."
+  },
+  designer: {
+    t: "UI-09d Lakeflow Designer", step: ["sql"],
+    overview: "소스·필터·조인·집계·출력 연산자를 카드로 쌓아 코드 없이 ETL을 만드는 화면입니다(생성된 SQL도 확인).",
+    features: ["코드 없이 연산자 카드로 메달리온 ETL 구성(시뮬레이션)"],
+    status: () => [noSess() || S_("세션", "활성", "ok")],
+    todo: () => [["화면의 예시로 시작해 보기", false, N("Lakeflow Designer", "designer")]],
+    caution: "교육용 시뮬레이션입니다. 실제 Databricks 동작과 다를 수 있습니다."
+  },
+  dash: {
+    t: "UI-05d Dashboards", step: ["sql"],
+    overview: "SQL 데이터셋으로 KPI·막대·선·표 위젯과 필터를 만들고 게시하는 대시보드 화면입니다.",
+    features: ["AI/BI 대시보드: 데이터셋·차트·필터·게시"],
+    status: () => [noSess() || S_("세션", "활성", "ok")],
+    todo: () => [["화면의 예시로 시작해 보기", false, N("Dashboards", "dash")]],
+    caution: "교육용 시뮬레이션입니다. 실제 Databricks 동작과 다를 수 있습니다."
+  },
+  ml: {
+    t: "UI-28 ML·MLflow", step: ["sql"],
+    overview: "UC 테이블로 간단한 모델을 학습하고 MLflow식 실험 추적, 모델 등록(버전·별칭), 특성 테이블을 연습하는 화면입니다.",
+    features: ["실험 추적·모델 학습·UC 모델 레지스트리·특성 테이블"],
+    status: () => [noSess() || S_("세션", "활성", "ok")],
+    todo: () => [["화면의 예시로 시작해 보기", false, N("ML·MLflow", "ml")]],
+    caution: "교육용 시뮬레이션입니다. 실제 Databricks 동작과 다를 수 있습니다."
+  },
+  genai: {
+    t: "UI-29 생성형 AI·RAG", step: ["sql"],
+    overview: "프롬프트를 다듬고, 문서 테이블에 AI Search 인덱스를 만들고, 검색 기반 에이전트를 만들어 추적·평가·배포하는 화면입니다(실제 LLM 아님).",
+    features: ["AI Playground·AI Search 인덱스·RAG 에이전트·평가(시뮬레이션)"],
+    status: () => [noSess() || S_("세션", "활성", "ok")],
+    todo: () => [["화면의 예시로 시작해 보기", false, N("생성형 AI·RAG", "genai")]],
+    caution: "교육용 시뮬레이션입니다. 실제 Databricks 동작과 다를 수 있습니다."
+  },
+  serve: {
+    t: "UI-30 Model Serving", step: ["sql"],
+    overview: "등록한 모델이나 에이전트를 엔드포인트로 배포하고 질의하는 화면입니다(Free Edition처럼 슬롯 2개).",
+    features: ["엔드포인트 생성·질의(모델·에이전트, 무료 슬롯 2개)"],
+    status: () => [noSess() || S_("세션", "활성", "ok")],
+    todo: () => [["화면의 예시로 시작해 보기", false, N("Model Serving", "serve")]],
+    caution: "교육용 시뮬레이션입니다. 실제 Databricks 동작과 다를 수 있습니다."
+  },
+  acad: {
+    t: "UI-07b Academy 학습 경로 대응", step: ["comp"],
+    overview: "Databricks Academy의 4개 역할 경로(데이터 엔지니어·분석가·ML·생성형 AI)와 코스·레슨을 이 시뮬레이터의 연습 화면에 대응시킨 표입니다. 세션 기록으로 해당 실습을 했는지 자동 확인합니다.",
+    features: ["역할별 경로·코스(시간·수준·선수 조건·공개 예정)", "레슨 제목별 대응(직접 연습/일부/미지원/강의)과 이동 버튼", "자동 확인 실습(쿼리 이력·적재·타임 트래블·파이프라인·Job 등)", "개선 후보 우선순위"],
+    status: () => [noSess() || S_("세션", "활성", "ok")],
+    todo: () => [["Academy 대응표에서 연습할 레슨 고르기", false, N("대응표", "acad")]],
+    caution: "레슨 본문은 조회하지 않았으므로 대응은 제목 단위입니다. 실제 코스는 Academy에서 진행하세요."
+  },
+  lib: {
+    t: "UI-05c 라이브러리", step: ["sql"],
+    overview: "실제 Databricks의 Queries·Dashboards·Alerts·Recents·Discover·Marketplace에 해당하는 간이 화면과 학습 배지를 모았습니다. 모두 이 세션의 실제 기록을 바탕으로 합니다.",
+    features: ["Queries: SQL Editor에서 [쿼리 저장]한 쿼리", "Dashboards: 쿼리 성공/실패·구문·소스 현황(막대)", "Alerts: 실패한 쿼리·파이프라인·웨어하우스 상태 규칙", "Recents · Discover(자산 탐색) · Marketplace 안내", "Achievements: 연속 학습일과 배지", "Ctrl+P 통합 검색"],
+    status: () => [noSess() || S_("세션", "활성", "ok")],
+    todo: () => [["SQL Editor에서 쿼리 실행 후 저장", ST && ST.usage_index && ST.usage_index.sql_runs > 0, N("SQL Editor", "sql")]],
+    caution: "저장한 쿼리·즐겨찾기·최근 항목은 이 브라우저에만 저장됩니다."
+  },
+  qh: {
+    t: "UI-05b Query History", step: ["sql"],
+    overview: "이 세션에서 실행한 SQL의 이력입니다. 실패한 쿼리의 오류와 해결 순서를 다시 볼 수 있고, 클릭하면 SQL Editor에 다시 채워 실행할 수 있습니다.",
+    features: ["상태·구문·소스·주체·기간·소요시간·텍스트 필터", "쿼리 펼치기: 전체 SQL, Statement ID, 대상 테이블, 오류 해결 안내", "SQL Editor에서 다시 열기", "실패 쿼리는 서버가 저장한 오류 코드·힌트·누락 권한을 함께 표시"],
+    status: () => [noSess() || S_("세션", "활성", "ok")],
+    todo: () => [["SQL Editor에서 쿼리 실행", ST && ST.usage_index && ST.usage_index.sql_runs > 0, N("SQL Editor", "sql")]],
+    caution: "이력은 세션 안에만 보관되며 최근 300건까지입니다."
+  },
   comp: {
     t: "UI-07 Compute / SQL Warehouses", step: ["env"],
     overview: "SQL Warehouse의 상태와 접근 권한을 관리합니다. UC 권한이 있어도 Warehouse CAN USE/entitlement가 없으면 실행되지 않습니다.",
-    features: ["시작/중지 (시작 후 몇 번의 명령 뒤 RUNNING)", "CAN USE 대상과 내 entitlement 표시", "모의 사용량 지수 (실제 청구액 아님)"],
+    features: ["시작/중지 (시작 후 몇 번의 명령 뒤 RUNNING). Free Edition 프로필은 서버리스 스타터가 SQL 실행 시 자동 시작되고 웨어하우스 생성은 불가", "CAN USE 대상과 내 entitlement 표시", "모의 사용량 지수 (실제 청구액 아님)"],
     status: () => [noSess() || S_("상태", ST.warehouse.state, ST.warehouse.state === "RUNNING" ? "ok" : ST.warehouse.state === "FAILED" ? "bad" : "w"), ST && S_("CAN USE", ST.warehouse.acl.join(", ")), ST && S_("사용량 지수", `${ST.usage_index.sql_runs} SQL`)],
     todo: () => [["Warehouse 시작", ST && ST.warehouse.state === "RUNNING", C("시작", "warehouse", { action: "start" }, "comp")]], caution: "STARTING 상태에서는 SQL이 실패합니다. 다른 명령을 한두 번 실행하면 RUNNING으로 바뀝니다."
   },
@@ -75,7 +163,7 @@ const HELP = {
   pipe: {
     t: "UI-09 Pipelines (Spark Declarative Pipelines on Lakeflow)", step: ["pipe"],
     overview: "Bronze→Silver 변환을 선언적 SELECT로 정의하고 Validate/Run 합니다. 품질 규칙(차단·격리·경고)이 적용되며 실패를 성공으로 숨기지 않습니다.",
-    features: ["소스 SQL 편집 · run_as 지정", "Validate: 구조·권한 검사 (검증 성공 ≠ 실행 성공)", "Run: 품질 결과표. block≈EXPECT…FAIL UPDATE, warn≈EXPECT, drop≈DROP ROW. quarantine은 공식 내장 기능이 아닌 WIZBASE 패턴(별도 격리 테이블)", "실행 이력과 원천 대비 정합성 대조(303행/격리 4건)"],
+    features: ["스트리밍 테이블·구체화 뷰·AUTO CDC는 ‘선언형 파이프라인’(UI-09c), 코드 없는 구성은 ‘Lakeflow Designer’ 화면에서", "소스 SQL 편집 · run_as 지정", "Validate: 구조·권한 검사 (검증 성공 ≠ 실행 성공)", "Run: 품질 결과표. block≈EXPECT…FAIL UPDATE, warn≈EXPECT, drop≈DROP ROW. quarantine은 공식 내장 기능이 아닌 WIZBASE 패턴(별도 격리 테이블)", "실행 이력과 원천 대비 정합성 대조(303행/격리 4건)"],
     status: () => { const p = ST && ST.pipelines.orders_pipeline; return [noSess() || S_("상태", p.state, p.state === "SUCCEEDED" ? "ok" : p.state === "FAILED" ? "bad" : "w"), p && S_("run_as", p.run_as.split("@")[0]), p && S_("품질 차단 확인", when(ms("pipeline_failed_dq"), "완료", "미실행"), when(ms("pipeline_failed_dq"), "ok", "w")), p && S_("정합성 대조", when(ms("pipeline_recon_ok"), "일치", "미일치/미실행"), when(ms("pipeline_recon_ok"), "ok", "w"))] },
     todo: () => [["Validate", ms("pipeline_validated"), C("Validate", "pipeline", { action: "validate" }, "pipe")], ["Run → 중복키 위반으로 FAILED 확인", ms("pipeline_failed_dq"), C("Run", "pipeline", { action: "run" }, "pipe")], ["소스를 최신 1행만 남기도록 수정 후 재실행", ms("pipeline_ok"), N("수정 SQL", "pipe", { plsql: "SELECT order_id, customer_id, CAST(order_date AS DATE) AS order_date, status, CAST(version AS INTEGER) AS version\nFROM food_dev.bronze.raw_orders\nQUALIFY ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY updated_at DESC) = 1" })]],
     caution: "대상 스키마의 USE SCHEMA/CREATE 권한이 run_as에 없으면 실행이 실패합니다."

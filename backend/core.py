@@ -1,7 +1,7 @@
 """WIZBASE DBX Project Rehearsal - state engine (A: SIMULATED / B: LOCAL_EXECUTED).
 Every result is derived from session state; nothing is a canned success."""
 from __future__ import annotations
-import copy, hashlib, json, os, re, shutil, threading, time, uuid
+import copy, hashlib, json, math, os, re, shutil, threading, time, uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -37,6 +37,17 @@ PROFILE = {
     "note": "단일 '2026 버전'이 아닌 분리된 기준 프로필. 이 프로필은 AWS 서울에서 모든 기능이 가능하다는 보증이 아님.",
 }
 
+PROFILE_FREE = {**copy.deepcopy(PROFILE), "profile_id": "databricks-free-edition-observed-20261112", "workspace_kind": "free_edition", "ui_observed_at": "2026-11-12", "evidence_status": "WORKSPACE_OBSERVED",
+                "compute": {"mode": "serverless_only", "dbr_version": "not_applicable", "serverless_environment": "unknown", "sql_warehouse_channel": "unknown", "warehouse_create": False, "auto_start": True},
+                "note": "Databricks Free Edition 워크스페이스 화면을 2026-11-12에 조회(읽기 전용)해 만든 프로필입니다. 서버리스 전용(웨어하우스 생성 비활성), 쿼리 시 자동 시작. "
+                        "실제 Free Edition의 기본 catalog 이름은 workspace 이지만 이 시뮬레이터의 실습 데이터는 food_dev 를 씁니다. 유료(Enterprise) 워크스페이스와 메뉴·기능이 다를 수 있습니다."}
+PROFILES = {PROFILE["profile_id"]: PROFILE, PROFILE_FREE["profile_id"]: PROFILE_FREE}
+
+
+def profile_of(S):
+    return PROFILES.get(S.get("profile_id"), PROFILE)
+
+
 FEATURES = [
     {"feature_id": "unity_catalog", "status": "DOC_CHECKED", "workspace_enabled": "unknown", "ui_path": "Catalog", "url": "https://docs.databricks.com/aws/en/data-governance/unity-catalog/access-control/permissions-concepts", "usable": True, "doc_checked_at": "2026-11-11", "workspace_checked_at": None},
     {"feature_id": "sql_warehouse", "status": "DOC_CHECKED", "workspace_enabled": "unknown", "ui_path": "SQL Warehouses", "url": "https://docs.databricks.com/aws/en/workspace/navigate-workspace", "usable": True, "doc_checked_at": "2026-11-11", "workspace_checked_at": None},
@@ -69,6 +80,15 @@ def nid(S, prefix):
 def lock_for(sid):
     with _glock:
         return _locks.setdefault(sid, threading.RLock())
+
+
+def sql_str(v) -> str:
+    """값을 databricks 방언 SQL 문자열 리터럴로. sqlglot(databricks)은 백슬래시를 이스케이프로 읽으므로 \\ 와 \' 로 이스케이프한다('' 는 이어붙이기로 해석되어 값이 손상됨)."""
+    s = str(v)
+    return "'" + s.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
+MAX_SQL_CHARS = 20000
 
 
 def sha(x) -> str:
@@ -128,7 +148,7 @@ def default_state(sid, owner, lesson_id, mode, learning_mode, seed=seedmod.SEED_
         ["data-engineers", "SELECT", f"schema:{CAT}.silver"], ["data-engineers", "CREATE TABLE", f"schema:{CAT}.silver"],
         ["data-engineers", "MODIFY", f"schema:{CAT}.silver"],
         ["data-engineers", "USE SCHEMA", f"schema:{CAT}.gold"], ["data-engineers", "SELECT", f"schema:{CAT}.gold"],
-        ["data-engineers", "CREATE TABLE", f"schema:{CAT}.gold"], ["data-engineers", "MODIFY", f"schema:{CAT}.gold"],
+        ["data-engineers", "CREATE TABLE", f"schema:{CAT}.gold"], ["data-engineers", "MODIFY", f"schema:{CAT}.gold"], ["data-engineers", "CREATE VOLUME", f"schema:{CAT}.gold"],
         ["analysts", "USE CATALOG", f"catalog:{CAT}"], ["analysts", "USE SCHEMA", f"schema:{CAT}.gold"],
         ["analysts", "SELECT", f"table:{CAT}.gold.v_order_overview"],
     ]
@@ -199,7 +219,7 @@ targets:
 """
 
 
-def create_session(owner, lesson_id="UC-SELECT-01", mode="B", learning_mode="guided", seed=seedmod.SEED_NAME):
+def create_session(owner, lesson_id="UC-SELECT-01", mode="B", learning_mode="guided", seed=seedmod.SEED_NAME, profile_id=None):
     if seed not in seedmod.CASES:
         raise ApiError(400, "UNKNOWN_SEED", "seed: " + ", ".join(seedmod.CASES))
     if mode not in ("A", "B"):
@@ -208,6 +228,11 @@ def create_session(owner, lesson_id="UC-SELECT-01", mode="B", learning_mode="gui
         raise ApiError(400, "BAD_LEARNING_MODE", "learning_mode: guided/practice/real/demo")
     sid = "s_" + uuid.uuid4().hex[:12]
     S = default_state(sid, owner, lesson_id, mode, learning_mode, seed)
+    if profile_id and profile_id in PROFILES:
+        S["profile_id"] = profile_id
+    if S["profile_id"] == PROFILE_FREE["profile_id"]:
+        S["warehouse"].update({"name": "Serverless Starter Warehouse", "type": "serverless", "size": "2X-Small", "auto_start": True, "can_create": False})
+        S["grants"].append(["data-engineers", "CREATE CATALOG", "metastore:main"])         # Free Edition: 코스 전용 catalog 를 만들 수 있음
     with lock_for(sid):
         _fresh_db(sid, seed)
         c = _open_conn(sid)
@@ -259,6 +284,7 @@ def load_all():
             c = _open_conn(S["id"])
             _lockdown(c)
             _conns[S["id"]] = c
+            _thist_invalidate(S)
             SESSIONS[S["id"]] = S
         except Exception as e:  # pragma: no cover
             print("load fail", p, e)
@@ -313,7 +339,7 @@ def is_admin(S, p):
 def sec_chain(sec):
     kind, name = sec.split(":", 1)
     parts = name.split(".")
-    if kind == "table":
+    if kind in ("table", "volume"):
         return [sec, f"schema:{parts[0]}.{parts[1]}", f"catalog:{parts[0]}"]
     if kind == "schema":
         return [sec, f"catalog:{parts[0]}"]
@@ -324,7 +350,7 @@ def has_priv(S, p, priv, sec):
     if is_admin(S, p):
         return True
     chain = sec_chain(sec)
-    if S["owners"].get(sec) == p:
+    if any(S["owners"].get(x) == p for x in chain):      # 상위(schema/catalog) 소유자는 하위 객체에 전권
         return True
     who = expand(S, p)
     for gp, pr, se in S["grants"]:
@@ -384,6 +410,10 @@ def warehouse_cmd(S, actor, payload, principal):
 
 # ---------------------------------------------------------------- SQL engine
 def _ser(v):
+    if isinstance(v, float) and (v != v or v in (float("inf"), float("-inf"))):
+        return None
+    if isinstance(v, timedelta):
+        return str(v)
     if isinstance(v, Decimal):
         return float(v)
     if isinstance(v, (datetime,)):
@@ -393,6 +423,23 @@ def _ser(v):
     if isinstance(v, (bytes, bytearray)):
         return v.hex()
     return v
+
+
+def user_catalogs(S):
+    return S.get("catalogs", {})
+
+
+def _phys(S, cat, db):
+    """(가상 catalog, schema) → DuckDB 물리 (catalog, schema). 사용자 catalog 는 food_dev 안의 'catalog__schema'."""
+    if cat in user_catalogs(S):
+        return CAT, f"{cat}__{db}"
+    return cat, db
+
+
+def _existsS(S, c, kind, parts):
+    """_exists 의 catalog 인식판: parts = [cat, db] | [cat, db, name] (가상 이름)."""
+    pc, pdb = _phys(S, parts[0], parts[1])
+    return _exists(c, kind, [pc, pdb] + list(parts[2:]))
 
 
 def _exists(c, kind, parts):
@@ -418,7 +465,7 @@ def sql_error(code, message, hint=None, **kw):
     return {"code": code, "message": message, "hint": hint, **kw}
 
 
-def run_sql(S, sql, principal, via="sql_editor", system=False, need_warehouse=True, trace=None, actor_id=None):
+def _run_sql(S, sql, principal, via="sql_editor", system=False, need_warehouse=True, trace=None, actor_id=None, swap=None):
     """Parse -> support check -> principal/UC permissions -> warehouse -> isolated compute -> audit."""
     h = sha(sql)
     out = {"status": "failed", "columns": [], "rows": [], "error": None, "sql_hash": h, "evidence_level": "LOCAL_EXECUTED",
@@ -445,6 +492,11 @@ def run_sql(S, sql, principal, via="sql_editor", system=False, need_warehouse=Tr
         if "databricks-sql-access" not in S["principals"].get(principal, {}).get("entitlements", []) and not is_admin(S, principal):
             return fail(sql_error("NO_SQL_ENTITLEMENT", "사용자에게 databricks-sql-access entitlement가 없습니다.", "entitlement와 UC 권한은 별도입니다."))
         ws = wh_state(S)
+        if ws == "STOPPED" and S["warehouse"].get("auto_start"):
+            S["warehouse"]["state"], S["warehouse"]["ready_rev"] = "RUNNING", None
+            ws = "RUNNING"
+            audit(S, actor_id or principal, "WAREHOUSE_AUTOSTART", S["warehouse"]["name"], "succeeded", "SIMULATED", {"reason": "서버리스: 쿼리 시 자동 시작"})
+            out["compat_notes"].append("서버리스 웨어하우스가 쿼리 시 자동으로 시작되었습니다(Free Edition 동작을 본뜬 시뮬레이션).")
         if ws != "RUNNING":
             return fail(sql_error("WAREHOUSE_NOT_RUNNING", f"SQL Warehouse 상태: {ws}. 먼저 Warehouse를 시작하세요.", "Compute/SQL Warehouses 화면에서 시작"))
         if not (set(S["warehouse"]["acl"]) & expand(S, principal)) and not is_admin(S, principal):
@@ -504,9 +556,9 @@ def run_sql(S, sql, principal, via="sql_editor", system=False, need_warehouse=Tr
                 return fail(sql_error("INSUFFICIENT_PERMISSIONS", f"foreign catalog `{cat}` 사용 권한 없음"))
             resolved.append((t, cat, db, name, "foreign"))
             continue
-        if cat != CAT:
+        if cat != CAT and cat not in user_catalogs(S):
             return fail(sql_error("TABLE_OR_VIEW_NOT_FOUND", f"카탈로그 `{cat}`를 찾을 수 없습니다."))
-        if not _exists(c, "table", [cat, db, name]):
+        if not _existsS(S, c, "table", [cat, db, name]):
             return fail(sql_error("TABLE_OR_VIEW_NOT_FOUND", f"`{cat}.{db}.{name}`을(를) 찾을 수 없습니다.", "이름 철자와 schema를 확인하세요."))
         resolved.append((t, cat, db, name, "uc"))
     for t, cat, db, name, src in resolved:
@@ -519,10 +571,16 @@ def run_sql(S, sql, principal, via="sql_editor", system=False, need_warehouse=Tr
                                       "부모 USE 권한과 SELECT는 별개입니다. 전체 관리자 권한 대신 최소권한을 요청하세요.", missing={"privilege": priv, "securable": sec}), "SQL_PERMISSION_DENIED")
     out["tables"] = [f"{cat}.{db}.{name}" for _, cat, db, name, _ in resolved]
 
+    vtarget = vschema = None
     if mode == "create":
         k = st.args.get("kind")
         if k == "SCHEMA":
             cat, db = (target.catalog or CAT), target.db
+            vschema = (cat, db)
+            if cat != CAT and cat not in user_catalogs(S):
+                return fail(sql_error("TABLE_OR_VIEW_NOT_FOUND", f"카탈로그 `{cat}`를 찾을 수 없습니다.", "SHOW CATALOGS 로 확인하거나 CREATE CATALOG 로 만드세요."))
+            if "__" in (db or "") or (db or "").startswith("_"):
+                return fail(sql_error("INVALID_NAME", "schema 이름에는 '__' 를 쓸 수 없습니다."))
             if not has_priv(S, principal, "USE CATALOG", f"catalog:{cat}") or not has_priv(S, principal, "CREATE SCHEMA", f"catalog:{cat}"):
                 return fail(sql_error("INSUFFICIENT_PERMISSIONS", f"CREATE SCHEMA on catalog:{cat} 필요", "전체 관리자 대신 CREATE SCHEMA 최소권한 요청"), "SQL_PERMISSION_DENIED")
         else:
@@ -530,9 +588,12 @@ def run_sql(S, sql, principal, via="sql_editor", system=False, need_warehouse=Tr
             for priv, sec in [("USE CATALOG", f"catalog:{cat}"), ("USE SCHEMA", f"schema:{cat}.{db}"), ("CREATE TABLE", f"schema:{cat}.{db}")]:
                 if not has_priv(S, principal, priv, sec):
                     return fail(sql_error("INSUFFICIENT_PERMISSIONS", f"{principal}: {sec} 에 {priv} 권한 없음", missing={"privilege": priv, "securable": sec}), "SQL_PERMISSION_DENIED")
-            if cat != CAT:
-                return fail(sql_error("SIMULATOR_UNSUPPORTED", "교육 카탈로그에서만 생성할 수 있습니다."))
-            if st.args.get("replace") and _exists(c, "table", [cat, db, name]):
+            if cat != CAT and cat not in user_catalogs(S):
+                return fail(sql_error("SIMULATOR_UNSUPPORTED", "교육 카탈로그 또는 내가 만든 catalog 에서만 생성할 수 있습니다.", "CREATE CATALOG 로 catalog 를 먼저 만드세요."))
+            if not _existsS(S, c, "schema", [cat, db]):
+                return fail(sql_error("SCHEMA_NOT_FOUND", f"schema `{cat}.{db}`이(가) 없습니다.", "CREATE SCHEMA 로 먼저 만드세요."))
+            vtarget = (cat, db, name)
+            if st.args.get("replace") and _existsS(S, c, "table", [cat, db, name]):
                 sec = f"table:{cat}.{db}.{name}"
                 if not (S["owners"].get(sec) == principal or has_priv(S, principal, "MODIFY", sec) or is_admin(S, principal)):
                     return fail(sql_error("INSUFFICIENT_PERMISSIONS", f"{sec} 소유자/MODIFY 권한 필요"))
@@ -540,8 +601,9 @@ def run_sql(S, sql, principal, via="sql_editor", system=False, need_warehouse=Tr
         if not isinstance(target, exp.Table):
             return fail(sql_error("SIMULATOR_UNSUPPORTED", "대상 테이블을 해석할 수 없습니다."))
         cat, db, name = _tbl_parts(target)
-        if cat != CAT or not _exists(c, "table", [cat, db, name]):
+        if (cat != CAT and cat not in user_catalogs(S)) or not _existsS(S, c, "table", [cat, db, name]):
             return fail(sql_error("TABLE_OR_VIEW_NOT_FOUND", f"`{cat}.{db}.{name}`을(를) 찾을 수 없습니다."))
+        vtarget = (cat, db, name)
         for priv, sec in [("USE CATALOG", f"catalog:{cat}"), ("USE SCHEMA", f"schema:{cat}.{db}"), ("MODIFY", f"table:{cat}.{db}.{name}")]:
             if not has_priv(S, principal, priv, sec):
                 return fail(sql_error("INSUFFICIENT_PERMISSIONS", f"{sec} 에 {priv} 권한 없음", missing={"privilege": priv, "securable": sec}), "SQL_PERMISSION_DENIED")
@@ -554,9 +616,26 @@ def run_sql(S, sql, principal, via="sql_editor", system=False, need_warehouse=Tr
                 t.set("catalog", exp.to_identifier(CAT))
                 t.set("db", exp.to_identifier("src_oracle"))
                 t.set("this", exp.to_identifier(fc["table_map"].get(name, name)))
+            elif swap and f"{cat}.{db}.{name}" in swap:
+                t.set("catalog", exp.to_identifier("memory"))
+                t.set("db", exp.to_identifier("main"))
+                t.set("this", exp.to_identifier(swap[f"{cat}.{db}.{name}"]))
+            elif cat in user_catalogs(S):
+                t.set("catalog", exp.to_identifier(CAT))
+                t.set("db", exp.to_identifier(f"{cat}__{db}"))
+        if (vtarget or vschema) and isinstance(target, exp.Table):          # DDL/DML 대상도 물리 이름으로
+            tc = (vschema or vtarget)[0]
+            if tc in user_catalogs(S):
+                target.set("catalog", exp.to_identifier(CAT))
+                target.set("db", exp.to_identifier(f"{tc}__{(vschema or vtarget)[1]}"))
         duck = st.sql(dialect="duckdb")
     except Exception as e:
         return fail(sql_error("TRANSPILE_ERROR", f"변환 실패: {e}"))
+    if mode in ("insert", "dml") and vtarget:
+        try:
+            _hist_ensure(S, c, ".".join(vtarget))
+        except Exception:
+            pass
     timer = threading.Timer(15.0, c.interrupt)
     timer.start()
     try:
@@ -568,13 +647,28 @@ def run_sql(S, sql, principal, via="sql_editor", system=False, need_warehouse=Tr
         else:
             if mode == "create":
                 if st.args.get("kind") == "SCHEMA":
-                    S["owners"][f"schema:{target.catalog or CAT}.{target.db}"] = principal
+                    S["owners"][f"schema:{vschema[0]}.{vschema[1]}"] = principal
                 else:
-                    cat, db, name = _tbl_parts(target)
+                    cat, db, name = vtarget
                     S["owners"][f"table:{cat}.{db}.{name}"] = principal
                     if st.args.get("kind") == "VIEW":
                         S["views_created_by"][f"{cat}.{db}.{name}"] = principal
             out["row_count"] = 0
+            try:
+                if mode in ("insert", "dml") or (mode == "create" and st.args.get("kind") == "TABLE"):
+                    _c1, _d1, _n1 = vtarget
+                    _fq1 = f"{_c1}.{_d1}.{_n1}"
+                    _hop = S.pop("_hop", None) or {}
+                    if mode == "create":
+                        _op = "CREATE OR REPLACE TABLE AS SELECT" if st.args.get("replace") else ("CREATE TABLE AS SELECT" if st.args.get("expression") is not None else "CREATE TABLE")
+                        if not st.args.get("replace"):
+                            _thist(S).pop(_fq1, None)
+                    else:
+                        _op = {"Insert": "WRITE", "Update": "UPDATE", "Delete": "DELETE", "Merge": "MERGE"}.get(kind, kind.upper())
+                    if not _hop.get("skip"):
+                        _hist_add(S, c, _fq1, _hop.get("op") or _op, {"mode": "Append"} if kind == "Insert" else {"statement": kind}, actor_id or principal)
+            except Exception:
+                pass
         out["status"] = "succeeded"
     except Exception as e:
         return fail(sql_error("EXECUTION_ERROR", str(e)[:300]))
@@ -585,8 +679,349 @@ def run_sql(S, sql, principal, via="sql_editor", system=False, need_warehouse=Tr
     return out
 
 
+# ---------------------------------------------------------------- Delta 버전 이력(시뮬레이션) · 타임 트래블 · 쿼리 이력
+_SNAP_MAX = 30
+_RE_DH = re.compile(r"^\s*DESCRIBE\s+HISTORY\s+([\w.`]+)(?:\s+LIMIT\s+(\d+))?\s*;?\s*$", re.I)
+_RE_RESTORE = re.compile(r"^\s*RESTORE\s+(?:TABLE\s+)?([\w.`]+)\s+TO\s+VERSION\s+AS\s+OF\s+(\d+)\s*;?\s*$", re.I)
+_RE_VAO = re.compile(r"([\w.`]+)\s+VERSION\s+AS\s+OF\s+(\d+)", re.I)
+
+
+def _thist(S):
+    return S.setdefault("thist", {})
+
+
+def _thist_invalidate(S):
+    """스냅샷은 메모리 DB(memory.main)에만 있어 세션을 다시 불러오면 사라진다 → '읽기 가능' 표시를 거짓으로 두지 않는다."""
+    for h in (S.get("thist") or {}).values():
+        for x in h:
+            x["snapshot"] = False
+
+
+def hop(S, op=None, skip=False):
+    """다음 run_sql 한 건의 Delta 이력 연산명을 바꾸거나(op) 기록을 건너뛴다(skip). 확장 기능(선언형 파이프라인 등)이 쓴다."""
+    S["_hop"] = {"op": op, "skip": skip}
+
+
+def pfq(S, fq):
+    """UC 3단계 이름(가상) → DuckDB 물리 이름. 사용자가 만든 catalog(S['catalogs'])는 food_dev 안의 'catalog__schema' 스키마로 저장된다."""
+    parts = fq.replace("`", "").split(".")
+    if len(parts) == 3 and parts[0] in S.get("catalogs", {}):
+        return f"{CAT}.{parts[0]}__{parts[1]}.{parts[2]}"
+    return fq
+
+
+def _snap_name(S, fq, v):
+    return f"snap_{hashlib.md5((S['id'] + fq).encode()).hexdigest()[:10]}_v{v}"
+
+
+def _hist_add(S, c, fq, op, params, user, rows=None):
+    h = _thist(S).setdefault(fq, [])
+    v = (h[-1]["version"] + 1) if h else 0
+    ok = True
+    try:
+        c.execute(f'CREATE OR REPLACE TABLE memory.main."{_snap_name(S, fq, v)}" AS SELECT * FROM {pfq(S, fq)}')
+        if rows is None:
+            rows = c.execute(f"SELECT count(*) FROM {pfq(S, fq)}").fetchone()[0]
+    except Exception:
+        ok = False
+    h.append({"version": v, "timestamp": now_utc(), "userName": user, "operation": op, "operationParameters": params, "numOutputRows": rows, "snapshot": ok})
+    if len(h) > 200:
+        del h[:len(h) - 200]
+    if len(h) > _SNAP_MAX:
+        old = h[-_SNAP_MAX - 1]
+        if old.get("snapshot"):
+            try:
+                c.execute(f'DROP TABLE IF EXISTS memory.main."{_snap_name(S, fq, old["version"])}"')
+            except Exception:
+                pass
+            old["snapshot"] = False
+
+
+def _hist_ensure(S, c, fq):
+    if fq not in _thist(S):
+        _hist_add(S, c, fq, "CREATE TABLE AS SELECT", {"origin": "시드 데이터(세션 시작 상태)"}, "system")
+
+
+def _is_view(c, fq, S=None):
+    cat, db, name = fq.split(".")
+    if S is not None:
+        cat, db = _phys(S, cat, db)
+    r = c.execute("select table_type from information_schema.tables where table_catalog=? and table_schema=? and table_name=?", [cat, db, name]).fetchall()
+    return bool(r) and "VIEW" in str(r[0][0])
+
+
+def _special(S, sql, principal, via, need_warehouse, trace, actor_id):
+    """DESCRIBE HISTORY / RESTORE / VERSION AS OF. 처리하면 결과 dict, 해당 없으면 None."""
+    c = _conns[S["id"]]
+    from . import ext_catalog
+    ext = ext_catalog.handle_sql(S, sql, principal, via, need_warehouse, trace, actor_id)
+    if ext is not None:
+        return ext
+    m_dh, m_rs = _RE_DH.match(sql), _RE_RESTORE.match(sql)
+    if m_dh or m_rs:
+        m = m_dh or m_rs
+        tbl = m.group(1).replace("`", "")
+        probe = _run_sql(S, f"SELECT * FROM {tbl} LIMIT 0", principal, via, False, need_warehouse, trace, actor_id)
+        if probe["status"] != "succeeded":
+            return probe
+        fq = probe["tables"][0]
+        if _is_view(c, fq, S):
+            probe.update(status="failed", error=sql_error("UNSUPPORTED_SQL", f"`{fq}`는 뷰입니다. DESCRIBE HISTORY/RESTORE는 Delta 테이블에만 적용됩니다."))
+            return probe
+        _hist_ensure(S, c, fq)
+        h = _thist(S)[fq]
+        if m_dh:
+            n = int(m.group(2)) if m.group(2) else len(h)
+            rows = [[x["version"], x["timestamp"], x["userName"], x["operation"], json.dumps(x["operationParameters"], ensure_ascii=False), x["numOutputRows"]] for x in reversed(h)][:n]
+            probe.update(columns=["version", "timestamp", "userName", "operation", "operationParameters", "numOutputRows"], rows=rows, row_count=len(rows),
+                         compat_notes=["Delta 버전 이력은 시뮬레이션입니다(DuckDB 스냅샷 기반). 공식 DESCRIBE HISTORY의 열 일부만 제공합니다."])
+            return probe
+        ver = int(m.group(2))
+        ent = next((x for x in h if x["version"] == ver), None)
+        if not ent or not ent.get("snapshot"):
+            probe.update(status="failed", error=sql_error("EXECUTION_ERROR", f"버전 {ver}을(를) 복원할 수 없습니다(없는 버전이거나 스냅샷이 보관되지 않음).", f"DESCRIBE HISTORY {fq} 로 가능한 버전을 확인하세요."))
+            return probe
+        sec = f"table:{fq}"
+        if not (has_priv(S, principal, "MODIFY", sec) or S["owners"].get(sec) == principal or is_admin(S, principal)):
+            probe.update(status="failed", error=sql_error("INSUFFICIENT_PERMISSIONS", f"{sec} 에 MODIFY 권한 필요", missing={"privilege": "MODIFY", "securable": sec}))
+            return probe
+        try:
+            c.execute(f'CREATE OR REPLACE TABLE {pfq(S, fq)} AS SELECT * FROM memory.main."{_snap_name(S, fq, ver)}"')
+            n = c.execute(f"SELECT count(*) FROM {pfq(S, fq)}").fetchone()[0]
+        except Exception as e:
+            probe.update(status="failed", error=sql_error("EXECUTION_ERROR", str(e)[:300]))
+            return probe
+        _hist_add(S, c, fq, "RESTORE", {"version": ver}, actor_id or principal, rows=n)
+        audit(S, actor_id or principal, "SQL_EXECUTED", fq, "succeeded", "LOCAL_EXECUTED", {"statement": "RESTORE", "rows": n}, effective=principal)
+        probe.update(columns=["table", "restored_to_version", "new_version", "num_restored_rows"], rows=[[fq, ver, _thist(S)[fq][-1]["version"], n]], row_count=1,
+                     compat_notes=["RESTORE는 시뮬레이션입니다(스냅샷으로 테이블 내용을 되돌리고 새 버전을 기록)."])
+        return probe
+    ms = list(_RE_VAO.finditer(sql)) if re.search(r"VERSION\s+AS\s+OF", sql, re.I) else []
+    if not ms:
+        return None
+    swap, clean, last = {}, "", 0
+    for m in ms:
+        tbl = m.group(1).replace("`", "")
+        ver = int(m.group(2))
+        probe = _run_sql(S, f"SELECT * FROM {tbl} LIMIT 0", principal, via, False, need_warehouse, trace, actor_id)
+        if probe["status"] != "succeeded":
+            return probe
+        fq = probe["tables"][0]
+        if _is_view(c, fq, S):
+            probe.update(status="failed", error=sql_error("UNSUPPORTED_SQL", f"`{fq}`는 뷰입니다. VERSION AS OF는 Delta 테이블에만 적용됩니다."))
+            return probe
+        _hist_ensure(S, c, fq)
+        ent = next((x for x in _thist(S)[fq] if x["version"] == ver), None)
+        if not ent or not ent.get("snapshot"):
+            probe.update(status="failed", error=sql_error("EXECUTION_ERROR", f"`{fq}` 의 버전 {ver}을(를) 읽을 수 없습니다(없는 버전이거나 스냅샷이 보관되지 않음).", f"DESCRIBE HISTORY {fq} 로 가능한 버전을 확인하세요."))
+            return probe
+        if fq in swap and swap[fq] != _snap_name(S, fq, ver):
+            probe.update(status="failed", error=sql_error("SIMULATOR_UNSUPPORTED", "한 쿼리에서 같은 테이블의 서로 다른 버전을 동시에 읽는 구문은 시뮬레이터 미지원입니다."))
+            return probe
+        swap[fq] = _snap_name(S, fq, ver)
+        clean += sql[last:m.start()] + tbl
+        last = m.end()
+    clean += sql[last:]
+    for nm in {m.group(1).replace("`", "").lower() for m in ms}:
+        total = len(re.findall(r"(?<![\w.])" + re.escape(nm) + r"(?![\w])", clean, re.I))
+        versioned = sum(1 for m in ms if m.group(1).replace("`", "").lower() == nm)
+        if total > versioned:
+            return {"status": "failed", "columns": [], "rows": [], "sql_hash": sha(sql), "evidence_level": "LOCAL_EXECUTED", "tables": [], "principal": principal, "compat_notes": [],
+                    "error": sql_error("SIMULATOR_UNSUPPORTED", f"한 쿼리에서 `{nm}` 의 현재 버전과 과거 버전을 함께 읽는 구문(시점 비교 조인 등)은 시뮬레이터 미지원입니다.", "과거 버전 결과를 CREATE TABLE 로 따로 만든 뒤 비교하세요.")}
+    r = _run_sql(S, clean, principal, via, False, need_warehouse, trace, actor_id, swap=swap)
+    if r["status"] == "succeeded":
+        r["compat_notes"] = r.get("compat_notes", []) + ["VERSION AS OF는 시뮬레이션입니다(해당 버전 시점의 스냅샷을 읽음)."]
+    return r
+
+
+def run_sql(S, sql, principal, via="sql_editor", system=False, need_warehouse=True, trace=None, actor_id=None):
+    """_run_sql 의 겉껍질: 특수 구문(DESCRIBE HISTORY·RESTORE·VERSION AS OF) 처리 + 쿼리 이력 기록."""
+    t0 = time.time()
+    out = None
+    if len(sql) > MAX_SQL_CHARS:
+        out = {"status": "failed", "columns": [], "rows": [], "error": sql_error("SQL_TOO_LONG", f"SQL이 너무 깁니다({len(sql):,}자). 최대 {MAX_SQL_CHARS:,}자까지 실행합니다.", "여러 문장으로 나누거나 뷰를 사용하세요."), "sql_hash": sha(sql[:200]),
+               "evidence_level": "LOCAL_EXECUTED", "tables": [], "principal": principal, "compat_notes": []}
+        sql = sql[:2000]
+    try:
+        if out is None and not system:
+            try:
+                out = _special(S, sql, principal, via, need_warehouse, trace, actor_id)
+            except Exception as e:  # pragma: no cover
+                out = {"status": "failed", "columns": [], "rows": [], "error": sql_error("EXECUTION_ERROR", str(e)[:300]), "sql_hash": sha(sql), "evidence_level": "LOCAL_EXECUTED", "tables": [], "principal": principal, "compat_notes": []}
+        if out is None:
+            out = _run_sql(S, sql, principal, via, system, need_warehouse, trace, actor_id)
+    finally:
+        S.pop("_hop", None)
+    if not system:
+        try:
+            q = S.setdefault("qh", [])
+            w = (sql.strip().split() or ["?"])[0].upper()
+            if w == "DESCRIBE" and _RE_DH.match(sql):
+                w = "DESCRIBE HISTORY"
+            w = out.pop("statement_label", None) or w
+            via = out.pop("via_override", None) or via
+            q.append({"id": "q_" + uuid.uuid4().hex[:10], "at": now_utc(), "scenario_clock": clock(S).isoformat(), "user": actor_id or principal, "principal": principal, "via": via,
+                      "statement": w[:20], "sql": sql[:2000], "status": "FINISHED" if out["status"] == "succeeded" else "FAILED", "duration_ms": int((time.time() - t0) * 1000),
+                      "rows": out.get("row_count"), "tables": out.get("tables", []), "sql_hash": out.get("sql_hash"),
+                      "error": ({"code": out["error"].get("code"), "message": str(out["error"].get("message"))[:300], "hint": out["error"].get("hint"), "missing": out["error"].get("missing")} if out.get("error") else None)})
+            if len(q) > 300:
+                del q[:len(q) - 300]
+        except Exception:
+            pass
+    return out
+
+
+# ---------------------------------------------------------------- Add data: CSV 업로드 → 테이블 / COPY INTO 증분 적재(시뮬레이션)
+_IDENT = re.compile(r"^[a-z][a-z0-9_]{0,40}$")
+
+
+def _col_names(header):
+    out, seen = [], set()
+    for i, h in enumerate(header):
+        n = re.sub(r"[^0-9a-z_]", "_", str(h).strip().lower()) or f"col{i + 1}"
+        if n[0].isdigit():
+            n = "c_" + n
+        base, k = n, 2
+        while n in seen:
+            n = f"{base}_{k}"; k += 1
+        seen.add(n); out.append(n)
+    return out
+
+
+def _infer(vals):
+    vs = [v for v in vals if v != ""]
+    if not vs:
+        return "VARCHAR"
+    def ok(f):
+        try:
+            for v in vs:
+                f(v)
+            return True
+        except Exception:
+            return False
+    if ok(int):
+        return "BIGINT"
+    if ok(lambda v: (_ for _ in ()).throw(ValueError()) if not math.isfinite(float(v)) else float(v)):
+        return "DOUBLE"
+    if ok(lambda v: datetime.strptime(v, "%Y-%m-%d")):
+        return "DATE"
+    return "VARCHAR"
+
+
+def add_data(S, actor, principal, schema, table, text, mode, filename, catalog=None):
+    """CSV 텍스트를 테이블로 만든다. mode: create | replace | append(COPY INTO: 같은 파일은 다시 적재하지 않음)."""
+    import csv, io
+    c = _conns[S["id"]]
+    err = lambda code, msg, hint=None, **kw: {"status": "failed", "error": sql_error(code, msg, hint, **kw)}
+    schema, table = (schema or "").strip().lower(), (table or "").strip().lower()
+    if not _IDENT.match(schema) or not _IDENT.match(table):
+        return err("INVALID_NAME", "schema/테이블 이름은 영문 소문자로 시작하고 영문 소문자·숫자·_ 만 쓸 수 있습니다(최대 41자).")
+    if mode not in ("create", "replace", "append"):
+        return err("INVALID_MODE", "mode는 create, replace, append 중 하나입니다.")
+    if len(text.encode("utf-8")) > 200_000:
+        return err("FILE_TOO_LARGE", "시뮬레이터는 200KB 이하 CSV만 받습니다.")
+    rows = list(csv.reader(io.StringIO(text.strip("\ufeff\r\n "))))
+    if len(rows) < 2:
+        return err("EMPTY_FILE", "머리글과 데이터가 1행 이상 필요합니다.")
+    header, data = _col_names(rows[0]), rows[1:]
+    if len(header) > 30 or len(data) > 2000:
+        return err("FILE_TOO_LARGE", "최대 30열·2,000행까지 받습니다.")
+    if any(len(r) != len(header) for r in data):
+        bad = next(i for i, r in enumerate(data, 2) if len(r) != len(header))
+        return err("MALFORMED_CSV", f"{bad}행의 열 수가 머리글({len(header)}열)과 다릅니다.", "쉼표가 들어간 값은 큰따옴표로 감싸세요.")
+    cat = (catalog or CAT).strip().lower()
+    if cat != CAT and cat not in user_catalogs(S):
+        return err("TABLE_OR_VIEW_NOT_FOUND", f"catalog `{cat}`을(를) 찾을 수 없습니다.", "SHOW CATALOGS 로 확인하거나 CREATE CATALOG 로 만드세요.")
+    sec_s, fq = f"schema:{cat}.{schema}", f"{cat}.{schema}.{table}"
+    if not _existsS(S, c, "schema", [cat, schema]):
+        return err("SCHEMA_NOT_FOUND", f"schema `{cat}.{schema}`이(가) 없습니다.", "SQL Editor에서 CREATE SCHEMA 하거나 기존 schema를 고르세요.")
+    for priv, sec in [("USE CATALOG", f"catalog:{cat}"), ("USE SCHEMA", sec_s), ("CREATE TABLE", sec_s)]:
+        if not has_priv(S, principal, priv, sec):
+            return err("INSUFFICIENT_PERMISSIONS", f"{principal}: {sec} 에 {priv} 권한 없음", "권한 요청 화면에서 최소 권한을 요청하세요.", missing={"privilege": priv, "securable": sec})
+    exists = _existsS(S, c, "table", [cat, schema, table])
+    sec_t = f"table:{fq}"
+    if exists and mode == "create":
+        return err("TABLE_ALREADY_EXISTS", f"`{fq}`이(가) 이미 있습니다.", "덮어쓰기(replace) 또는 COPY INTO 증분 추가(append)를 고르세요.")
+    if exists and not (S["owners"].get(sec_t) == principal or has_priv(S, principal, "MODIFY", sec_t) or is_admin(S, principal)):
+        return err("INSUFFICIENT_PERMISSIONS", f"{sec_t} 소유자/MODIFY 권한 필요", missing={"privilege": "MODIFY", "securable": sec_t})
+    if mode == "append" and not exists:
+        return err("TABLE_OR_VIEW_NOT_FOUND", f"`{fq}`이(가) 없어 추가할 수 없습니다.", "먼저 create로 만드세요.")
+    sha_ = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+    loaded = S.setdefault("loaded_files", {}).setdefault(fq, [])
+    skipped = False
+    if mode == "append":
+        if sha_ in loaded:
+            skipped = True
+        else:
+            cols = [r[0] for r in c.execute(f"DESCRIBE {pfq(S, fq)}").fetchall()]
+            if cols != header:
+                return err("SCHEMA_MISMATCH", f"파일의 열({', '.join(header)})이 테이블의 열({', '.join(cols)})과 다릅니다.", "열 이름과 순서를 맞추세요(실제 COPY INTO는 mergeSchema 옵션으로 확장할 수 있습니다).")
+    types = [_infer([r[i] for r in data]) for i in range(len(header))]
+
+    def conv(v, t):
+        if v == "":
+            return None
+        return int(v) if t == "BIGINT" else float(v) if t == "DOUBLE" else v
+
+    if mode == "replace" and exists:
+        _hist_ensure(S, c, fq)                              # 덮어쓰기 전 현재 상태를 버전으로 남긴다(이력은 이어서 증가)
+    old_loaded = list(loaded)
+    try:
+        c.execute("BEGIN TRANSACTION")
+        if mode in ("create", "replace"):
+            c.execute(f"DROP TABLE IF EXISTS {pfq(S, fq)}") if mode == "replace" else None
+            c.execute(f"CREATE TABLE {pfq(S, fq)} ({', '.join(f'\"{h}\" {t}' for h, t in zip(header, types))})")
+            loaded.clear()
+            S["owners"][sec_t] = S["owners"].get(sec_t) or principal
+        if not skipped:
+            ph = ", ".join("?" for _ in header)
+            if mode == "append":
+                tys = [r[1] for r in c.execute(f"DESCRIBE {pfq(S, fq)}").fetchall()]
+                types = ["BIGINT" if "INT" in t else "DOUBLE" if t in ("DOUBLE", "FLOAT") else "DATE" if t == "DATE" else "VARCHAR" for t in tys]
+            c.executemany(f"INSERT INTO {pfq(S, fq)} VALUES ({ph})", [[conv(v, t) for v, t in zip(r, types)] for r in data])
+            loaded.append(sha_)
+        c.execute("COMMIT")
+    except Exception as e:
+        try:
+            c.execute("ROLLBACK")
+        except Exception:
+            pass
+        loaded[:] = old_loaded
+        return err("EXECUTION_ERROR", str(e)[:300], "숫자 열에 숫자가 아닌 값이 섞였는지 확인하세요(실패해도 기존 테이블은 그대로 유지됩니다).")
+    if _is_view(c, fq, S):
+        pass
+    op = {"create": "CREATE TABLE", "replace": "CREATE OR REPLACE TABLE", "append": "COPY INTO"}[mode]
+    if mode == "create":
+        _thist(S).pop(fq, None)
+    if not skipped:
+        _hist_add(S, c, fq, op, {"file": (filename or "upload.csv")[:60], "format": "CSV", "sha": sha_, "rows": len(data)}, actor["user_id"])
+    total = c.execute(f"SELECT count(*) FROM {pfq(S, fq)}").fetchone()[0]
+    audit(S, actor["user_id"], "FILE_UPLOAD_TABLE", fq, "skipped" if skipped else "succeeded", "LOCAL_EXECUTED", {"mode": mode, "rows": len(data), "file_sha": sha_}, effective=principal)
+    S.setdefault("qh", []).append({"id": "q_" + uuid.uuid4().hex[:10], "at": now_utc(), "scenario_clock": clock(S).isoformat(), "user": actor["user_id"], "principal": principal, "via": "add_data",
+                                  "statement": "COPY INTO" if mode == "append" else "CREATE TABLE", "sql": f"-- Add data: {filename or 'upload.csv'} → {fq} ({mode})", "status": "FINISHED", "duration_ms": 0,
+                                  "rows": 0 if skipped else len(data), "tables": [fq], "sql_hash": sha_, "error": None})
+    return {"status": "succeeded", "table": fq, "mode": mode, "skipped": skipped, "rows_loaded": 0 if skipped else len(data), "rows_total": total,
+            "columns": [{"name": h, "type": t} for h, t in zip(header, types)],
+            "note": ("같은 내용의 파일이 이미 적재되어 건너뛰었습니다(COPY INTO는 멱등합니다)." if skipped else "적재했습니다.")}
+
+
+def _grant_sec(st):
+    sec_kind = str(st.args.get("kind") or "TABLE").lower()
+    sn = st.args["securable"]
+    parts = [x for x in [sn.catalog, sn.db, sn.name] if x]
+    if sec_kind == "catalog":
+        return f"catalog:{sn.name}"
+    if sec_kind == "schema":
+        return f"schema:{sn.db or CAT}.{sn.name}"
+    return "table:" + ".".join(parts)
+
+
 def _grant(S, st, kind, principal, out, fail, h, actor_id):
-    if not is_admin(S, principal):
+    try:
+        _owner_ok = any(S["owners"].get(x) == principal for x in sec_chain(_grant_sec(st)))
+    except Exception:
+        _owner_ok = False
+    if not is_admin(S, principal) and not _owner_ok:
         audit(S, actor_id or principal, "FORBIDDEN_SELF_GRANT_ATTEMPT", "grant", "blocked", "SIMULATED", {"stmt": kind}, code_hash=h, effective=principal)
         milestone(S, "self_grant_attempt")
         return fail(sql_error("INSUFFICIENT_PERMISSIONS", "GRANT/REVOKE는 소유자·MANAGE·관리자만 수행합니다. 권한 요청 티켓(UI-15)을 제출하세요.", "자기 권한 부여 시도는 금지 이벤트로 기록됩니다."), "SQL_PERMISSION_DENIED")
@@ -1058,7 +1493,7 @@ def conn_cmd(S, actor, payload, principal):
 # ---------------------------------------------------------------- pipelines
 def _pl_priv(S, p, principal):
     # source tables read + target create
-    r = run_sql(S, p["source_sql"], principal, system=False, need_warehouse=False)
+    r = run_sql(S, p["source_sql"], principal, via="pipeline", system=False, need_warehouse=False)
     return r
 
 
@@ -1083,7 +1518,7 @@ def pipeline_cmd(S, actor, payload, principal):
         if not isinstance(tree, exp.Query):
             p["state"] = "CREATED"
             return "failed", {"error": sql_error("PIPELINE_SOURCE_INVALID", "선언적 파이프라인 소스는 데이터셋 SELECT 정의여야 합니다(SQL Editor DDL과 별도 검증).")}
-        rr = run_sql(S, f"SELECT * FROM ({p['source_sql']}) LIMIT 1", p["run_as"], need_warehouse=False)
+        rr = run_sql(S, f"SELECT * FROM ({p['source_sql']}) LIMIT 1", p["run_as"], via="pipeline", need_warehouse=False)
         if rr["status"] != "succeeded":
             p["state"] = "CREATED"
             return "failed", {"error": rr["error"], "note": "실행 신원(run_as) 기준 검증"}
@@ -1102,7 +1537,7 @@ def pipeline_cmd(S, actor, payload, principal):
                 p["state"] = "FAILED"
                 p["history"].append({"rev": S["revision"], "state": "FAILED", "reason": f"run_as {p['run_as']}: {sec} {priv} 없음"})
                 return "failed", {"state": "FAILED", "error": sql_error("INSUFFICIENT_PERMISSIONS", f"파이프라인 실행 신원 {p['run_as']} 에 {sec} {priv} 없음. 파이프라인 ACL과 데이터 권한은 별개.")}
-        rr = run_sql(S, f"SELECT * FROM ({p['source_sql']})", p["run_as"], need_warehouse=False)
+        rr = run_sql(S, f"SELECT * FROM ({p['source_sql']})", p["run_as"], via="pipeline", need_warehouse=False)
         if rr["status"] != "succeeded":
             p["state"] = "FAILED"
             p["history"].append({"rev": S["revision"], "state": "FAILED", "reason": rr["error"]["message"]})
@@ -1168,7 +1603,7 @@ def _run_tasks(S, job_name, tasks, run_as, actor, source="job", retries=0):
         attempts = 0
         while True:
             attempts += 1
-            r = run_sql(S, t["sql"], run_as, need_warehouse=False, actor_id=actor["user_id"])
+            r = run_sql(S, t["sql"], run_as, via="job", need_warehouse=False, actor_id=actor["user_id"])
             if r["status"] == "succeeded" or attempts > retries:
                 break
         results[k] = {"status": r["status"], "attempts": attempts, "rows": r.get("rows"), "columns": r.get("columns"), "error": r["error"]}
@@ -1210,8 +1645,8 @@ def job_cmd(S, actor, payload, principal):
         audit(S, actor["user_id"], "JOB_RUN", j["name"], status, "LOCAL_EXECUTED", {"run_as": j["run_as"], "triggered_by": principal})
         return ("ok" if status == "succeeded" else "failed"), run
     if a == "compare_identity":
-        mine = run_sql(S, j["tasks"][0]["sql"], principal, need_warehouse=False)
-        theirs = run_sql(S, j["tasks"][0]["sql"], j["run_as"], need_warehouse=False)
+        mine = run_sql(S, j["tasks"][0]["sql"], principal, via="job", need_warehouse=False)
+        theirs = run_sql(S, j["tasks"][0]["sql"], j["run_as"], via="job", need_warehouse=False)
         return "ok", {"editor": {"principal": principal, "status": mine["status"], "error": mine["error"]}, "run_as": {"principal": j["run_as"], "status": theirs["status"], "error": theirs["error"]}}
     return "failed", {"error": sql_error("BAD_ACTION", str(a))}
 
@@ -1283,7 +1718,7 @@ def cli_run(S, actor, line, principal):
     if args[:2] == ["auth", "describe"] or args[:2] == ["current-user", "me"]:
         return "ok", {"stdout": json.dumps({"user": principal, "host": b["cli_host"], "groups": S["principals"][principal]["groups"]}, ensure_ascii=False, indent=1)}
     if args[:2] == ["catalogs", "list"]:
-        cats = [CAT] + list(S["foreign_catalogs"])
+        cats = [CAT] + list(user_catalogs(S)) + list(S["foreign_catalogs"])
         vis = [c for c in cats if has_priv(S, principal, "USE CATALOG", f"catalog:{c}")]
         return "ok", {"stdout": "\n".join(vis)}
     if args[:2] == ["schemas", "list"] and len(args) >= 3:
@@ -1296,7 +1731,7 @@ def cli_run(S, actor, line, principal):
         rows = q1(S, "select table_name from information_schema.tables where table_catalog=? and table_schema=?", [args[2], args[3]])
         return "ok", {"stdout": "\n".join(r[0] for r in rows)}
     if args[:2] == ["tables", "get"] and len(args) >= 3:
-        r = run_sql(S, f"SELECT * FROM {args[2]} LIMIT 5", principal, need_warehouse=False)
+        r = run_sql(S, f"SELECT * FROM {args[2]} LIMIT 5", principal, via="cli", need_warehouse=False)
         if r["status"] != "succeeded":
             return "failed", {"stderr": f"{r['error']['code']}: {r['error']['message']}"}
         return "ok", {"stdout": json.dumps({"name": args[2], "columns": r["columns"], "sample": r["rows"]}, ensure_ascii=False, default=str), "same_engine_as_ui": True}
@@ -1497,7 +1932,7 @@ def genie_ask(S, actor, question, as_principal):
     if ds not in g["datasets"]:
         rec.update(status="DATASET_NOT_REGISTERED", sql=sql, note=f"{ds} 가 Genie 데이터셋에 등록되지 않았습니다. 설정을 수정하세요.")
         g["history"].append(rec); return rec
-    r = run_sql(S, sql, as_principal, need_warehouse=False, actor_id=actor["user_id"])
+    r = run_sql(S, sql, as_principal, via="genie", need_warehouse=False, actor_id=actor["user_id"])
     rec.update(sql=sql, template=name, status="OK" if r["status"] == "succeeded" else "DENIED", columns=r["columns"], rows=r["rows"], error=r["error"], evidence_level="LOCAL_EXECUTED")
     if r["status"] == "succeeded":
         milestone(S, "genie_ok")
@@ -1639,6 +2074,7 @@ def restore(S, name):
     keep = {"checkpoints": S["checkpoints"], "audit": S["audit"]}
     S.clear(); S.update(copy.deepcopy(cp["state"])); S.update(keep)
     cc = _open_conn(S["id"]); _lockdown(cc); _conns[S["id"]] = cc
+    _thist_invalidate(S)
     audit(S, "instructor", "CHECKPOINT_RESTORED", name, "ok", "SIMULATED", {})
     return {"restored": name}
 
@@ -1730,7 +2166,10 @@ def commands(S, actor, command_type, payload, idem_key=None, expected_revision=N
     elif ct == "cli":
         status, result = cli_run(S, actor, payload.get("line", ""), principal)
     elif ct == "bundle.edit":
-        S["bundle"]["files"][payload["path"]] = payload["content"]
+        _p, _t = str(payload.get("path", "")), str(payload.get("content", ""))
+        if not re.fullmatch(r"[A-Za-z0-9_./-]{1,100}", _p) or ".." in _p or len(_t) > 200_000 or (_p not in S["bundle"]["files"] and len(S["bundle"]["files"]) >= 50):
+            raise ApiError(400, "INVALID_PATH", "파일 경로는 영문·숫자·_ . / - 만 쓰고(100자 이하, '..' 불가), 내용은 200KB 이하, 파일은 50개까지입니다.")
+        S["bundle"]["files"][_p] = _t
         result = {"hash": bundle_hash(S["bundle"]["files"])}
     elif ct == "genie.ask":
         ap = persona or payload.get("as_principal") or principal
@@ -1742,7 +2181,7 @@ def commands(S, actor, command_type, payload, idem_key=None, expected_revision=N
         result = S["genie"]
     elif ct == "env.check":
         milestone(S, "env_checked")
-        result = {"profile": PROFILE, "identity": {"principal": principal, "groups": S["principals"][principal]["groups"], "entitlements": S["principals"][principal]["entitlements"], "admin": is_admin(S, principal)},
+        result = {"profile": profile_of(S), "identity": {"principal": principal, "groups": S["principals"][principal]["groups"], "entitlements": S["principals"][principal]["entitlements"], "admin": is_admin(S, principal)},
                   "warehouse": wh_state(S), "unknown_items": ["ui_release_id", "serverless_environment", "sql_warehouse_channel", "cli_version", "genie_agents.workspace_enabled", "oracle_cdc.workspace_enabled"]}
     elif ct == "feature.use":
         f = next((x for x in FEATURES if x["feature_id"] == payload.get("feature_id")), None)
@@ -1910,7 +2349,7 @@ def evidence(S):
     sqls = [{"code_hash": e["code_hash"], "outcome": e["outcome"], "principal": e["effective_principal"], "clock": e["scenario_clock"], "level": e["evidence_level"]} for e in S["audit"] if e["event_type"] in ("SQL_EXECUTED", "SQL_FAILED", "SQL_PERMISSION_DENIED")]
     return {
         "report": "WIZBASE DBX Project Rehearsal 증거 보고서 (교육 환경, Databricks 공식 서비스·인증 아님)",
-        "mode": S["mode"], "learning_mode": S["learning_mode"], "profile": PROFILE, "seed": S["seed"], "scenario_clock_base": seedmod.BASE_CLOCK,
+        "mode": S["mode"], "learning_mode": S["learning_mode"], "profile": profile_of(S), "seed": S["seed"], "scenario_clock_base": seedmod.BASE_CLOCK,
         "data_digest_initial": S["data_digest0"], "data_digest_current": data_digest(S), "policy_version": S["policy"]["active"],
         "verification_levels_note": "SQL 결과=LOCAL_EXECUTED(DuckDB), 그 외 리소스·승인·가상 API=SIMULATED. DBX_VERIFIED/WORKSPACE_CHECKED/SA_REVIEWED 없음.",
         "timeline": [{"t": e["scenario_clock"], "type": e["event_type"], "actor": e["actor_id"], "principal": e["effective_principal"], "outcome": e["outcome"], "level": e["evidence_level"], "trace": e["trace_id"]} for e in S["audit"]],

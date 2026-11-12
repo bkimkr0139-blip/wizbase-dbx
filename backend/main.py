@@ -1,6 +1,7 @@
 """FastAPI app: WIZBASE DBX Project Rehearsal. Server-side auth, ownership and role checks on every route."""
 from __future__ import annotations
 import json, os, re, secrets, time, threading
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -13,6 +14,7 @@ from . import core, v11, v11_ext, guide, labs, transfer, ko_guide, sysinfo, feed
 from . import pack as pack_mod
 from . import real
 from . import telemetry
+from . import academy, serving, ext_catalog, ext_dlt, ext_dash, ext_ml, ext_genai
 from . import usage
 from . import content as C
 from .core import ApiError
@@ -108,6 +110,48 @@ def sess(sid, a, write=False):
     return S
 
 
+import contextvars
+_METHOD = contextvars.ContextVar("dbx_method", default="GET")
+MAX_BODY = 3_000_000
+
+
+@app.middleware("http")
+async def _limits(request: Request, call_next):
+    """요청 본문 크기 제한(3MB) + 변경 요청 여부를 sess_ext 에 전달."""
+    try:
+        n = int(request.headers.get("content-length") or 0)
+    except ValueError:
+        n = 0
+    if n > MAX_BODY:
+        return JSONResponse({"error": {"code": "BODY_TOO_LARGE", "message": f"요청이 너무 큽니다(최대 {MAX_BODY // 1_000_000}MB)."}}, status_code=413)
+    tok = _METHOD.set(request.method)
+    try:
+        return await call_next(request)
+    finally:
+        _METHOD.reset(tok)
+
+
+def sess_ext(sid, a, write=False):
+    """확장 기능(add-data·볼륨·파이프라인·ML·AI·대시보드·서빙)용 세션 접근: 검토자(reviewer)는 다른 사람 세션을 읽기만 하고 바꿀 수 없다."""
+    S = sess(sid, a)
+    if _METHOD.get() not in ("GET", "HEAD") and a["role"] == "reviewer" and S["owner"] != a["user_id"]:
+        raise ApiError(403, "FORBIDDEN", "검토자는 다른 사람의 세션을 변경할 수 없습니다(읽기만 가능).")
+    return S
+
+
+for _m in (serving, ext_catalog, ext_dlt, ext_dash, ext_ml, ext_genai):
+    _m.register(app, actor_of, sess_ext)
+
+
+@app.exception_handler(ValueError)
+@app.exception_handler(TypeError)
+@app.exception_handler(KeyError)
+@app.exception_handler(OverflowError)
+async def _bad_input(request: Request, exc: Exception):
+    """입력 형식 문제로 생긴 예외를 500 대신 400 으로."""
+    return JSONResponse({"error": {"code": "INVALID_INPUT", "message": "입력 값의 형식이 올바르지 않습니다(숫자·목록·필드 이름을 확인하세요).", "detail": type(exc).__name__}}, status_code=400)
+
+
 # ---------------------------------------------------------------- auth
 class Login(BaseModel):
     name: str
@@ -186,13 +230,13 @@ class NewSession(BaseModel):
 @app.post("/api/sessions")
 def new_session(b: NewSession, request: Request, authorization: Optional[str] = Header(None)):
     a = actor_of(authorization)
-    if b.profile_id != core.PROFILE["profile_id"]:
-        raise ApiError(400, "UNKNOWN_PROFILE", "지원 프로필: " + core.PROFILE["profile_id"])
+    if b.profile_id not in core.PROFILES:
+        raise ApiError(400, "UNKNOWN_PROFILE", "지원 프로필: " + ", ".join(core.PROFILES))
     if a["role"] == "learner" and sum(1 for s in core.SESSIONS.values() if s["owner"] == a["user_id"]) >= 5:
         raise ApiError(429, "SESSION_LIMIT", "세션은 사용자당 5개까지입니다.")
-    if len(core.SESSIONS) >= 300:
+    if len(core.SESSIONS) >= int(os.environ.get("DBX_MAX_SESSIONS", "300")):
         raise ApiError(503, "CAPACITY", "서버 세션 용량 초과")
-    S = core.create_session(a["user_id"], b.lesson_id, b.mode, b.learning_mode, b.seed)
+    S = core.create_session(a["user_id"], b.lesson_id, b.mode, b.learning_mode, b.seed, b.profile_id)
     S["owner_name"] = a["name"]
     core.save(S)
     usage.log("session_new", a, request, mode=S["mode"], learning=S["learning_mode"])
@@ -286,6 +330,10 @@ def execution(eid: str, session_id: str, authorization: Optional[str] = Header(N
 
 
 def _visible_catalog(S, principal):
+    return ext_catalog.visible_catalog(S, principal)
+
+
+def _visible_catalog_legacy(S, principal):
     c = core._conns[S["id"]]
     rows = c.execute("select table_catalog, table_schema, table_name, table_type from information_schema.tables where table_catalog=? order by 1,2,3", [core.CAT]).fetchall()
     tree = {}
@@ -335,16 +383,99 @@ def catalog(sid: str, principal: Optional[str] = None, authorization: Optional[s
 
 @app.get("/api/sessions/{sid}/catalog/table")
 def catalog_table(sid: str, name: str, authorization: Optional[str] = Header(None)):
+    """테이블 상세: Overview·Sample Data·Details·Permissions·History·Lineage·Insights·Quality 탭의 데이터를 한 번에 돌려준다."""
     a = actor_of(authorization)
     S = sess(sid, a)
     with core.lock_for(sid):
         p = core.ADMIN if a["role"] == "admin" else core.TRAINEE
-        r = core.run_sql(S, f"SELECT * FROM {name} LIMIT 10", p, need_warehouse=False, actor_id=a["user_id"])
+        r = core.run_sql(S, f"SELECT * FROM {name} LIMIT 10", p, via="catalog", need_warehouse=False, actor_id=a["user_id"])
         if r["status"] != "succeeded":
             return {"name": name, "error": r["error"], "columns": [], "rows": []}
-        cols = core._conns[sid].execute(f"DESCRIBE {name}").fetchall()
-        return {"name": name, "columns": [{"name": c[0], "type": c[1]} for c in cols], "rows": r["rows"], "preview_columns": r["columns"], "grants": [g for g in S["grants"] if name.replace(".", "") in "".join(g[2].split(":")[1:]).replace(".", "") or True][:0],
-                "lineage": [e for e in LINEAGE if name in e], "evidence_level": "LOCAL_EXECUTED", "owner": S["owners"].get("table:" + name, "uc-admin")}
+        c = core._conns[sid]
+        if not r.get("tables") or (r["tables"][0].split(".")[0] != core.CAT and r["tables"][0].split(".")[0] not in core.user_catalogs(S)):
+            return {"name": name, "error": core.sql_error("UNSUPPORTED_SQL", "이 이름은 상세를 지원하지 않습니다(외부(foreign) catalog 이거나 3단계 테이블 이름이 아닙니다).", "SQL Editor에서 SELECT 로 조회하세요."), "columns": [], "rows": []}
+        fq = r["tables"][0]
+        cols = c.execute(f"DESCRIBE {core.pfq(S, fq)}").fetchall()
+        is_view = core._is_view(c, fq, S)
+        total = c.execute(f"SELECT count(*) FROM {core.pfq(S, fq)}").fetchone()[0]
+        quality = []
+        for col in cols[:40]:
+            q = f'"{col[0]}"'
+            try:
+                nn, dd = c.execute(f"SELECT count({q}), count(DISTINCT {q}) FROM {core.pfq(S, fq)}").fetchone()
+                quality.append({"column": col[0], "type": col[1], "nulls": total - nn, "null_pct": round(100 * (total - nn) / total, 1) if total else 0, "distinct": dd})
+            except Exception:
+                quality.append({"column": col[0], "type": col[1], "nulls": None, "null_pct": None, "distinct": None})
+        sec = f"table:{fq}"
+        chain = core.sec_chain(sec)
+        grants = [{"principal": g[0], "privilege": g[1], "securable": g[2], "inherited": g[2] != sec} for g in S["grants"] if g[2] in chain]
+        owner = S["owners"].get(sec, "uc-admin")
+        if not is_view:
+            core._hist_ensure(S, c, fq)
+        hist = [] if is_view else [{k: v for k, v in h.items()} for h in reversed(core._thist(S).get(fq, []))]
+        touched = [q for q in S.get("qh", []) if fq in (q.get("tables") or []) and q.get("via") != "catalog"]
+        users = {}
+        for q in touched:
+            users[q["principal"]] = users.get(q["principal"], 0) + 1
+        insights = {"query_count": len(touched), "failed": sum(1 for q in touched if q["status"] == "FAILED"), "top_users": sorted(users.items(), key=lambda x: -x[1])[:5],
+                    "recent": [{"at": q["at"], "principal": q["principal"], "via": q["via"], "statement": q["statement"], "status": q["status"], "sql": q["sql"][:300]} for q in touched[-5:][::-1]]}
+        kind = "VIEW" if is_view else "TABLE"
+        return {"name": fq, "kind": kind, "columns": [{"name": c_[0], "type": c_[1]} for c_ in cols], "rows": r["rows"], "preview_columns": r["columns"], "row_count": total,
+                "grants": grants, "history": hist, "quality": quality, "insights": insights,
+                "details": {"type": "Managed(시뮬레이션)" if not is_view else "View", "data_source": "Delta(시뮬레이션: DuckDB 스냅샷)" if not is_view else "-", "columns": len(cols), "rows": total, "versions": len(hist), "owner": owner,
+                            "created_by_learner": bool(S["views_created_by"].get(fq)) or sec in S["owners"]},
+                "lineage": [e for e in LINEAGE if fq in e], "evidence_level": "LOCAL_EXECUTED", "owner": owner}
+
+
+@app.post("/api/sessions/{sid}/add-data")
+def add_data_ep(sid: str, b: dict, authorization: Optional[str] = Header(None)):
+    a = actor_of(authorization)
+    S = sess_ext(sid, a)
+    with core.lock_for(sid):
+        p = core.ADMIN if a["role"] == "admin" else core.TRAINEE
+        r = core.add_data(S, a, p, str(b.get("schema", "")), str(b.get("table", "")), str(b.get("csv", "")), str(b.get("mode", "create")), str(b.get("filename", "")), str(b.get("catalog", "")) or None)
+        core.save(S)
+        return r
+
+
+@app.get("/api/sessions/{sid}/academy")
+def academy_view(sid: str, authorization: Optional[str] = Header(None)):
+    """Academy 역할별 경로 ↔ 시뮬레이터 대응표(제목 단위)와 세션 기록 기반 자동 실습 확인."""
+    a = actor_of(authorization)
+    S = sess(sid, a)
+    with core.lock_for(sid):
+        return academy.view(S)
+
+
+@app.get("/api/sessions/{sid}/query-history")
+def query_history(sid: str, status: str = "", statement: str = "", via: str = "", principal: str = "", q: str = "", minutes: int = 0, min_ms: int = 0,
+                  page: int = 0, size: int = 25, authorization: Optional[str] = Header(None)):
+    """Query History 화면: 필터(상태·구문·소스·주체·기간·최소 소요시간·텍스트)와 페이지."""
+    a = actor_of(authorization)
+    S = sess(sid, a)
+    with core.lock_for(sid):
+        items = [x for x in S.get("qh", []) if x.get("via") != "catalog"]
+        facets = {"statements": sorted({x["statement"] for x in items}), "vias": sorted({x["via"] for x in items}), "principals": sorted({x["principal"] for x in items})}
+        if status:
+            items = [x for x in items if x["status"] == status]
+        if statement:
+            items = [x for x in items if x["statement"] == statement]
+        if via:
+            items = [x for x in items if x["via"] == via]
+        if principal:
+            items = [x for x in items if x["principal"] == principal]
+        if min_ms:
+            items = [x for x in items if x["duration_ms"] >= min_ms]
+        if minutes:
+            cut = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
+            items = [x for x in items if x["at"] >= cut]
+        if q:
+            ql = q.lower()
+            items = [x for x in items if ql in x["sql"].lower() or ql in (x["id"] or "").lower() or ql in json.dumps(x.get("error") or {}).lower()]
+        items = items[::-1]
+        size = max(5, min(100, size))
+        total = len(items)
+        return {"total": total, "page": page, "size": size, "items": items[page * size:(page + 1) * size], "facets": facets}
 
 
 @app.get("/api/resources/{rid:path}")

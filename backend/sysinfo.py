@@ -6,7 +6,7 @@ from pathlib import Path
 from . import core, labs, pack, transfer, v11
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.4.15"
+VERSION = "0.5.0"
 RELEASED = "2026-11-12"
 SHELL_VERSION = "0.1.1"  # PC 앱(desktop/dbx_app.py APP_VERSION)의 최신 버전 — 새 exe를 배포할 때 함께 올린다
 APP_FILE = ROOT / "dist_app" / "release" / "WIZBASE-DBX-Rehearsal.exe"
@@ -58,6 +58,19 @@ def central_manifest():
 PURPOSE = ("WIZBASE(Databricks 파트너)의 실제 PoC 준비와 파트너 레벨 상향을 위한 인증 시험 준비를 지원하는 교육·훈련 환경. "
            "Databricks 공식 제품·교육·시험이 아니며 합격·자격·투입을 보증하지 않음.")
 CHANGELOG = [
+    {"version": "0.5.0", "date": "2026-11-12", "notes": ["실제 Databricks Free Edition 워크스페이스를 읽기 전용으로 조회한 결과(FIELD_SURVEY_2026-11-12.md)를 바탕으로 한 개선",
+                                                      "Query History 화면(UI-05b): 상태·구문·소스·주체·기간·소요시간·텍스트 필터, 실패 쿼리 펼치면 오류 해결 안내, SQL Editor에서 다시 열기",
+                                                      "Catalog 테이블 상세를 Overview·Sample Data·Details·Permissions·History·Lineage·Insights·Quality 8개 탭으로 개편",
+                                                      "Delta 버전 이력 시뮬레이션: DESCRIBE HISTORY·VERSION AS OF·RESTORE(최근 30개 버전 스냅샷)",
+                                                      "Add data 화면(UI-08b): CSV 업로드로 테이블 생성, COPY INTO 증분 적재(같은 파일은 건너뜀), UC 권한 검사",
+                                                      "Free Edition 프로필: 서버리스 전용·웨어하우스 생성 불가·쿼리 시 자동 시작(기본 프로필은 수동 시작 유지)",
+                                                      "메뉴·화면 이름을 실제와 맞춤(Jobs & Pipelines, Genie Agents), Workspace를 Home·Shared with me·Workspace·Favorites·Trash 구조로 개편, Compute 화면에 실제 표 형식 반영",
+                                                      "다중 catalog(CREATE CATALOG·DROP·SHOW)와 Volumes(UI-08c): 코스 전용 catalog, CREATE VOLUME·LIST·COPY INTO(볼륨→테이블, 같은 파일 재적재 건너뜀)",
+                                                      "선언형 파이프라인(UI-09c): 스트리밍 테이블·구체화 뷰·expectations·AUTO CDC(SCD1) 시뮬레이션, 증분 처리·원본 변경 실패·전체 새로고침·이벤트 로그",
+                                                      "Dashboards(UI-05d): 데이터셋·막대/선/카운터/표 위젯·필터·게시, SQL Editor의 Genie Code 패널(규칙 기반), Lakeflow Designer(UI-09d, 연산자 카드 ETL)",
+                                                      "AI·ML 메뉴: ML·MLflow(UI-25, 실험·모델 등록·별칭·특성 테이블), 생성형 AI·RAG(UI-26, Playground·AI Search 인덱스·RAG 에이전트·평가), Model Serving(UI-27, 슬롯 2개) — 외부 호출 없는 교육용 시뮬레이션",
+                                                      "Academy 역할별 학습 경로(UI-07b): Data engineers·Data analysts·ML practitioners·Generative AI engineers 경로의 코스·레슨을 제목 단위로 대응(직접/일부/미지원), 세션 기록으로 실습 자동 확인, 개선 후보 우선순위", "라이브러리(UI-05c): Queries·Dashboards·Alerts·Recents·Discover·Marketplace 안내·Achievements(연속 학습일·배지), Ctrl+P 통합 검색",
+                                                      "용어 사전에 Genie Agents/Code·Lakebase·AI Search·Visual Data Prep·OpenSharing·COPY INTO·타임 트래블 등 추가, Academy 코스 주제 연계 표(프로젝트 트랙)"]},
     {"version": "0.4.15", "date": "2026-11-12", "notes": ["설치형 앱 사용자 식별: 로그인한 실명을 설치 ID와 연결해 서버 접속 기록·설치 PC 목록·사용자별 활동에 표시", "AXOS 처리 결과 회신: 앱이 운영 서버의 처리 상태를 조회(앱 시작·로그인·내 피드백 열기·[지금 확인]·10분 주기, 배치 조회)해 사용자에게 알림, 서버 피드백 관리 큐에 '전달됨/전달 대기'와 조회 시각 기록"]},
     {"version": "0.4.14", "date": "2026-11-12", "notes": ["설치형 앱 사용 신호를 운영 서버로 전달(인터넷 연결 시): 앱 실행·업데이트 알림/적용/실패(설치 ID·버전·OS), 다운로드·업데이트 확인 요청의 구분 헤더, AXOS 피드백(설치 정보 포함)이 서버 접속·사용 기록과 피드백 관리 큐에 기록", "접속·사용 기록에 '설치형 앱 현황'(버전 분포·플랫폼·업데이트 결과·다운로드 경로·설치 PC 목록 검색/쪽 나누기)과 지표 3종 추가, 앱 정보에서 신호 전송 끄기/켜기"]},
     {"version": "0.4.13", "date": "2026-11-12", "notes": ["UI-01 환경 점검의 전체 세션(admin) 목록에 검색(세션 ID·사용자·레슨·모드)과 쪽 나누기(쪽당 10~100개), 조건에 맞는 세션 모두 선택, 다른 쪽에서 고른 세션 선택 유지"]},
@@ -94,10 +107,12 @@ CHANGELOG = [
 MENU = [
     ("홈", "home", [("env", "환경 점검", "클라우드·리전·프로필·세션 시작, 기능 매니페스트"), ("req", "착수·요구", "인터뷰 카드·데이터 계약 검토")]),
     ("워크스페이스", "ws", [("ws", "Workspace", "폴더·객체 탐색"), ("cat", "Catalog", "Unity Catalog 탐색"), ("sql", "SQL Editor", "DuckDB 기반 SQL(권한·MODIFY 포함)"),
+                       ("qh", "Query History", "실행한 SQL 이력·필터·오류 해결"), ("dash", "Dashboards", "AI/BI 대시보드: 데이터셋·차트·필터·게시"), ("lib", "라이브러리", "Queries·Dashboards·Alerts·Recents·Discover·Marketplace·Achievements"),
                        ("nb", "Notebook", "로컬 코드 실습"), ("comp", "Compute", "Warehouse 시작/중지")]),
-    ("데이터 구축", "pipe", [("conn", "수집", "Connections"), ("pipe", "Pipelines", "파이프라인"), ("cdc", "CDC 재생", "중복·역순·삭제 재생"), ("jobs", "Jobs", "Job/repair"),
-                        ("genie", "Genie", "의미모델"), ("agent", "Agent", "승인 흐름"), ("trace", "Tracing", "평가"), ("bundle", "Git/Bundle", "branch·PR·배포"), ("perm", "권한", "GRANT/관리")]),
-    ("훈련·시연", "train", [("track", "프로젝트 트랙", "8주 훈련"), ("demo", "고객 시연", "20분 시연·Q&A"), ("xfer", "전이 시드·협업", "제조 IoT·클릭스트림·RAG 시드, 4역할 협업"), ("real", "실제 환경 연결", "내 교육용 워크스페이스·테스트 DB 연결 방법과 실제 SQL 실행")]),
+    ("데이터 구축", "pipe", [("conn", "수집", "Connections"), ("vol", "Volumes", "UC Volume 만들기·파일 업로드·COPY INTO(볼륨→테이블)"), ("adddata", "데이터 추가", "CSV 업로드→테이블·COPY INTO 증분 적재"), ("pipe", "Jobs & Pipelines › Pipelines", "파이프라인(실제 메뉴명 Jobs & Pipelines)"), ("dpipe", "선언형 파이프라인", "스트리밍 테이블·구체화 뷰·expectations·AUTO CDC(SCD1) 시뮬레이션"), ("designer", "Lakeflow Designer", "코드 없이 연산자 카드로 메달리온 ETL 구성(시뮬레이션)"), ("cdc", "CDC 재생", "중복·역순·삭제 재생"), ("jobs", "Jobs & Pipelines › Jobs", "Job/repair"),
+                        ("genie", "Genie Agents", "의미모델·Genie"), ("agent", "Agent", "승인 흐름"), ("trace", "Tracing", "평가"), ("bundle", "Git/Bundle", "branch·PR·배포"), ("perm", "권한", "GRANT/관리")]),
+    ("훈련·시연", "train", [("track", "프로젝트 트랙", "8주 훈련"), ("demo", "고객 시연", "20분 시연·Q&A"), ("acad", "Academy 경로 대응", "역할별 학습 경로↔연습 화면 대응·자동 실습 확인"), ("xfer", "전이 시드·협업", "제조 IoT·클릭스트림·RAG 시드, 4역할 협업"), ("real", "실제 환경 연결", "내 교육용 워크스페이스·테스트 DB 연결 방법과 실제 SQL 실행")]),
+    ("AI·ML", "ai", [("ml", "ML·MLflow", "실험 추적·모델 학습·UC 모델 레지스트리·특성 테이블"), ("genai", "생성형 AI·RAG", "AI Playground·AI Search 인덱스·RAG 에이전트·평가(시뮬레이션)"), ("serve", "Model Serving", "엔드포인트 생성·질의(모델·에이전트, 무료 슬롯 2개)")]),
     ("인증 준비", "cert", [("prof", "역량·등급", "내부 등급"), ("plan", "학습계획", "목표 기반 계획"), ("map", "공식 목표", "목표 지도"), ("ko", "한국어 가이드", "한국어 공식 가이드 대조"),
                        ("tutor", "AI 튜터", "근거 기반 답변"), ("exam", "시험센터", "문항·모의시험"), ("lab", "실습 증거함", "21개 실습 팩 증거"), ("qual", "콘텐츠 품질", "문항 검수 상태")]),
     ("검토·운영", "review", [("rvw", "검토 센터", "컨설턴트 자체 검토 큐·매뉴얼"), ("fbq", "피드백·개발큐", "AXOS 피드백 관리·개발큐(admin 전용)"), ("usage", "접속·사용 기록", "웹 접속·사용 기록과 차트(admin 전용)"), ("vmx", "현장 대조표", "V1~V6"), ("conf", "자료 충돌", "공식 자료 상충"),
@@ -210,7 +225,8 @@ def system_document():
           "6-1. **AXOS 피드백 폐루프**: 사용자는 우측 AXOS 탭에서 기능 추가·화면 버그·기능 개선·DBX 불일치 오류·문항/자료 오류·기타를 제출(텍스트 + PNG/JPEG/GIF/WEBP 최대 5장·장당 3MB, 붙여넣기·끌어놓기 지원). 화면·버전·빌드·클라이언트(웹/PC 앱)가 자동 첨부됨. 상태: 접수 → 검토·승인 → 개발큐 → 개발중 → 반영완료(반려·보류는 사유 필수, 제출자에게 표시). 개발큐로 옮기면 **개발 지시서**(대상 화면·후보 파일·완료 기준)가 자동 생성되고 `개발큐.md`로 내려받아 개발 입력으로 사용. 반영완료 시 반영 버전을 기록하고 제출자에게 알림. **관리(전이·수정·검색·쪽 나누기·선택/일괄 변경·선택 삭제·이미지 열람·큐)는 admin만**, 제출자는 본인 건의 상태만 조회. 개발 자체는 자동 실행이 아니라 개발큐를 입력으로 운영자가 수행.",
           "7. **전이 도메인 신청**: 원하는 산업 도메인(목적·필요 데이터·심어 둘 문제·희망 시기)을 AXOS 탭에서 신청하면 다른 피드백과 같은 폐루프(접수 → 검토·승인 → 개발큐 → 개발중 → 반영완료)로 관리되며 이메일은 보내지 않음. 합성 데이터 요청만 받음.",
           f"8. **설치형 앱(Windows·macOS)**: ① **단독 설치형(권장, Windows .exe / macOS .app)** — 서버(FastAPI)와 DuckDB가 앱 안에 포함되어 내 PC(127.0.0.1)에서만 실행. 학습 데이터는 `%LOCALAPPDATA%\\WIZBASE\\DBXRehearsal-Standalone\\data`에 저장되며 인터넷·운영자 PC가 없어도 학습 가능. 인터넷이 연결되면 업데이트 확인(알림 → 선택 시 적용, 데이터 유지)과 AXOS 피드백 전달(운영자 개발큐 접수·처리 상태 반영, 오프라인이면 보류 후 자동 전송)이 이루어짐. **업데이트는 두 종류**: (가) **콘텐츠 팩**(화면·서버 코드 변경, 수백 KB, 재빌드 불필요 — 운영 서버가 저장소 파일에서 즉석 생성, 앱이 내려받아 SHA-256과 파일별 해시를 검증해 `overlay/current`에 두고 자동 재시작, 새 팩이 서버를 못 띄우면 자동으로 폐기하고 내장 버전으로 복구), (나) **앱 전체 교체**(새 라이브러리·앱 껍데기 변경 시 `STANDALONE_COMPAT`가 바뀐 경우: Windows는 내려받아 SHA-256 검증 후 교체, macOS는 새 .app 다운로드 후 사용자가 교체). macOS 앱은 Apple Silicon·Intel 별도 빌드, 코드 서명·공증이 없어 처음에는 우클릭 > 열기가 필요. admin 기능·시스템 문서는 포함되지 않고 접근 코드는 PC마다 무작위 생성. ② **접속형** — 운영자 서버 사이트를 PC 창으로 여는 앱(서버 부하·오프라인 제약은 웹과 동일).\n          8-1. **Windows PC 앱(접속형)**(현재 {SHELL_VERSION}): 시작 화면에서 내려받는 설치용 exe(WebView2, Windows 10/11 64비트, 코드 서명 없음 — SmartScreen 경고 가능). 사이트가 갱신되면 적용 여부 알림, 앱 신버전도 알림. 시스템 문서는 포함되지 않으며 서버도 앱 요청에는 문서를 내주지 않음.",
-          "9. **거버넌스**: 투입 승인(본인 승인 금지·만료), Academy 이력 확인대기, 개인정보 열람/삭제, 감사 로그.", "",
+          "9. **거버넌스**: 투입 승인(본인 승인 금지·만료), Academy 이력 확인대기, 개인정보 열람/삭제, 감사 로그.",
+          "10. **Databricks 공식 서비스 체계 확장(v0.5.0, 모두 교육용 시뮬레이션)**: ① 내 전용 카탈로그(CREATE/DROP CATALOG)·UC Volume·COPY INTO·Delta 버전 이력(DESCRIBE HISTORY·VERSION AS OF·RESTORE)·Free Edition 프로필(서버리스 자동 시작) ② 선언형 파이프라인(스트리밍 테이블·구체화 뷰·expectations·AUTO CDC SCD1·이벤트 로그·전체 새로고침)과 Lakeflow Designer ③ Dashboards(데이터셋·위젯 4종·필터·게시)·SQL Editor의 Genie Code(규칙 기반)·Query History·Catalog 8개 탭 ④ ML(순수 파이썬 모델 3종·실험 추적·UC 모델 버전/별칭·특성 테이블)·생성형 AI(Playground·BM25 AI Search·RAG 에이전트·평가)·Model Serving(슬롯 2개) ⑤ Academy 역할별 학습 경로 대응(제목 단위·실습 자동 확인). 화면 UI-05b/05c/05d/07b/08b/08c/09c/28/29/30. HELP·AI 지원에 모두 반영.", "",
           "## 4. 역할", "", "| 역할 | 권한 |", "|---|---|", "| learner | 본인 세션(선택 삭제 가능)·실습·시험 |", "| instructor | 강사: 정답표·수료·검토 (admin 고유 기능 접근 불가) |",
           "| reviewer | 검토자(위즈베이스 DB 컨설턴트): 검수·재확인·대조표 |", "| admin | **수퍼유저**: 시스템 문서, 피드백 관리·개발큐, 도메인 신청 포함 모든 요구사항·피드백 관리 (별도 admin 접근 코드 필요 — staff·instructor 코드로는 로그인 불가) |", "",
           "## 5. 구성", "", "- 서버: Python FastAPI(`backend/`), 화면: 정적 HTML/JS(`static/`), 데이터: `data/`(세션·v11.json), 학습자 PC adapter: `adapter/`.",
@@ -230,6 +246,7 @@ def system_document():
           "- macOS 앱은 이 개발 환경(Windows)에서 빌드·시험하지 못해 Mac 또는 GitHub Actions(`build-standalone-mac`)에서 빌드해야 하며, 실제 Mac 실행은 미검증. 콘텐츠 팩은 새 라이브러리 추가·앱 껍데기 변경을 담을 수 없음(앱 전체 교체 필요).",
           "- 단독 설치형: 업데이트·피드백 전달은 운영자 서버가 켜져 있고 인터넷이 연결될 때만 가능. 설치 파일은 약 46MB, 코드 서명 없음(SmartScreen 경고 가능). 단독형은 PC별 데이터가 분리되어 사용자 간 협업 기능(팀)·중앙 검토는 이용할 수 없음.",
           "- 피드백 → 개발은 자동 개발이 아님(개발큐 지시서를 운영자가 처리). PC 앱 exe는 코드 서명 없음.",
+          "- v0.5.0 확장 기능(ML·생성형 AI·Model Serving·Genie Code·Designer)은 실제 MLflow·LLM·벡터 임베딩이 아닌 **규칙·순수 파이썬 시뮬레이션**이다. 모델·서빙·에이전트에는 별도 ACL이 없고 세션 소유자만 접근한다. 세션 JSON에 실행 이력·감사 기록이 계속 쌓인다(일부만 상한). COPY INTO 다중 파일 중간 실패는 원자적이지 않다. 미지원: SCD2, IGNORE NULL UPDATES, read_files, AI 함수, Agent Bricks 상세, Genie One, system 테이블. Academy 대응은 레슨 제목 단위.",
           "- Python 격리 실행기 미구성(AT-16은 차단 방식). 파트너 tier·Portal 연결은 회사가 직접 확인.", "", "## 7. 변경 이력", ""]
     for r in CHANGELOG:
         L += [f"**{r['version']}** ({r['date']})"] + [f"- {n}" for n in r["notes"]] + [""]

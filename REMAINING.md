@@ -67,3 +67,9 @@
 - 빌드: `tools/build_standalone.py`(Windows), `tools/build_standalone_mac.py`(Mac) / `.github/workflows/build-standalone-mac.yml`.
 - **미검증**: macOS 실행(이 환경에서 빌드·시험 불가). Intel Mac 러너 라벨(`macos-15-intel`)은 GitHub 정책에 따라 바뀔 수 있음.
 - 팩에 못 담는 변경: 새 라이브러리·앱 껍데기 → STANDALONE_COMPAT/EXE_COMPAT 둘 다 올리고 재빌드.
+
+## v0.5.0 — 실제 Databricks Free Edition 조회(2026-11-12)에 따른 개선
+근거: `FIELD_SURVEY_2026-11-12.md`(사용자 계정 화면 읽기 전용 조회: 메뉴·역할별 학습 경로 4개·코스 개요 5개). 레슨 본문은 열지 않았다.
+- 구현(모두 **교육용 시뮬레이션**, 실제 Databricks·MLflow·LLM 아님): Query History, Catalog 8개 탭, Delta 버전 이력·타임 트래블·RESTORE, Add data(CSV·COPY INTO), Free Edition 프로필(서버리스 자동 시작), 다중 catalog(CREATE CATALOG)·Volumes, 선언형 파이프라인(스트리밍 테이블·구체화 뷰·expectations·AUTO CDC SCD1), Dashboards·Genie Code(규칙 기반)·Lakeflow Designer(연산자 카드), ML·MLflow(순수 파이썬 모델 3종·레지스트리·특성 테이블), 생성형 AI·RAG(BM25 키워드 검색·추출형 모의 모델·평가), Model Serving(슬롯 2개), 라이브러리·Ctrl+P·Academy 경로 대응표.
+- 독립 검수에서 찾은 결함(SQL 주입 2건·XSS·서버 정지 유발 정규식·VERSION AS OF 오작동·DROP CATALOG 오삭제 등)은 수정하고 `tests/test_review_fixes.py` 로 회귀 방지.
+- **알려진 한계(남김)**: 서빙·모델·에이전트는 세션 소유자만 접근하는 구조라 별도 ACL이 없음 / 세션 JSON에 실행 이력·감사가 계속 쌓임(상한은 일부만) / COPY INTO 다중 파일 중간 실패 시 부분 적재 / DLT `STREAM <이름>` 구문이 일반 SELECT 의 같은 형태 단어를 오인할 수 있음 / 특성 테이블 조인은 500행까지 / Genie Code·Designer·AI 기능은 실제 LLM이 아님 / SCD2·IGNORE NULL UPDATES·read_files·Agent Bricks 유형 상세·Genie One·AI 함수는 미지원.

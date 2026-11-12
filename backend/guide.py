@@ -184,6 +184,22 @@ SCREEN_NAME = {"cdc": "UI-09b CDC 재생", "env": "UI-01 환경 점검", "req": 
                "evid": "증거 보고서", "prof": "UI-17 역량·등급", "plan": "UI-18 학습계획", "map": "UI-19 공식 목표 지도", "tutor": "UI-20 AI 튜터", "exam": "UI-21 시험센터", "lab": "UI-22 실습 증거함", "qual": "UI-23 콘텐츠 품질", "partner": "UI-24 파트너 인력", "conf": "UI-25 자료 충돌"}
 
 ERR_HELP = {
+    "SQL_TOO_LONG": "SQL이 20,000자를 넘었습니다. 여러 문장으로 나누거나 뷰·CTAS로 단계를 줄이세요.",
+    "SCHEMA_NOT_FOUND": "스키마를 찾지 못했습니다. catalog.schema 이름 철자를 확인하고, 필요하면 `CREATE SCHEMA` 를 먼저 실행하세요(내 카탈로그에서는 CREATE 권한이 필요).",
+    "TABLE_ALREADY_EXISTS": "같은 이름의 테이블이 이미 있습니다. 이름을 바꾸거나 `CREATE OR REPLACE TABLE` 을 쓰세요. 데이터 추가 화면에서는 ‘덮어쓰기’를 선택합니다.",
+    "VOLUME_NOT_FOUND": "Volume을 찾지 못했습니다. Volumes 화면(UI-08c)에서 먼저 만들었는지, /Volumes/catalog/schema/volume 경로 철자가 맞는지 확인하세요.",
+    "SCHEMA_MISMATCH": "적재할 파일의 열이 대상 테이블과 맞지 않습니다. 열 이름·개수·형식을 확인하세요(COPY INTO는 열을 자동으로 맞추지 않습니다).",
+    "MALFORMED_CSV": "CSV를 읽지 못했습니다. 첫 줄 헤더, 쉼표·따옴표, 열 개수를 확인하세요.",
+    "PIPELINE_PARSE_ERROR": "선언형 파이프라인 SQL을 해석하지 못했습니다. `CREATE STREAMING TABLE / MATERIALIZED VIEW … AS SELECT`, `CREATE FLOW … AUTO CDC` 형태와 세미콜론을 확인하세요.",
+    "PIPELINE_SOURCE_INVALID": "파이프라인이 읽는 원천이 올바르지 않습니다. 원천 테이블이 있고 SELECT 권한이 있는지, STREAM(...) 은 스트리밍 가능한 테이블에만 쓰는지 확인하세요.",
+    "TOO_MANY_VERSIONS": "모델·테이블 버전이 상한에 도달했습니다. 불필요한 버전·실행을 정리하세요.",
+    "DATASET_NOT_QUERY": "대시보드 데이터셋은 SELECT 문이어야 합니다. INSERT·DDL 같은 문장은 넣을 수 없습니다.",
+    "EMPTY_DATASET": "데이터셋 결과가 비어 있어 차트를 그릴 수 없습니다. 쿼리·필터 조건을 확인하세요.",
+    "INDEX_TOO_LARGE": "AI Search 인덱스가 크기 제한을 넘었습니다. 문서 수를 줄이거나 청크 크기를 키우세요.",
+    "FILE_TOO_LARGE": "파일이 너무 큽니다. 더 작은 파일로 나누어 올리세요(요청 본문 한도 3MB).",
+    "NO_CAN_USE": "이 Warehouse에 대한 CAN USE 권한이 없습니다. 관리자에게 Warehouse 사용 권한을 요청하세요(UC 권한과 별개).",
+    "NO_SQL_ENTITLEMENT": "SQL 사용 자격(entitlement)이 없습니다. 권한 화면에서 SQL access 부여를 요청하세요.",
+    "UNSUPPORTED_SQL": "시뮬레이터가 지원하지 않는 SQL입니다. 지원 범위는 SQL Editor 화면의 안내를 확인하고, 다른 방식으로 바꿔 보세요.",
     "INSUFFICIENT_PERMISSIONS": "권한 오류입니다. 로그인 성공과 권한은 별개이며, 오류 문구의 **누락 권한(어느 계층: catalog/schema/table)**을 찾는 것이 첫 단계입니다. 전체 관리자 권한이 아니라 그 권한만 최소로 요청하세요. 자기 자신에게 GRANT 하면 금지 이벤트로 기록됩니다.",
     "WAREHOUSE_NOT_RUNNING": "SQL Warehouse가 꺼져 있습니다. 시작 후 몇 번의 명령이 지나면 RUNNING이 됩니다(결정적 시뮬레이션).",
     "TABLE_OR_VIEW_NOT_FOUND": "객체를 찾지 못했습니다. 3단계 이름(catalog.schema.table)과 철자, 그리고 파이프라인이 먼저 실행되어 대상 테이블이 만들어졌는지 확인하세요.",

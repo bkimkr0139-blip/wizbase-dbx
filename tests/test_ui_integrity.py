@@ -7,6 +7,20 @@ from backend import assistant, guide, sysinfo
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 APP = ROOT.joinpath("static", "app.js").read_text(encoding="utf-8")
 HELP = ROOT.joinpath("static", "help.js").read_text(encoding="utf-8")
+XJS = {p.name: p.read_text(encoding="utf-8") for p in sorted(ROOT.joinpath("static").glob("x_*.js"))}
+APP_ALL = APP + "\n".join(XJS.values())
+
+
+def _assign_block(src, target):
+    """x_*.js 의 Object.assign(V|H, { ... }); 블록 본문."""
+    out = []
+    for m in re.finditer(r"Object\.assign\(" + target + r",\s*\{", src):
+        i, depth = m.end(), 1
+        while i < len(src) and depth:
+            depth += {"{": 1, "}": -1}.get(src[i], 0)
+            i += 1
+        out.append(src[m.end():i - 1])
+    return "\n".join(out)
 MENU_VIEWS = [v for _, _, its in sysinfo.MENU for v, _, _ in its]
 
 
@@ -19,23 +33,27 @@ def handlers():
     blk = _block(APP, "window.H = {")
     names = set(re.findall(r"(?:async )?([A-Za-z_][A-Za-z0-9_]*)\([A-Za-z_, ]*\)\s*\{", blk))
     names |= set(re.findall(r"^  ([A-Za-z_][A-Za-z0-9_]*): ", blk, re.M))
+    xb = "\n".join(_assign_block(s, "H") for s in XJS.values())
+    names |= set(re.findall(r"(?:async )?([A-Za-z_][A-Za-z0-9_]*)\([A-Za-z_, ]*\)\s*\{", xb))
+    names |= set(re.findall(r"^  ([A-Za-z_][A-Za-z0-9_]*): ", xb, re.M))
     return names
 
 
 def views():
     blk = _block(APP, "const V = {")
-    return set(re.findall(r"^  (?:async )?([A-Za-z0-9_]+)\(\) \{", blk, re.M))
+    xb = "\n".join(_assign_block(s, "V") for s in XJS.values())
+    return set(re.findall(r"^  (?:async )?([A-Za-z0-9_]+)\(\) \{", blk + "\n" + xb, re.M))
 
 
 def test_every_button_action_has_a_handler():
-    used = set(re.findall(r'data-a="([A-Za-z0-9_]+)"', APP + HELP))
+    used = set(re.findall(r'data-a="([A-Za-z0-9_]+)"', APP_ALL + HELP))
     missing = sorted(used - handlers())
     assert not missing, f"동작(H.*)이 없는 버튼: {missing}"
 
 
 def test_every_navigation_target_is_a_real_view():
     v = views()
-    targets = set(re.findall(r'data-v="([a-z0-9]+)"', APP)) | set(re.findall(r'\b(?:SCN|N)\(\s*"[^"]*",\s*"([a-z0-9]+)"', APP + HELP))
+    targets = set(re.findall(r'data-v="([a-z0-9]+)"', APP_ALL)) | set(re.findall(r'\b(?:SCN|N)\(\s*"[^"]*",\s*"([a-z0-9]+)"', APP_ALL + HELP))
     targets |= set(re.findall(r'nav\("[^"]*",\s*"([a-z0-9]+)"', ROOT.joinpath("backend", "guide.py").read_text(encoding="utf-8") + ROOT.joinpath("backend", "assistant.py").read_text(encoding="utf-8")))
     bad = sorted(t for t in targets if t not in v)
     assert not bad, f"존재하지 않는 화면으로 이동하는 링크: {bad}"

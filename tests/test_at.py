@@ -8,6 +8,7 @@ os.environ["DBX_INSTRUCTOR_CODE"] = "I-test-code"
 os.environ["DBX_STAFF_CODE"] = "S-test-code"
 os.environ["DBX_ADMIN_CODE"] = "A-test-code"
 os.environ["DBX_LOGIN_LIMIT"] = "100000"
+os.environ["DBX_MAX_SESSIONS"] = "100000"          # 전체 스위트가 한 프로세스에서 세션을 계속 만들므로 운영 상한(300)을 풀어 둔다
 
 from fastapi.testclient import TestClient  # noqa: E402
 from backend.main import app  # noqa: E402

@@ -6,8 +6,9 @@ const ls = { get(k) { try { return localStorage.getItem(k) } catch { return null
 let TOKEN = ls.get("tok"), ME = null, SID = ls.get("sid"), ST = null, VIEW = ls.get("view") || "env", META = null, LASTLOG = "", PRINCIPAL = "", SIDE = true;
 let AI_SCROLL = "top", AI_KEEP = 0, SESSQ = { q: "", page: 0, size: 25, checked: new Set(), ids: [] }, REAL = null, LASTVIEW = "", PENDING_DEL = [], SYS = null, CLIENT_BUILD = null, RTAB = ls.get("rtab") || "", SYSPOP = "";
 const NAV = [
-  ["학습 환경", [["env", "UI-01 환경 점검"], ["req", "UI-02 착수·요구·계약"], ["ws", "UI-03 Workspace"], ["cat", "UI-04 Catalog Explorer"], ["sql", "UI-05 SQL Editor"], ["nb", "UI-06 Notebook"], ["comp", "UI-07 Compute/Warehouses"], ["track", "프로젝트 트랙(8주)"], ["demo", "고객 시연 20분"]]],
-  ["데이터 구축", [["conn", "UI-08 Connections/수집"], ["pipe", "UI-09 Pipelines"], ["cdc", "UI-09b CDC 재생"], ["jobs", "UI-10 Jobs"], ["genie", "UI-11 의미모델·Genie"], ["agent", "UI-12 Agent·승인"], ["trace", "UI-13 Tracing/평가"], ["bundle", "UI-14 Git/Bundle/CLI"], ["perm", "UI-15 권한·관리"]]],
+  ["AI·ML", [["ml", "UI-28 ML·MLflow"], ["genai", "UI-29 생성형 AI·RAG"], ["serve", "UI-30 Model Serving"]]],
+  ["학습 환경", [["env", "UI-01 환경 점검"], ["req", "UI-02 착수·요구·계약"], ["ws", "UI-03 Workspace"], ["cat", "UI-04 Catalog Explorer"], ["sql", "UI-05 SQL Editor"], ["qh", "UI-05b Query History"], ["lib", "UI-05c 라이브러리"], ["dash", "UI-05d Dashboards"], ["nb", "UI-06 Notebook"], ["comp", "UI-07 Compute/Warehouses"], ["track", "프로젝트 트랙(8주)"], ["demo", "고객 시연 20분"], ["acad", "UI-07b Academy 경로 대응"]]],
+  ["데이터 구축", [["conn", "UI-08 Connections/수집"], ["adddata", "UI-08b Add data"], ["vol", "UI-08c Volumes"], ["pipe", "UI-09 Jobs & Pipelines › Pipelines"], ["dpipe", "UI-09c 선언형 파이프라인"], ["designer", "UI-09d Lakeflow Designer"], ["cdc", "UI-09b CDC 재생"], ["jobs", "UI-10 Jobs & Pipelines › Jobs"], ["genie", "UI-11 의미모델·Genie Agents"], ["agent", "UI-12 Agent·승인"], ["trace", "UI-13 Tracing/평가"], ["bundle", "UI-14 Git/Bundle/CLI"], ["perm", "UI-15 권한·관리"]]],
   ["운영", [["rvw", "검토 센터"], ["fbq", "피드백·개발큐"], ["usage", "접속·사용 기록"], ["ko", "한국어 가이드"], ["xfer", "전이 시드·협업"], ["real", "실제 환경 연결"], ["inst", "UI-16 강사·수료"], ["evid", "증거 보고서"]]],
   ["전문과정 v1.1", [["prof", "UI-17 역량·등급"], ["plan", "UI-18 목표·학습계획"], ["map", "UI-19 공식 목표 지도"], ["tutor", "UI-20 AI 튜터"], ["exam", "UI-21 시험센터"], ["lab", "UI-22 실제 실습 증거함"], ["qual", "UI-23 콘텐츠 품질"], ["partner", "UI-24 파트너 인력"], ["conf", "UI-25 자료 충돌"], ["vmx", "UI-26 현장 대조표"]]]
 ];
@@ -35,7 +36,9 @@ const fmtIso = t => { if (!t) return "-"; const d = new Date(t); return isNaN(d)
 const fmtKst = t => t ? new Date(t * 1000).toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }).slice(0, 16) : "-";
 const badge = (t, c) => `<span class="b ${c || ""}">${esc(t)}</span>`;
 const lv = l => badge(l, l === "LOCAL_EXECUTED" ? "ok" : "w");
-function table(cols, rows, untrusted) { if (!rows || !rows.length) return `<div class="mute">(없음)</div>`; return `<div class="tw"><table><tr>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr>${rows.map(r => `<tr>${r.map(c => `<td>${typeof c === "object" && c !== null ? pretty(c, 2) : (!untrusted && typeof c === "string" && /^<(a|button|input|span)\b/.test(c) ? c : ((!untrusted && autoLink(c)) || esc(c)))}</td>`).join("")}</tr>`).join("")}</table></div>` }
+const T = s => ({ __html: esc(s) });   // 사용자 입력 텍스트를 '이스케이프 완료 HTML'로 table 셀에 넣는 래퍼(셀 첫 글자가 '<span' 같아도 태그로 해석되지 않게)
+const isTrustedCell = c => typeof c === "string" && /^<(a|button|input|span)\b/.test(c) && !/\son[a-z]+\s*=|javascript:|<\s*(script|iframe)/i.test(c);
+function table(cols, rows, untrusted) { if (!rows || !rows.length) return `<div class="mute">(없음)</div>`; return `<div class="tw"><table><tr>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr>${rows.map(r => `<tr>${r.map(c => `<td>${typeof c === "object" && c !== null ? (c.__html !== undefined ? c.__html : pretty(c, 2)) : (!untrusted && isTrustedCell(c) ? c : ((!untrusted && autoLink(c)) || esc(c)))}</td>`).join("")}</tr>`).join("")}</table></div>` }
 const val = id => $("#" + id)?.value;
 const PV = v => ({ unknown: "미확인", to_be_pinned: "미지정(확정 전)", to_be_recorded: "미기록", not_applicable: "해당 없음", serverless: "서버리스", training: "교육용", aws: "AWS", en: "영어(en)", DOC_CHECKED: "문서 확인만 완료" })[v] ?? (v === null || v === undefined ? "기록 없음" : v === true ? "예" : v === false ? "아니오" : String(v));
 function profileHtml(p) {
@@ -120,7 +123,7 @@ async function render(soft) {
     <button class="aitab axostab ${AI_OPEN && PANEL === "axos" ? "on" : ""}" data-a="axostoggle" aria-label="AXOS 피드백 열기">${ICON.axos}<span>AXOS</span>${FB_UNSEEN ? '<i class="pulse"></i>' : ""}</button>
     <aside id="ai" class="${AI_OPEN ? "open" : ""}">${aiHtml()}</aside>
     <div class="log" id="log">${fixBtn()}<span>${esc(LASTLOG) || "실행 로그 · 오류 · 증거 수준이 여기에 표시됩니다."}</span></div>`;
-  if (VIEW !== LASTVIEW) { LASTVIEW = VIEW; api("/api/usage/view", { body: { view: VIEW } }).catch(() => { }) }
+  if (VIEW !== LASTVIEW) { LASTVIEW = VIEW; pushRecent("view", VIEW, (NAV.flatMap(g => g[1]).find(x => x[0] === VIEW) || [VIEW, VIEW])[1]); touchStreak(); api("/api/usage/view", { body: { view: VIEW } }).catch(() => { }) }
   if (ME && VIEW === LASTVIEW) ls.set("lv_" + ME.name.toLowerCase(), VIEW);
   const needSess = !["env", "exam", "prof", "plan", "map", "tutor", "lab", "qual", "partner", "conf", "vmx", "inst", "rvw", "ko", "xfer", "fbq", "usage", "real"].includes(VIEW);
   const main = $("#main");
@@ -184,6 +187,7 @@ const HOTKEYS = { KeyA: "aitoggle", KeyU: "sysupdate", KeyI: "sysinfo", KeyK: "k
 document.addEventListener("keydown", ev => {
   if (!TOKEN || !SYS) return;
   const code = ev.code || "";
+  if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && !ev.altKey && code === "KeyP") { ev.preventDefault(); qsearch(); return }
   if (ev.key === "F1") { ev.preventDefault(); H.helptoggle(); return }
   if (ev.key === "F10" || (ev.altKey && !ev.ctrlKey && !ev.shiftKey && /^Digit[1-9]$/.test(code))) {
     ev.preventDefault(); const nm = SYS.menu.length + 1;
@@ -544,11 +548,11 @@ window.H = {
   logout() { TOKEN = null; ME = null; ST = null; ls.del("tok"); render() },
   side() { SIDE = !SIDE; render(true) },
   nav(d) { VIEW = d.v; ls.set("view", VIEW); render(true) },
-  async newsess() { const j = await api("/api/sessions", { body: { mode: val("mode"), learning_mode: val("lmode"), lesson_id: "UC-SELECT-01", seed: val("seedsel") } }); SID = j.session_id; ls.set("sid", SID); ST = null; GUIDE = null; loadChat(); await refresh() },
+  async newsess() { const j = await api("/api/sessions", { body: { mode: val("mode"), learning_mode: val("lmode"), lesson_id: "UC-SELECT-01", seed: val("seedsel"), profile_id: val("profsel") || undefined } }); SID = j.session_id; ls.set("sid", SID); ST = null; GUIDE = null; loadChat(); await refresh() },
   async opensess(d) { SID = d.id; ls.set("sid", SID); ST = null; GUIDE = null; loadChat(); await refresh() },
   async hint() { const j = await api(`/api/sessions/${SID}/hints`); $("#hint").textContent = `[${j.level}/5] ${j.hint}`; await refresh() },
   async c(d, el) { const p = d.p ? JSON.parse(d.p) : {}; await cmd(d.t, p) },
-  async sql() { const ex = await cmd("sql.execute", { sql: val("sqlbox"), as_principal: val("asp") || undefined }); LAST.sql = ex; HIST.sql.unshift({ q: val("sqlbox"), s: ex?.status, err: ex?.result?.error || null }); HFIX = ex?.result?.error ? 0 : -1; render(true) },
+  async sql() { const q = val("sqlbox"); LAST.sqlq = q; const ex = await cmd("sql.execute", { sql: q, as_principal: val("asp") || undefined }); LAST.sql = ex; HIST.sql.unshift({ q, s: ex?.status, err: ex?.result?.error || null }); HFIX = ex?.result?.error ? 0 : -1; render(true) },
   async whstart() { await cmd("warehouse", { action: "start" }) }, async whstop() { await cmd("warehouse", { action: "stop" }) },
   async ticket() { await api("/api/permission-requests", { body: { session_id: SID, securable: val("t_sec"), privilege: val("t_priv"), reason: val("t_reason") } }).then(() => { log("권한 요청 티켓 생성"); return refresh() }).catch(e => log("✗ " + e.message, true)) },
   async resolve(d) { await api(`/api/sessions/${SID}/tickets/${d.id}/resolve`, { body: { decision: d.dec, note: "" } }).then(() => log("티켓 " + d.dec)).catch(e => log("✗ " + e.message, true)); await refresh() },
@@ -585,8 +589,24 @@ window.H = {
   async replay(d) { const r = await api("/api/instructor/replay", { body: { session_id: d.sid } }); LAST.replay = r; render(true) },
   async explain(d) { const r = await api("/api/instructor/evaluate", { body: { session_id: d.sid, explain_score: +val("exs") } }); LAST.score = r; render(true) },
   async asrole(d) { PRINCIPAL = d.p; await refresh() },
-  async ctab(d) { LAST.ctab = d.t; render(true) },
-  async ctable(d) { LAST.tbl = await api(`/api/sessions/${SID}/catalog/table?name=${encodeURIComponent(d.n)}`); render(true) },
+  adfile(el) { const f = el.files && el.files[0]; if (!f) return; if (f.size > 200000) { toast("200KB 이하 파일만 올릴 수 있습니다."); return } const fr = new FileReader(); fr.onload = () => { AD.csv = String(fr.result || ""); AD.filename = f.name; if (!AD.table) AD.table = f.name.replace(/\.[^.]+$/, "").toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/^[^a-z]+/, "").slice(0, 40); render(true) }; fr.readAsText(f, "utf-8") },
+  adsample(d) { const x = AD_SAMPLES[+d.i]; AD.csv = x[1]; AD.filename = `sample_${+d.i + 1}.csv`; if (!AD.table) AD.table = "store_sales"; render(true) },
+  async adrun() { try { AD.csv = val("adcsv") ?? AD.csv; AD.schema = val("adsch") ?? AD.schema; AD.catalog = val("adcat") ?? AD.catalog; AD.table = val("adtbl") ?? AD.table; const r = await api(`/api/sessions/${SID}/add-data`, { body: { catalog: AD.catalog, schema: AD.schema, table: AD.table, csv: AD.csv, mode: AD.mode, filename: AD.filename } }); AD.res = r.status === "succeeded" ? r : { error: r.error }; log(r.status === "succeeded" ? `${r.table} ${r.skipped ? "건너뜀(이미 적재)" : r.rows_loaded + "행 적재"}` : "✗ " + r.error.message, r.status !== "succeeded"); if (r.status !== "succeeded") { LASTERR = r.error } await refresh() } catch (e) { toast(e.message) } },
+  qsave() { const q = (val("sqlbox") || "").trim(); if (!q) { toast("저장할 SQL이 없습니다."); return } const k = "qsave_" + SID, a = lsj(k, []).filter(x => x.sql !== q); a.unshift({ name: q.replace(/\s+/g, " ").slice(0, 40), sql: q, at: new Date().toISOString() }); ls.set(k, JSON.stringify(a.slice(0, 30))); log("쿼리를 저장했습니다(라이브러리 > Queries)") },
+  qdel(d) { const k = "qsave_" + SID; ls.set(k, JSON.stringify(lsj(k, []).filter((_, i) => i !== +d.i))); render(true) },
+  libtab(d) { LAST.libtab = d.k; render(true) },
+  libdtype(d) { LAST.dtype = d.k; render(true) },
+  qsearch() { qsearch() },
+  async recopen(d) { VIEW = "cat"; ls.set("view", "cat"); await H.ctable({ n: d.n }) },
+  acadpath(d) { ACAD.path = d.k; render(true) },
+  wstab(d) { LAST.wstab = d.k; render(true) },
+  wsfav(d) { const k = "wsfav_" + SID; let f = []; try { f = JSON.parse(ls.get(k) || "[]") } catch { } f = f.includes(d.k) ? f.filter(x => x !== d.k) : [...f, d.k]; ls.set(k, JSON.stringify(f)); render(true) },
+  ctab(d) { CTAB = d.k; render(true) },
+  qhfilter() { QH.status = val("qhs") || ""; QH.statement = val("qhst") || ""; QH.via = val("qhv") || ""; QH.principal = val("qhp") || ""; QH.minutes = +(val("qhm") || 0); QH.min_ms = +(val("qhd") || 0); QH.q = val("qhq") || ""; QH.page = 0; render(true) },
+  qhreset() { QH = { status: "", statement: "", via: "", principal: "", q: "", minutes: 0, min_ms: 0, page: 0, size: QH.size }; render(true) },
+  qhpage(d) { QH.page = Math.max(0, +d.p); render(true) },
+  qhpagesize(v) { QH.size = +v; QH.page = 0; render(true) },
+  async ctable(d) { pushRecent("table", d.n, d.n); LAST.tbl = await api(`/api/sessions/${SID}/catalog/table?name=${encodeURIComponent(d.n)}`); render(true) },
   /* v1.1 */
   async examstart(d) { LAST.att = await api("/api/exam-attempts", { body: { exam_id: val("exid"), kind: val("exk"), max_items: +val("exmax") || null } }).catch(e => { log("✗ " + e.message + (e.data?.shortfall ? " " + JSON.stringify(e.data.shortfall) : ""), true); return null }); render(true) },
   async examans(d) { const sel = [...document.querySelectorAll(`input[name="q_${d.i}"]:checked`)].map(x => x.value); LAST.ver = (LAST.ver || 0) + 1; await api(`/api/exam-attempts/${LAST.att.attempt_id}/responses`, { body: { item_id: d.i, answer: sel, client_version: LAST.ver } }).then(r => log("응답 저장 " + JSON.stringify(r))).catch(e => log("✗ " + e.message, true)) },
@@ -625,6 +645,9 @@ const REMEDY = {
   NO_SQL_ENTITLEMENT: e => ({ why: "Databricks SQL 사용 자격(entitlement)이 없습니다. 로그인 성공과 SQL 사용 권한은 다릅니다.", steps: ["권한·관리 화면의 Principal 표에서 내 entitlement를 확인합니다.", "관리자에게 Databricks SQL access 부여를 요청합니다."], actions: [SCN("권한·관리 화면으로", "perm"), SCA("AI 지원에게 물어보기", "SQL entitlement 오류는 어떻게 해결해?")] }),
   INSUFFICIENT_PERMISSIONS: e => { const m = e.missing || {}; return ({ why: `Unity Catalog 권한이 부족합니다${m.privilege ? ` — ${m.securable} 에 ${m.privilege} 권한이 필요합니다` : ""}. 부모(catalog/schema)의 USE 권한과 테이블 SELECT는 별개입니다.`, steps: ["필요한 권한(대상·권한 종류)을 확인합니다.", "권한 요청 화면에 아래 내용이 미리 채워집니다. 사유를 구체적으로 보완해 제출합니다(ALL PRIVILEGES 같은 과도한 요청은 반려).", "관리자가 처리해 승인되면 SQL Editor에서 다시 실행합니다."], actions: [SCN("권한 요청하러 가기 (자동 입력)", "perm", { t_sec: m.securable || "schema:food_dev.silver", t_priv: m.privilege || "USE SCHEMA", t_reason: "SQL 조회를 위해 필요한 최소 권한" }), SCN("Catalog에서 권한 확인", "cat"), SCN("SQL Editor로 돌아가기", "sql")] }) },
   TABLE_OR_VIEW_NOT_FOUND: e => ({ why: "테이블이나 뷰를 찾을 수 없습니다. 이름이 틀렸거나, 권한이 없어 보이지 않는 것일 수 있습니다. 이름은 3단계(catalog.schema.table)로 씁니다.", steps: ["Catalog Explorer에서 실제 테이블 이름과 내가 볼 수 있는 범위를 확인합니다.", "SQL의 catalog.schema.table 철자를 고칩니다.", "그래도 안 보이면 권한 문제일 수 있으니 권한 요청을 확인합니다."], actions: [SCN("Catalog에서 이름 찾기", "cat"), SCN("예제 SQL로 다시 시작", "sql", { sqlbox: EX_SQL[0] }), SCN("권한 확인", "perm")] }),
+  SCHEMA_NOT_FOUND: e => ({ why: "schema 가 없습니다. 테이블·volume 을 만들려면 그 schema 가 먼저 있어야 합니다.", steps: ["CREATE SCHEMA catalog.schema 로 먼저 만듭니다(내가 만든 catalog 는 소유자라 바로 가능).", "Catalog 화면에서 이름을 확인합니다."], actions: [SCN("Catalog에서 확인", "cat"), SCN("CREATE SCHEMA 예시", "sql", { sqlbox: "CREATE SCHEMA IF NOT EXISTS food_dev.gold_demo" })] }),
+  INVALID_NAME: e => ({ why: "이름 규칙에 맞지 않습니다. catalog·schema·테이블·volume 이름은 영문 소문자로 시작하고 소문자·숫자·_ 만 쓰며 '__' 는 쓸 수 없습니다.", steps: ["이름을 규칙에 맞게 고칩니다(예: my_course)."], actions: [] }),
+  SQL_TOO_LONG: e => ({ why: "SQL이 너무 깁니다(최대 20,000자). 시뮬레이터는 서버 보호를 위해 긴 SQL을 실행하지 않습니다.", steps: ["여러 문장으로 나누어 하나씩 실행합니다.", "반복되는 조건은 뷰(CREATE VIEW)나 CTE로 줄입니다.", "큰 데이터는 SQL에 직접 넣지 말고 Add data로 올립니다."], actions: [SCN("Add data로 올리기", "adddata"), SCN("SQL Editor로 돌아가기", "sql")] }),
   PARSE_ERROR: e => ({ why: "SQL 문법을 해석하지 못했습니다(괄호·쉼표·키워드 철자 등).", steps: ["메시지의 위치 주변에서 철자·괄호·쉼표를 확인합니다.", "아래 예제 SQL로 동작을 먼저 확인한 뒤 조금씩 바꿔 봅니다."], actions: [SCN("예제 SQL 불러오기 (조회)", "sql", { sqlbox: EX_SQL[0] }), SCN("예제 SQL 불러오기 (집계)", "sql", { sqlbox: EX_SQL[1] }), SCA("AI 지원에게 물어보기", "SQL 문법 오류가 났어. 어떻게 고쳐?")] }),
   UNSUPPORTED_SQL: e => ({ why: "이 시뮬레이터가 지원하지 않는 SQL입니다(실제 Databricks에서는 될 수 있습니다). 지원: SELECT/JOIN/GROUP BY/CTE/CASE, CREATE SCHEMA/TABLE/VIEW, INSERT, UPDATE/DELETE/MERGE, GRANT/REVOKE(관리자).", steps: ["지원 범위 안의 문장으로 바꿔 봅니다.", "정말 필요한 기능이면 AXOS 탭에서 \"기능 추가 요청\"으로 알려 주세요."], actions: [SCN("지원 예제로 시작", "sql", { sqlbox: EX_SQL[0] }), { type: "axos", label: "기능 추가 요청하기 (AXOS)", kind: "FEATURE" }] }),
   SIMULATOR_UNSUPPORTED: e => REMEDY.UNSUPPORTED_SQL(e),
@@ -726,7 +749,7 @@ function autoLink(c) {
   if (!v && /^s_[0-9a-f]{8,}$/.test(c)) return `<a href="#" class="golink" data-a="opensess" data-id="${esc(c)}" title="이 세션 열기">${esc(c)} ›</a>`;
   return v && v !== VIEW && canGo(v) ? goLink(v, c) : null;
 }
-const NEXTV = { env: "req", req: "comp", ws: "cat", cat: "sql", sql: "perm", nb: "pipe", comp: "cat", conn: "pipe", pipe: "jobs", cdc: "jobs", jobs: "nb", genie: "agent", agent: "trace", trace: "bundle", bundle: "perm", perm: "sql", track: "demo", demo: "evid", xfer: "prof", prof: "plan", plan: "map", map: "tutor", ko: "tutor", tutor: "exam", exam: "lab", lab: "qual", qual: "partner", partner: "conf", conf: "vmx", vmx: "rvw", rvw: "vmx", fbq: "usage", usage: "evid", real: "lab", inst: "evid", evid: "prof" };
+const NEXTV = { env: "req", req: "comp", ws: "cat", cat: "sql", sql: "qh", qh: "lib", lib: "perm", nb: "pipe", comp: "cat", conn: "adddata", adddata: "vol", vol: "pipe", pipe: "dpipe", dpipe: "designer", designer: "jobs", dash: "genie", ml: "serve", genai: "serve", serve: "trace", cdc: "jobs", jobs: "nb", genie: "agent", agent: "trace", trace: "bundle", bundle: "perm", perm: "sql", track: "acad", acad: "demo", demo: "evid", xfer: "prof", prof: "plan", plan: "map", map: "tutor", ko: "tutor", tutor: "exam", exam: "lab", lab: "qual", qual: "partner", partner: "conf", conf: "vmx", vmx: "rvw", rvw: "vmx", fbq: "usage", usage: "evid", real: "lab", inst: "evid", evid: "prof" };
 function viewFooter(v) {
   let n = NEXTV[v]; if (n && !canGo(n)) n = ["evid", "prof", "env"].find(x => x !== v && canGo(x));
   const b = [];
@@ -803,6 +826,77 @@ function kpiTile(label, v, prev, o = {}) {
   const d = prev ? Math.round((v - prev) / prev * 100) : null;
   return `<div class="kpi"><div class="kl">${esc(label)}</div><div class="kv">${nf(v)}${o.unit ? `<small>${o.unit}</small>` : ""}</div><div class="kd">${d === null ? "이전 기간 기록 없음" : `${d > 0 ? "▲" : d < 0 ? "▼" : "–"} ${Math.abs(d)}% (이전 ${USG.days}일 ${nf(prev)})`}</div></div>`;
 }
+
+const CTABS = [["overview", "Overview"], ["sample", "Sample Data"], ["details", "Details"], ["perms", "Permissions"], ["history", "History"], ["lineage", "Lineage"], ["insights", "Insights"], ["quality", "Quality"]];
+let CTAB = "overview", QH = { status: "", statement: "", via: "", principal: "", q: "", minutes: 0, min_ms: 0, page: 0, size: 25 };
+const VIA_L = { dashboard: "Dashboard", designer: "Lakeflow Designer", dlt: "선언형 파이프라인", volume: "Volumes", genie_code: "Genie Code", ml: "ML", rag: "RAG", add_data: "Add data", sql_editor: "SQL Editor", notebook: "Notebook", pipeline: "Pipeline", job: "Job", genie: "Genie", cli: "CLI", catalog: "Catalog" };
+function tblDetail(t) {
+  if (t.error) return resBox({ result: { error: t.error } });
+  const isView = t.kind === "VIEW", sqlBtn = (label, q) => scBtn(SCN(label, "sql", { sqlbox: q }));
+  const tabs = `<div class="vfilters" role="tablist">${CTABS.map(([k, l]) => `<button class="${CTAB === k ? "primary" : "ghost"}" role="tab" data-a="ctab" data-k="${k}">${l}</button>`).join("")}</div>`;
+  const head = `<b>${esc(t.name)}</b> ${badge(isView ? "VIEW" : "TABLE", isView ? "w" : "ok")} ${lv(t.evidence_level)} <span class="mute">owner ${esc(t.owner)}</span>`;
+  let b = "";
+  if (CTAB === "overview") b = `<div class="grid2"><div><h3>컬럼</h3>${table(["이름", "타입"], t.columns.map(x => [T(x.name), x.type]))}</div><div><h3>About this ${isView ? "view" : "table"}</h3>${kvTable({ State: "Active(시뮬레이션)", Owner: t.owner, Type: isView ? "View" : "Managed", "Data source": t.details.data_source, Rows: nf(t.row_count), Columns: t.columns.length })}</div></div>`;
+  else if (CTAB === "sample") b = `<div class="sub">처음 10행(읽기 전용 미리보기)</div>${table(t.preview_columns, t.rows, true)}`;
+  else if (CTAB === "details") b = kvTable({ 유형: t.details.type, "데이터 소스": t.details.data_source, 행: nf(t.details.rows), 열: t.details.columns, "보관 버전 수": isView ? "-" : t.details.versions, 소유자: t.details.owner, "학습자가 만든 객체": t.details.created_by_learner ? "예" : "아니오(시드)" }) + `<div class="sub">실제 Databricks Details 탭에는 저장 위치·형식·파티션·크기 등이 나옵니다. 이 시뮬레이터는 로컬 DuckDB이므로 저장 위치 정보는 제공하지 않습니다.</div>`;
+  else if (CTAB === "perms") b = table(["주체", "권한", "대상", "상속"], t.grants.map(g => [T(g.principal), g.privilege, T(g.securable), g.inherited ? "상위에서 상속" : "직접 부여"])) + `<div class="sub">소유자와 관리자는 목록에 없어도 접근합니다. 부모(catalog/schema)의 USE 권한과 테이블 SELECT는 별개입니다.</div><div class="row">${scBtn(SCN("권한 화면으로", "perm"))}</div>`;
+  else if (CTAB === "history") b = isView ? `<div class="mute">뷰에는 Delta 버전 이력이 없습니다(기반 테이블의 이력을 확인하세요).</div>` : `${table(["버전", "시각(KST)", "사용자", "작업", "파라미터", "행 수", "읽기 가능"], t.history.map(h => [h.version, fmtIso(h.timestamp), h.userName, h.operation, kvText(h.operationParameters), h.numOutputRows ?? "-", h.snapshot ? "예" : "보관 안 됨"]))}
+      <div class="sub">쓰기(INSERT/UPDATE/DELETE/MERGE/CREATE OR REPLACE) 때마다 새 버전이 생깁니다. 시뮬레이터는 최근 30개 버전의 스냅샷을 보관합니다(세션을 다시 불러오면 이전 스냅샷은 사라질 수 있음).</div>
+      <div class="row">${sqlBtn("DESCRIBE HISTORY 열기", `DESCRIBE HISTORY ${t.name}`)}${sqlBtn("VERSION AS OF 0 조회", `SELECT * FROM ${t.name} VERSION AS OF 0 LIMIT 10`)}${sqlBtn("RESTORE 예시(주의: 내용이 되돌아감)", `RESTORE TABLE ${t.name} TO VERSION AS OF 0`)}</div>`;
+  else if (CTAB === "lineage") { const up = t.lineage.filter(e => e[1] === t.name).map(e => e[0]), dn = t.lineage.filter(e => e[0] === t.name).map(e => e[1]); b = `<div class="grid2"><div><h3>Upstream(이 객체가 읽는 것)</h3>${up.length ? up.map(x => `<div>◀ ${esc(x)}</div>`).join("") : '<span class="mute">없음</span>'}</div><div><h3>Downstream(이 객체를 쓰는 것)</h3>${dn.length ? dn.map(x => `<div>▶ ${esc(x)}</div>`).join("") : '<span class="mute">없음</span>'}</div></div><div class="sub">교육용 고정 계보입니다. 실제 계보는 쿼리 실행에서 자동 수집됩니다.</div>` }
+  else if (CTAB === "insights") { const i = t.insights; b = `<div class="kpis"><div class="kpi"><b>${i.query_count}</b><span>이 세션에서 조회·변경한 쿼리</span></div><div class="kpi"><b>${i.failed}</b><span>실패</span></div></div>${i.top_users.length ? table(["주체", "쿼리 수"], i.top_users) : ""}${i.recent.length ? table(["시각", "주체", "소스", "구문", "상태", "SQL"], i.recent.map(r => [fmtIso(r.at), r.principal, VIA_L[r.via] || r.via, r.statement, r.status, r.sql]), true) : '<div class="mute">아직 이 테이블을 사용한 쿼리가 없습니다.</div>'}<div class="row">${scBtn(SCN("Query History 열기", "qh"))}</div>`; }
+  else if (CTAB === "quality") b = table(["컬럼", "타입", "NULL 수", "NULL 비율(%)", "고유값 수"], t.quality.map(q => [T(q.column), q.type, q.nulls ?? "-", q.null_pct ?? "-", q.distinct ?? "-"])) + `<div class="sub">현재 데이터를 직접 계산한 간이 프로파일입니다(실제 Quality 탭은 모니터링 기능을 켜야 표시됩니다).</div>`;
+  return `${head}${tabs}<div class="ctab">${b}</div>`;
+}
+const QHQ = () => Object.entries(QH).filter(([k, v]) => !["page", "size"].includes(k) && v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).concat([`page=${QH.page}`, `size=${QH.size}`]).join("&");
+
+const AD_SAMPLES = [
+  ["샘플 1(첫 적재)", "order_date,store_id,sku,qty,unit_price\n2026-11-01,S01,A100,3,1200\n2026-11-01,S02,A200,5,800\n2026-11-02,S01,A200,2,800\n2026-11-02,S03,A300,7,450\n2026-11-03,S02,A100,1,1200\n"],
+  ["샘플 2(추가분)", "order_date,store_id,sku,qty,unit_price\n2026-11-04,S01,A300,4,450\n2026-11-04,S03,A100,2,1200\n2026-11-05,S02,A200,6,800\n"],
+];
+const AD_CONNECTORS = ["Amazon S3", "Foreign Catalog", "OpenSharing", "Salesforce", "SQL Server", "Google Analytics", "SAP", "Workday", "ServiceNow", "Dynamics 365", "MySQL", "SharePoint"];
+let AD = { catalog: "food_dev", schema: "gold", table: "", mode: "create", csv: "", filename: "", res: null };
+
+const LIBT = [["queries", "Queries"], ["dash", "Dashboards"], ["alerts", "Alerts"], ["recents", "Recents"], ["discover", "Discover"], ["market", "Marketplace"], ["ach", "Achievements"]];
+const lsj = (k, d) => { try { return JSON.parse(ls.get(k) || "null") ?? d } catch { return d } };
+const todayKey = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+function pushRecent(t, k, label) { if (!SID) return; const key = "rec_" + SID, a = lsj(key, []).filter(x => !(x.t === t && x.k === k)); a.unshift({ t, k, label, at: new Date().toISOString() }); ls.set(key, JSON.stringify(a.slice(0, 20))) }
+function touchStreak() { if (!ME) return; const key = "streak_" + ME.name.toLowerCase(), d = todayKey(), o = lsj(key, { last: "", n: 0, best: 0 }); if (o.last === d) return; const y = new Date(Date.now() - 864e5).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }); o.n = o.last === y ? o.n + 1 : 1; o.best = Math.max(o.best || 0, o.n); o.last = d; ls.set(key, JSON.stringify(o)) }
+function qsearch() {
+  if ($("#qs")) { $("#qs").remove(); return }
+  const items = []; const seen = new Set();
+  (SYS?.menu || []).forEach(g => g.items.forEach(i => { if (!seen.has(i.view)) { seen.add(i.view); items.push({ k: "v:" + i.view, label: i.label, sub: i.desc, run: () => H.nav({ v: i.view }) }) } }));
+  NAV.forEach(g => g[1].forEach(([v, l]) => { if (!seen.has(v)) { seen.add(v); items.push({ k: "v:" + v, label: l, sub: g[0], run: () => H.nav({ v }) }) } }));
+  lsj("qsave_" + SID, []).forEach(q => items.push({ k: "q:" + q.name, label: "쿼리: " + q.name, sub: q.sql.slice(0, 60), run: () => { LAST.sqlq = q.sql; H.nav({ v: "sql" }) } }));
+  lsj("rec_" + SID, []).filter(x => x.t === "table").forEach(x => items.push({ k: "t:" + x.k, label: "테이블: " + x.k, sub: "최근", run: async () => { VIEW = "cat"; ls.set("view", "cat"); await H.ctable({ n: x.k }) } }));
+  const ov = document.createElement("div"); ov.id = "qs"; ov.className = "qsov";
+  ov.innerHTML = `<div class="qsbox" role="dialog" aria-label="통합 검색"><input id="qsin" placeholder="화면·저장한 쿼리·최근 테이블 검색 (Enter 이동, Esc 닫기)" autocomplete="off"><div class="qsl" id="qsl"></div></div>`;
+  document.body.appendChild(ov);
+  let cur = 0, shown = [];
+  const draw = () => { const q = $("#qsin").value.trim().toLowerCase(); shown = items.filter(i => !q || (i.label + " " + (i.sub || "")).toLowerCase().includes(q)).slice(0, 12); cur = Math.min(cur, Math.max(0, shown.length - 1)); $("#qsl").innerHTML = shown.length ? shown.map((i, n) => `<div class="qsi ${n === cur ? "on" : ""}" data-n="${n}"><b>${esc(i.label)}</b><span class="mute">${esc(i.sub || "")}</span></div>`).join("") : '<div class="mute" style="padding:8px">결과 없음</div>' };
+  const go = n => { const it = shown[n]; ov.remove(); if (it) it.run() };
+  ov.addEventListener("click", e => { const r = e.target.closest(".qsi"); if (r) go(+r.dataset.n); else if (e.target === ov) ov.remove() });
+  $("#qsin").addEventListener("input", () => { cur = 0; draw() });
+  $("#qsin").addEventListener("keydown", e => { if (e.key === "Escape") { ov.remove() } else if (e.key === "Enter") { e.preventDefault(); go(cur) } else if (e.key === "ArrowDown") { e.preventDefault(); cur = Math.min(shown.length - 1, cur + 1); draw() } else if (e.key === "ArrowUp") { e.preventDefault(); cur = Math.max(0, cur - 1); draw() } });
+  draw(); $("#qsin").focus();
+}
+function academyCard() {
+  const rows = [
+    ["Free Edition·서버리스 컴퓨트", "Compute(UI-07), 프로필 선택(Free Edition)", "comp"],
+    ["Unity Catalog 탐색·테이블 상세", "Catalog(UI-04) 8개 탭", "cat"],
+    ["SQL 작성·실행 이력", "SQL Editor(UI-05), Query History(UI-05b)", "qh"],
+    ["파일 적재(CTAS·COPY INTO)", "Add data(UI-08b)", "adddata"],
+    ["버전 이력·타임 트래블(DESCRIBE HISTORY·VERSION AS OF·RESTORE)", "Catalog History 탭, SQL Editor", "cat"],
+    ["파이프라인·Job 구성", "Jobs & Pipelines(UI-09·UI-10)", "pipe"],
+  ];
+  return `<div class="card"><b>Databricks Academy 연계 — Get started with data engineering</b><div class="sub">2026-11-12 Free Edition 워크스페이스에서 관찰한 코스 개요(예상 235분·레슨 11개·실습 8개·Demo→Lab 쌍·선수 조건: Free Edition, 서버리스, 코스 전용 catalog 생성 권한)와 이 시뮬레이터의 연습 화면을 <b>주제 단위</b>로 대응시킨 표입니다. 레슨 본문은 수강을 시작해야 열려 조회하지 않았으므로 레슨 제목 단위 대응은 아닙니다.</div>
+    ${table(["코스 주제", "이 시뮬레이터에서 연습", "이동"], rows.map(r => [r[0], r[1], scBtn(SCN("열기", r[2]))]))}
+    <div class="row">${scBtn(SCN("4개 역할 경로 전체 대응표 열기", "acad"))}</div><div class="sub">실제 코스는 Academy에서 본인 계정으로 진행하세요(공식 콘텐츠를 복제하지 않습니다).</div></div>`;
+}
+
+let ACAD = { path: "data-engineers" };
+const COVL = { full: ["직접 연습", "ok"], partial: ["일부(근사)", "w"], none: ["미지원", "bad"], lecture: ["강의", ""] };
+const TIERL = { onboarding: "온보딩", associate: "Associate", professional: "Professional" };
 function pagerHtml(total, page, size, act) {
   const pages = Math.max(1, Math.ceil(total / size)), b = (label, p, dis) => `<button class="ghost" data-a="${act}" data-p="${p}" ${dis ? "disabled" : ""}>${label}</button>`;
   const st = Math.max(0, Math.min(page - 2, pages - 5)), nums = []; for (let i = st; i < Math.min(pages, st + 5); i++) nums.push(`<button class="${i === page ? "primary" : "ghost"}" data-a="${act}" data-p="${i}" ${i === page ? 'aria-current="page"' : ""}>${i + 1}</button>`);
@@ -943,7 +1037,7 @@ const V = {
     const sp = await api(`/api/sessions/page?q=${encodeURIComponent(SESSQ.q)}&page=${SESSQ.page}&size=${SESSQ.size}`); SESSQ.page = sp.page; SESSQ.ids = sp.ids; const sess = sp.items; const feats = await api("/api/features");
     return `<h2>UI-01 환경 점검</h2><div class="sub">클라우드·리전·프로필·권한·미지원 항목 확인. 프로필은 선택 예시이며 모든 기능이 가능하다는 보증이 아닙니다.</div>
     <div class="card"><b>새 세션</b><div class="row"><select id="mode"><option value="B">B 로컬 코드 실습 (LOCAL_EXECUTED)</option><option value="A">A 완전 모의 (SIMULATED)</option><option value="C">C 실제 교육용 DBX (이 배포 미지원)</option></select>
-    <select id="seedsel"><option value="food-order-v1">시드 v1</option><option value="food-order-v2">시드 v2 (다른 숫자)</option><option value="food-order-v3">시드 v3 (다른 숫자)</option></select><select id="lmode"><option value="guided">안내형</option><option value="practice">실습형</option><option value="real">실전형</option><option value="demo">고객 시연형</option></select><button data-a="newsess">세션 시작</button></div>
+    <select id="profsel" title="환경 프로필"><option value="aws-seoul-training-baseline-20261111">AWS 서울 교육 기준(웨어하우스 수동 시작)</option><option value="databricks-free-edition-observed-20261112">Free Edition(서버리스 전용·자동 시작, 2026-11-12 관찰)</option></select><select id="seedsel"><option value="food-order-v1">시드 v1</option><option value="food-order-v2">시드 v2 (다른 숫자)</option><option value="food-order-v3">시드 v3 (다른 숫자)</option></select><select id="lmode"><option value="guided">안내형</option><option value="practice">실습형</option><option value="real">실전형</option><option value="demo">고객 시연형</option></select><button data-a="newsess">세션 시작</button></div>
     <div class="sub">실습 범위: 식자재 주문 변경 합성 데이터(거래처 30·상품 100·주문 300·주문행 900, 시드 food-order-v1, 기준시각 2026-11-11 15:20 KST). 실행 경계: Python/PySpark 미실행, 외부 접속 차단. 모드는 실행 중 전환 불가.</div></div>
     <div class="card"><b>${ME.role === "admin" ? "전체 세션 (admin)" : "내 세션"}</b>${(() => { const L = sess; const bar = `<div class="vfilters"><input id="sessq" value="${esc(SESSQ.q)}" placeholder="세션 ID·사용자·레슨·모드 검색" style="width:260px" onkeydown="if(event.key==='Enter')H.sesssearch()"><button data-a="sesssearch">검색</button>${SESSQ.q ? `<button class="ghost" data-a="sesssearchclear">검색 지우기</button>` : ""}<span class="mute">${SESSQ.q ? "조건에 맞는 " : "전체 "}${nf(sp.total)}개</span></div>`; return (L.length || SESSQ.q) ? bar + `<div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button data-a="sesssel">이 쪽 전체 선택/해제</button><button data-a="sessselall">조건에 맞는 ${nf(Math.min(sp.total, 500))}개 모두 선택</button><button data-a="sessdel">선택 삭제</button><span class="mute">선택 <b>${SESSQ.checked.size}</b>개(다른 쪽 포함)</span></div>` + table(["", "세션", "사용자", ...(ME.role === "admin" ? ["사용자 ID"] : []), "레슨", "모드", "진행", "revision", "생성 일시", "최종 작업 일시", ""], L.map(s => [`<input type="checkbox" class="sesschk" data-id="${esc(s.session_id)}" ${SESSQ.checked.has(s.session_id) ? "checked" : ""} aria-label="${esc(s.session_id)} 선택">`, s.session_id, s.owner_name || "(이름 미기록)", ...(ME.role === "admin" ? [s.owner] : []), s.lesson_id, s.mode + "/" + s.learning_mode, `${s.completed}/${s.lessons}`, s.revision, fmtKst(s.created_at), fmtKst(s.last_activity_at), `<a href="#" data-a="opensess" data-id="${esc(s.session_id)}">열기</a>`])) + pagerHtml(sp.total, sp.page, sp.size, "sesspage") : '<div class="mute">(없음)</div>' })()}</div>
     ${ST ? `<div class="card"><button data-a="c" data-t="env.check">환경 점검 실행</button> <button data-a="whstart">Warehouse 시작</button><div class="sub">환경 점검·미확인 항목이 로그와 증거에 기록됩니다.</div></div>` : ""}
@@ -959,23 +1053,99 @@ const V = {
 order version: 주문 변경마다 +1 (낙관적 잠금)</pre><div class="sub">gold.v_available_inventory 는 시드 상태에서 계약과 다릅니다. SQL Editor에서 확인하고 수정하세요.</div></div></div>`;
   },
   async ws() {
-    const a = await api(`/api/sessions/${SID}/audit`);
-    return `<h2>UI-03 Workspace</h2><div class="row"><input id="wsq" placeholder="검색(리소스명)" oninput="document.querySelectorAll('#wsl tr').forEach((r,i)=>{if(i)r.style.display=r.textContent.toLowerCase().includes(this.value.toLowerCase())?'':'none'})"></div>
-    <div class="card"><div id="wsl">${table(["종류", "이름", "상태/리비전"], [...ST.notebook.cells.map(c => ["Notebook cell", c.id + " (" + c.lang + ")", c.status]), ...Object.keys(ST.bundle.files).map(f => ["File", f, ST.bundle.local_hash.slice(0, 8)]), ...Object.values(ST.pipelines).map(p => ["Pipeline", p.name, p.state]), ...Object.values(ST.jobs).map(j => ["Job", j.name, j.runs.length + " runs"])])}</div></div>
+    const a = await api(`/api/sessions/${SID}/audit`), fav = (() => { try { return JSON.parse(ls.get("wsfav_" + SID) || "[]") } catch { return [] } })();
+    const me = ME.name, items = [...ST.notebook.cells.map(c => ({ n: c.id + " (" + c.lang + ")", t: "Notebook cell", o: me, u: c.ran_at_rev != null ? "rev " + c.ran_at_rev : "-", s: c.status, k: "nb:" + c.id })), ...Object.keys(ST.bundle.files).map(f => ({ n: f, t: "File", o: me, u: ST.bundle.local_hash.slice(0, 8), s: "-", k: "f:" + f })), ...Object.values(ST.pipelines).map(p => ({ n: p.name, t: "Pipeline", o: p.run_as || me, u: "rev " + ((p.history || []).slice(-1)[0] || {}).rev, s: p.state, k: "p:" + p.name })), ...Object.values(ST.jobs).map(j => ({ n: j.name, t: "Job", o: j.run_as || me, u: j.runs.length + " runs", s: "-", k: "j:" + j.name }))];
+    const shared = [{ n: "데이터 계약(가용재고 산식)", t: "Document", o: "강사/컨설턴트", u: "-", s: "읽기 전용", k: "sh:contract" }, { n: "고객 인터뷰 카드", t: "Document", o: "강사/컨설턴트", u: "-", s: "읽기 전용", k: "sh:interview" }];
+    const tab = LAST.wstab || "workspace", star = k => `<a href="#" data-a="wsfav" data-k="${esc(k)}">${fav.includes(k) ? "★" : "☆"}</a>`;
+    const rowsOf = list => list.map(x => [star(x.k), T(x.n), x.t, T(x.o), x.u, x.s]);
+    const lists = { home: items, shared, workspace: [...items, ...shared], favorites: [...items, ...shared].filter(x => fav.includes(x.k)), trash: [] };
+    const tabBar = [["home", "Home"], ["shared", "Shared with me"], ["workspace", "Workspace"], ["favorites", "Favorites"], ["trash", "Trash"]].map(([k, l]) => `<button class="${tab === k ? "primary" : "ghost"}" data-a="wstab" data-k="${k}">${l}</button>`).join("");
+    const L = lists[tab];
+    return `<h2>UI-03 Workspace</h2><div class="sub">실제 Workspace는 Home · Shared with me · Workspace · Favorites · Trash 로 나뉘고 열은 Name · Type · Owner · Created at · Last updated at 입니다. 이 시뮬레이터는 생성 시각 대신 리비전을 표시합니다.</div>
+    <div class="vfilters">${tabBar}<input id="wsq" placeholder="검색(리소스명)" oninput="document.querySelectorAll('#wsl tr').forEach((r,i)=>{if(i)r.style.display=r.textContent.toLowerCase().includes(this.value.toLowerCase())?'':'none'})"></div>
+    <div class="card"><div id="wsl">${tab === "trash" ? '<div class="mute">휴지통이 비어 있습니다(이 시뮬레이터는 삭제 기능을 제공하지 않습니다).</div>' : L.length ? table(["★", "Name", "Type", "Owner", "Last updated", "상태"], rowsOf(L)) : '<div class="mute">즐겨찾기한 항목이 없습니다. ☆를 눌러 추가하세요.</div>'}</div></div>
     <h3>변경 이력 (감사 이벤트 최근 25)</h3>${table(["시각(시나리오)", "유형", "주체", "결과", "증거"], a.slice(-25).reverse().map(e => [e.scenario_clock.slice(11, 19), e.event_type, e.effective_principal, e.outcome, e.evidence_level]))}`;
   },
   async cat() {
     const c = await api(`/api/sessions/${SID}/catalog` + (PRINCIPAL ? `?principal=${encodeURIComponent(PRINCIPAL)}` : ""));
     const t = LAST.tbl;
     return `<h2>UI-04 Catalog Explorer</h2><div class="sub">3단계 이름 catalog.schema.table · 주체 ${esc(c.principal)} 기준 가시성 ${staff() ? `· <a href="#" data-a="asrole" data-p="">trainee</a> | <a href="#" data-a="asrole" data-p="analyst-b@wizbase.training">analyst-b</a> | <a href="#" data-a="asrole" data-p="svc-runner">svc-runner</a>` : ""}</div>
-    <div class="grid2"><div class="card"><b>${esc(c.catalog)}</b>${c.schemas.map(s => `<div><b>${s.usable ? "📂" : "🔒"} ${s.schema}</b> ${s.usable ? "" : badge("USE SCHEMA/CATALOG 없음", "bad")}<br>${s.tables.map(x => `<div style="margin-left:14px">${x.type === "VIEW" ? "👁" : "▦"} ${x.can_select ? `<a href="#" data-a="ctable" data-n="${c.catalog}.${s.schema}.${x.name}">${x.name}</a>` : `<span class="mute">${x.name}</span> ${badge("SELECT 불가", "bad")}`} <span class="mute">owner ${esc(x.owner)}</span></div>`).join("")}</div>`).join("")}${c.foreign_catalogs.map(f => `<div>🌐 ${f.catalog} (${f.kind})</div>`).join("")}</div>
-    <div class="card">${t ? (t.error ? resBox({ result: { error: t.error } }) : `<b>${esc(t.name)}</b> ${lv(t.evidence_level)} owner ${esc(t.owner)}<h3>컬럼</h3>${table(["이름", "타입"], t.columns.map(x => [x.name, x.type]))}<h3>미리보기</h3>${table(t.preview_columns, t.rows)}<h3>계보</h3>${table(["upstream", "downstream"], t.lineage)}`) : '<span class="mute">테이블을 선택하세요. 부모 USE 권한 없이는 목록에서 잠깁니다.</span>'}</div></div>`;
+    <div class="grid2"><div>${(c.catalogs || [{ catalog: c.catalog, schemas: c.schemas, usable: true, kind: "managed" }]).map(k => `<div class="card"><b>${k.usable === false ? "🔒" : "🗄"} ${esc(k.catalog)}</b> ${k.kind === "user" ? badge("내가 만든 catalog", "ok") : ""} ${k.usable === false ? badge("USE CATALOG 없음", "bad") : ""}${k.owner && k.kind === "user" ? ` <span class="mute">owner ${esc(k.owner)}</span>` : ""}${k.comment && k.kind === "user" ? `<div class="sub">${esc(k.comment)}</div>` : ""}${k.schemas.length ? "" : '<div class="mute">schema 없음 — CREATE SCHEMA 로 만드세요</div>'}${k.schemas.map(s => `<div><b>${s.usable ? "📂" : "🔒"} ${esc(s.schema)}</b> ${s.usable ? "" : badge("USE SCHEMA/CATALOG 없음", "bad")}<br>${s.tables.map(x => `<div style="margin-left:14px">${x.type === "VIEW" ? "👁" : "▦"} ${x.can_select ? `<a href="#" data-a="ctable" data-n="${esc(k.catalog)}.${esc(s.schema)}.${esc(x.name)}">${esc(x.name)}</a>` : `<span class="mute">${esc(x.name)}</span> ${badge("SELECT 불가", "bad")}`} <span class="mute">owner ${esc(x.owner)}</span></div>`).join("")}${(s.volumes || []).map(v => `<div style="margin-left:14px">📦 <a href="#" data-a="nav" data-v="vol">${esc(v.name)}</a> ${badge("volume")} <span class="mute">파일 ${v.files} · owner ${esc(v.owner)}</span></div>`).join("")}</div>`).join("")}</div>`).join("")}${c.foreign_catalogs.length ? `<div class="card">${c.foreign_catalogs.map(f => `<div>🌐 ${esc(f.catalog)} (${esc(f.kind)})</div>`).join("")}</div>` : ""}
+      <div class="row">${scBtn(SCN("CREATE CATALOG 예시", "sql", { sqlbox: "CREATE CATALOG IF NOT EXISTS my_course COMMENT 'course catalog'" }))}${scBtn(SCN("Volumes 열기", "vol"))}</div></div>
+    <div class="card">${t ? tblDetail(t) : '<span class="mute">테이블을 선택하세요. 부모 USE 권한 없이는 목록에서 잠깁니다. 선택하면 Overview·Sample Data·Details·Permissions·History·Lineage·Insights·Quality 탭으로 볼 수 있습니다.</span>'}</div></div>`;
+  },
+  async adddata() {
+    const r = AD.res;
+    return `<h2>UI-08b Add data</h2><div class="sub">파일(CSV)을 올려 테이블을 만들거나 COPY INTO 방식으로 증분 적재합니다. 실제 Databricks의 Add data 화면(파일 업로드·볼륨·커넥터)을 본뜬 시뮬레이션이며 합성 데이터만 사용하세요. 권한은 UC 기준(USE SCHEMA + CREATE TABLE, 기존 테이블은 MODIFY)입니다.</div>
+    <div class="card"><b>Files · Create or modify table</b>
+      <div class="vfilters"><label>catalog <input id="adcat" value="${esc(AD.catalog)}" style="width:110px" oninput="AD.catalog=this.value"></label><label>schema <input id="adsch" value="${esc(AD.schema)}" style="width:110px" oninput="AD.schema=this.value"></label>
+      <label>table <input id="adtbl" value="${esc(AD.table)}" placeholder="예: store_sales" style="width:150px" oninput="AD.table=this.value"></label>
+      <label>방식 <select id="admode" onchange="AD.mode=this.value;render(true)">${[["create", "새로 만들기"], ["replace", "덮어쓰기(CREATE OR REPLACE)"], ["append", "COPY INTO 증분 추가"]].map(([v, l]) => `<option value="${v}" ${AD.mode === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+      <input type="file" accept=".csv,text/csv" onchange="H.adfile(this)"></div>
+      <div class="row">${AD_SAMPLES.map((x, i) => `<button class="ghost" data-a="adsample" data-i="${i}">${x[0]}</button>`).join("")}</div>
+      <textarea id="adcsv" oninput="AD.csv=this.value" placeholder="CSV 내용을 붙여 넣거나 파일을 고르세요(첫 줄은 머리글, 200KB·2,000행 이하)" style="min-height:130px">${esc(AD.csv)}</textarea>
+      <div class="row"><button data-a="adrun">적재</button>${AD.filename ? `<span class="mute">파일: ${esc(AD.filename)}</span>` : ""}</div></div>
+    ${r ? (r.error ? `<div class="card">${remedyHtml(r.error)}</div>` : `<div class="card">${badge(r.skipped ? "건너뜀" : "성공", r.skipped ? "w" : "ok")} <b>${esc(r.table)}</b> · ${esc(r.mode)} · 이번 적재 ${nf(r.rows_loaded)}행 · 전체 ${nf(r.rows_total)}행<div class="sub">${esc(r.note)}</div>${table(["열", "추론한 타입"], r.columns.map(c => [c.name, c.type]))}<div class="row">${scBtn(SCN("Catalog에서 보기", "cat"))}${scBtn(SCN("History 확인(DESCRIBE HISTORY)", "sql", { sqlbox: `DESCRIBE HISTORY ${r.table}` }))}</div></div>`) : ""}
+    <div class="card"><b>COPY INTO 증분 적재 연습</b><ol><li>"샘플 1"로 <b>새로 만들기</b> → 5행.</li><li>"샘플 2(추가분)"를 <b>COPY INTO 증분 추가</b> → 8행(3행 추가).</li><li>같은 "샘플 2"를 한 번 더 추가 → <b>건너뜀</b>(이미 적재한 파일은 다시 읽지 않습니다 = 멱등).</li><li>Catalog의 History 탭이나 <code>DESCRIBE HISTORY</code>에서 버전 0→1이 생긴 것을 확인합니다.</li></ol>
+      <div class="sub">열 이름·순서가 다른 파일을 추가하면 SCHEMA_MISMATCH 오류가 납니다(스키마 변경 대응 연습).</div></div>
+    <div class="card"><b>Databricks connectors(실제 화면 목록, 참고용)</b><div class="chips">${AD_CONNECTORS.map(x => badge(x)).join(" ")}</div><div class="sub">이 시뮬레이터에서 실습할 수 있는 수집은 <b>파일 업로드(이 화면)</b>, <b>Foreign Catalog/Oracle CDC(수집·CDC 화면)</b>입니다. 나머지 커넥터는 이름과 위치만 안내합니다. 목록은 Free Edition 화면에서 확인한 시점(2026-11-12) 기준이며 에디션·업데이트에 따라 다릅니다.</div>
+      <div class="row">${scBtn(SCN("수집(Connections)으로", "conn"))}${scBtn(SCN("CDC 재생으로", "cdc"))}</div></div>`;
+  },
+  async lib() {
+    const tab = LAST.libtab || "queries", bar = `<div class="vfilters">${LIBT.map(([k, l]) => `<button class="${tab === k ? "primary" : "ghost"}" data-a="libtab" data-k="${k}">${l}</button>`).join("")}<button class="ghost" data-a="qsearch" title="Ctrl+P">🔍 통합 검색(Ctrl+P)</button></div>`;
+    let b = "";
+    const qh = (tab === "dash" || tab === "alerts" || tab === "ach") ? await api(`/api/sessions/${SID}/query-history?size=100`) : null;
+    if (tab === "queries") { const a = lsj("qsave_" + SID, []); b = a.length ? table(["이름", "저장 시각", "열기", "삭제"], a.map((q, i) => [q.name, fmtIso(q.at), scBtn(SCN("SQL Editor에서 열기", "sql", { sqlbox: q.sql })), `<a href="#" data-a="qdel" data-i="${i}">삭제</a>`])) : '<div class="mute">저장한 쿼리가 없습니다. SQL Editor에서 [쿼리 저장]을 누르세요(이 브라우저에만 저장).</div>' }
+    else if (tab === "dash") { const it = qh.items, cnt = f => { const m = {}; it.forEach(x => { m[f(x)] = (m[f(x)] || 0) + 1 }); return Object.entries(m).sort((a, c) => c[1] - a[1]) }, mx = Math.max(1, ...cnt(x => x.statement).map(x => x[1]), ...cnt(x => x.via).map(x => x[1]));
+      const bars = (title, rows, bad) => `<div class="card"><b>${title}</b>${rows.length ? rows.map(([k, n]) => `<div class="qbar"><span>${esc(VIA_L[k] || k)}</span><i class="${bad ? "bad" : ""}" style="width:${Math.round(240 * n / mx)}px"></i><span>${n}</span></div>`).join("") : '<div class="mute">데이터 없음</div>'}</div>`;
+      b = `<div class="sub">이 세션의 쿼리 이력(최근 ${it.length}건)으로 만든 학습 현황 대시보드입니다. 실제 Dashboards는 SQL 결과를 시각화하는 별도 기능이며 이 시뮬레이터는 현황 카드만 제공합니다.</div><div class="grid2">${bars("상태별", cnt(x => x.status === "FINISHED" ? "성공" : "실패"))}${bars("구문별", cnt(x => x.statement))}${bars("소스별", cnt(x => x.via))}${bars("오류 코드별", cnt(x => x.error ? x.error.code : "").filter(x => x[0]), true)}</div>` }
+    else if (tab === "alerts") { const fails = qh.items.filter(x => x.status === "FAILED").length, pf = Object.values(ST.pipelines).filter(p => p.state === "FAILED").length, wf = ST.warehouse.state === "FAILED" ? 1 : 0;
+      b = `<div class="sub">실제 Alerts는 쿼리 결과가 조건을 넘으면 알림을 보냅니다. 여기서는 이 세션 상태로 계산한 규칙 3개를 보여 줍니다(알림 전송 없음).</div>` + table(["규칙", "조건", "현재", "상태"], [["쿼리 실패", "최근 100건 중 실패 ≥ 1", fails, fails ? badge("TRIGGERED", "bad") : badge("OK", "ok")], ["파이프라인 실패", "FAILED 상태 ≥ 1", pf, pf ? badge("TRIGGERED", "bad") : badge("OK", "ok")], ["웨어하우스 실패", "상태 = FAILED", wf, wf ? badge("TRIGGERED", "bad") : badge("OK", "ok")]]) + `<div class="row">${scBtn(SCN("Query History 열기", "qh", {}))}</div>` }
+    else if (tab === "recents") { const a = lsj("rec_" + SID, []); b = a.length ? table(["종류", "이름", "시각", "열기"], a.map(x => [x.t === "table" ? "테이블" : "화면", x.label, fmtIso(x.at), x.t === "table" ? `<a href="#" data-a="recopen" data-n="${esc(x.k)}">열기</a>` : scBtn(SCN("열기", x.k))])) : '<div class="mute">최근 항목이 없습니다.</div>' }
+    else if (tab === "discover") { const c = await api(`/api/sessions/${SID}/catalog`), dt = LAST.dtype || "all", types = [["all", "전체"], ["table", "Tables"], ["view", "Views"], ["job", "Jobs"], ["pipe", "Pipelines"], ["nb", "Notebooks"]];
+      const a = [...c.schemas.flatMap(sc => sc.tables.map(t => ({ t: t.type === "VIEW" ? "view" : "table", n: `${c.catalog}.${sc.schema}.${t.name}`, o: t.owner, ok: t.can_select }))), ...Object.values(ST.jobs).map(j => ({ t: "job", n: j.name, o: j.run_as || "-", ok: true })), ...Object.values(ST.pipelines).map(p => ({ t: "pipe", n: p.name, o: p.run_as || "-", ok: true })), ...ST.notebook.cells.map(x => ({ t: "nb", n: x.id, o: ME.name, ok: true }))].filter(x => dt === "all" || x.t === dt);
+      b = `<div class="sub">실제 Discover는 Domains(Sales·Marketing·Finance·Human Resources) 기준으로 자산을 찾습니다. 이 시뮬레이터에는 도메인 분류가 없어 자산 유형으로만 걸러 보여 줍니다.</div><div class="vfilters">${types.map(([k, l]) => `<button class="${dt === k ? "primary" : "ghost"}" data-a="libdtype" data-k="${k}">${l}</button>`).join("")}</div>` + table(["유형", "이름", "소유자", "접근"], a.map(x => [x.t, x.n, x.o, x.ok ? "가능" : badge("권한 없음", "bad")])) }
+    else if (tab === "market") b = `<div class="card"><b>Marketplace</b><div class="sub">실제 Marketplace는 외부 데이터·AI 자산을 찾아 워크스페이스에 가져오는 메뉴입니다. 이 시뮬레이터는 외부 자산을 제공하지 않으며(합성 데이터만 사용), 메뉴 위치와 용도만 안내합니다. 실제 사용은 Databricks 워크스페이스에서 하세요.</div></div>`;
+    else { const st = lsj("streak_" + ME.name.toLowerCase(), { n: 0, best: 0 }), t = qh.items, has = f => t.some(f), ach = [["첫 쿼리 실행", has(x => x.status === "FINISHED" && x.via === "sql_editor")], ["오류를 만나 본 경험", has(x => x.status === "FAILED")], ["파일 적재(Add data)", has(x => x.via === "add_data")], ["COPY INTO 증분 적재", has(x => x.statement === "COPY INTO")], ["버전 이력 조회(DESCRIBE HISTORY)", has(x => x.statement === "DESCRIBE HISTORY")], ["타임 트래블(VERSION AS OF)", has(x => /VERSION\s+AS\s+OF/i.test(x.sql))], ["RESTORE로 되돌리기", has(x => x.statement === "RESTORE")]], got = ach.filter(x => x[1]).length;
+      b = `<div class="kpis"><div class="kpi"><b>${st.n}일</b><span>연속 학습일(이 브라우저 기준)</span></div><div class="kpi"><b>${st.best || st.n}일</b><span>최장 연속</span></div><div class="kpi"><b>${got}/${ach.length}</b><span>배지</span></div></div>` + table(["배지", "상태"], ach.map(x => [x[0], x[1] ? badge("획득", "ok") : badge("미획득", "")])) + `<div class="sub">배지는 이 세션의 쿼리 이력으로 계산합니다(최근 100건). 연속 학습일은 하루 한 번 화면을 열면 늘어납니다.</div>` }
+    return `<h2>UI-05c 라이브러리</h2>${bar}<div class="card">${b}</div>`;
+  },
+  async acad() {
+    const a = await api(`/api/sessions/${SID}/academy`), P = a.paths.find(p => p.id === ACAD.path) || a.paths[0];
+    const tabs = a.paths.map(p => `<button class="${p.id === P.id ? "primary" : "ghost"}" data-a="acadpath" data-k="${p.id}">${esc(p.title)}</button>`).join("");
+    const cov = c => { const n = c.coverage, t = n.full + n.partial + n.none; return t ? `직접 ${n.full} · 일부 ${n.partial} · 미지원 ${n.none}${n.lecture ? ` · 강의 ${n.lecture}` : ""}` : "레슨 목록 미조회" };
+    const course = c => c.status === "coming_soon" ? `<div class="card"><b>${esc(c.title)}</b> ${badge(TIERL[c.tier] || c.tier)} ${badge("Coming soon", "w")}<div class="sub">목록에 공개 예정으로만 표시됩니다. 공개되면 다시 조회해 반영합니다.</div></div>` :
+      `<div class="card"><b>${esc(c.title)}</b> ${badge(TIERL[c.tier] || c.tier)} ${badge(c.level || "")} <span class="mute">${c.minutes}분${c.lesson_count ? ` · 레슨 ${c.lesson_count} · 실습 ${c.lab_count}` : ""}</span>
+      <div class="sub">${esc(c.desc)}</div>
+      ${c.prereq.length ? `<div class="sub"><b>선수 조건(관찰)</b>: ${c.prereq.map(esc).join(" / ")}</div>` : ""}
+      <div class="sub"><b>시뮬레이터 대응</b>: ${cov(c)}${c.practice_total ? ` · 자동 확인 실습 ${c.practice_done}/${c.practice_total} 완료` : ""}</div>
+      ${c.lessons.length ? `<details><summary>레슨별 대응 보기(${c.lessons.length}개)</summary>${table(["종류", "레슨(공식 제목)", "대응", "연습 화면", "내 실습"], c.lessons.map(l => [l.kind, l.title + (l.note ? ` — ${l.note}` : ""), badge(COVL[l.cov][0], COVL[l.cov][1]), l.view ? scBtn(SCN("열기", l.view)) : "-", l.check ? (l.done ? badge("확인됨", "ok") : badge("미실습", "")) : "-"]))}</details>` : ""}</div>`;
+    return `<h2>UI-07b Academy 학습 경로 대응</h2><div class="sub">Databricks Academy의 역할별 경로와 이 시뮬레이터의 연습 화면을 비교한 표입니다. 근거: ${esc(a.observed_at)} Free Edition 화면 조회(${esc(a.evidence)}). ${a.limits.map(esc).join(" ")}</div>
+    <div class="vfilters">${tabs}</div>
+    <div class="card"><b>${esc(P.title)}</b> <span class="mute">토픽: ${P.topics.map(esc).join(" · ")}</span></div>
+    ${P.courses.map(course).join("")}
+    <div class="card"><b>개선 후보(우선순위)</b>${table(["우선", "항목", "이유", "범위"], a.gaps.map(g => [g.p, g.title, g.why, g.scope]), true)}</div>`;
+  },
+  async qh() {
+    const h = await api(`/api/sessions/${SID}/query-history?${QHQ()}`), f = h.facets || {};
+    const opt = (arr, cur, lab) => `<option value="">전체</option>` + arr.map(x => `<option value="${esc(x)}" ${cur === x ? "selected" : ""}>${esc(lab ? (lab[x] || x) : x)}</option>`).join("");
+    const rows = h.items.map(x => `<details class="qhrow"><summary>${badge(x.status === "FINISHED" ? "성공" : "실패", x.status === "FINISHED" ? "ok" : "bad")} <span class="mute">${esc(fmtIso(x.at))}</span> · ${esc(x.principal)} · ${esc(VIA_L[x.via] || x.via)} · <b>${esc(x.statement)}</b> · ${x.duration_ms}ms${x.rows !== null && x.rows !== undefined ? ` · ${x.rows}행` : ""}<br><code>${esc(x.sql.replace(/\s+/g, " ").slice(0, 120))}</code></summary>
+      <pre>${esc(x.sql)}</pre><div class="mute">Statement ID ${esc(x.id)} · 대상 ${esc((x.tables || []).join(", ") || "-")}</div>${x.error ? remedyHtml(x.error) : ""}<div class="row">${scBtn(SCN("SQL Editor에서 다시 열기", "sql", { sqlbox: x.sql }))}</div></details>`).join("");
+    return `<h2>UI-05b Query History</h2><div class="sub">이 세션에서 실행한 SQL의 이력입니다(최근 300건). 실패한 쿼리는 펼치면 원인과 해결 순서가 나옵니다. 실제 Databricks의 Query History 화면과 같은 필터(사용자·기간·상태·구문·소스·시간·ID)를 제공합니다.</div>
+    <div class="card"><div class="vfilters"><label>상태 <select id="qhs" onchange="H.qhfilter()">${opt(["FINISHED", "FAILED"], QH.status, { FINISHED: "성공", FAILED: "실패" })}</select></label>
+    <label>구문 <select id="qhst" onchange="H.qhfilter()">${opt(f.statements || [], QH.statement)}</select></label>
+    <label>소스 <select id="qhv" onchange="H.qhfilter()">${opt(f.vias || [], QH.via, VIA_L)}</select></label>
+    <label>주체 <select id="qhp" onchange="H.qhfilter()">${opt(f.principals || [], QH.principal)}</select></label>
+    <label>기간 <select id="qhm" onchange="H.qhfilter()">${[[0, "전체"], [10, "최근 10분"], [60, "최근 1시간"], [1440, "최근 24시간"]].map(([v, l]) => `<option value="${v}" ${QH.minutes === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    <label>소요 <select id="qhd" onchange="H.qhfilter()">${[[0, "전체"], [50, "≥50ms"], [200, "≥200ms"], [1000, "≥1초"]].map(([v, l]) => `<option value="${v}" ${QH.min_ms === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+    <input id="qhq" value="${esc(QH.q)}" placeholder="SQL·Statement ID·오류 검색" style="width:200px" onkeydown="if(event.key==='Enter')H.qhfilter()"><button data-a="qhfilter">검색</button><button class="ghost" data-a="qhreset">초기화</button></div>
+    ${h.total ? rows : '<div class="mute">조건에 맞는 쿼리 이력이 없습니다. SQL Editor에서 쿼리를 실행하면 여기에 쌓입니다.</div>'}${pagerHtml(h.total, h.page, h.size, "qhpage")}</div>`;
   },
   async sql() {
     return `<h2>UI-05 SQL Editor</h2><div class="sub">Warehouse ${esc(ST.warehouse.state)} · 구문 분석(AST) → 지원 범위 → UC 권한 → Warehouse → 격리 실행 → 감사. 지원: SELECT/JOIN/GROUP BY/CTE/CASE, CREATE SCHEMA/TABLE/VIEW, INSERT, GRANT/REVOKE(관리자). Spark와 의미가 다를 수 있음.</div>
-    <div class="card"><textarea id="sqlbox">${esc(LAST.sqlq || "SELECT * FROM food_dev.silver.orders LIMIT 5")}</textarea><div class="row"><button data-a="sql">실행</button>${ME.role === "instructor" || ME.role === "admin" ? `<select id="asp"><option value="">내 신원</option><option>uc-admin@wizbase.training</option><option>svc-runner</option><option>analyst-b@wizbase.training</option></select>` : ""}<button class="sec" data-a="whstart">Warehouse 시작</button>
+    <div class="card"><textarea id="sqlbox">${esc(LAST.sqlq || "SELECT * FROM food_dev.silver.orders LIMIT 5")}</textarea><div class="row"><button data-a="sql">실행</button><button class="ghost" data-a="qsave">쿼리 저장</button>${ME.role === "instructor" || ME.role === "admin" ? `<select id="asp"><option value="">내 신원</option><option>uc-admin@wizbase.training</option><option>svc-runner</option><option>analyst-b@wizbase.training</option></select>` : ""}<button class="sec" data-a="whstart">Warehouse 시작</button>
     <span class="mute">예: SELECT product_id, SUM(on_hand_qty-reserved_qty-damaged_qty) AS available_qty FROM food_dev.silver.inventory GROUP BY product_id</span></div></div>
-    ${resBox(LAST.sql)}<h3>실행 이력</h3><div class="sub">실패(failed)를 누르면 원인과 해결 순서, 바로가기가 펼쳐집니다. 성공한 문장은 [다시 쓰기]로 편집기에 불러옵니다.</div>
+    ${typeof gcPanel === "function" ? gcPanel() : ""}${resBox(LAST.sql)}<h3>실행 이력</h3><div class="sub">실패(failed)를 누르면 원인과 해결 순서, 바로가기가 펼쳐집니다. 성공한 문장은 [다시 쓰기]로 편집기에 불러옵니다.</div>
     <div class="tw"><table><tr><th>SQL</th><th>상태</th><th></th></tr>${HIST.sql.slice(0, 10).map((h, i) => `<tr><td><code>${esc(h.q.slice(0, 90))}</code></td><td>${h.s === "ok" ? badge("ok", "ok") : `<button class="b bad hfail" data-a="hfix" data-i="${i}" title="원인과 해결 방법 보기">${esc(h.s || "failed")} ▸ ${HFIX === i ? "접기" : "해결 방법"}</button>`}</td><td><button class="ghost" data-a="hreuse" data-i="${i}">다시 쓰기</button></td></tr>${HFIX === i && h.err ? `<tr><td colspan="3">${remedyHtml(h.err)}</td></tr>` : ""}`).join("") || `<tr><td colspan="3" class="mute">(없음)</td></tr>`}</table></div>`;
   },
   async nb() {
@@ -986,9 +1156,12 @@ order version: 주문 변경마다 +1 (낙관적 잠금)</pre><div class="sub">g
     <h3>변수 상태 (-- as: 이름)</h3>${Object.keys(nb.vars || {}).length ? pretty(nb.vars) : `<div class="mute">(저장된 변수 없음 — 셀에 <code>-- as: 이름</code>을 쓰면 결과가 변수로 저장됩니다)</div>`}<div class="mute">재시작 ${nb.restarts}회 · 메모리 변수 초기화, 영속 테이블 유지</div>`;
   },
   async comp() {
-    const w = ST.warehouse; const me = ST.principals[ST.principal] || {};
-    return `<h2>UI-07 Compute / SQL Warehouses</h2><div class="card"><b>${esc(w.name)}</b> 상태 ${badge(w.state, w.state === "RUNNING" ? "ok" : w.state === "FAILED" ? "bad" : "w")} CAN USE: ${w.acl.join(", ")}<div class="row"><button data-a="whstart">시작</button><button class="sec" data-a="whstop">중지</button></div>
-    <div class="sub">내 entitlement: ${(me.entitlements || []).join(", ")} · UC 권한만으로는 Warehouse가 실행되지 않습니다. 시작에는 몇 번의 명령 후 RUNNING 으로 전이됩니다(결정적).</div></div>
+    const w = ST.warehouse, me = ST.principals[ST.principal] || {}, free = w.can_create === false, auto = !!w.auto_start;
+    const tabs = ["Serverless", "SQL warehouses", "AI Search", "Apps", "Lakebase"];
+    return `<h2>UI-07 Compute / SQL Warehouses</h2><div class="sub">실제 화면은 상단 탭(${tabs.join(" · ")})과 필터(Only my…·Created by·Size·Status)로 구성됩니다. 이 시뮬레이터는 SQL Warehouse만 다룹니다.</div>
+    ${table(["Status", "Name", "Size", "Active/Max", "Type", "CAN USE"], [[w.state, w.name, w.size || "-", (w.state === "RUNNING" ? 1 : 0) + "/1", w.type === "serverless" ? "Serverless" : "Pro(가정)", w.acl.join(", ")]])}
+    <div class="card"><b>${esc(w.name)}</b> 상태 ${badge(w.state, w.state === "RUNNING" ? "ok" : w.state === "FAILED" ? "bad" : "w")} ${auto ? badge("자동 시작", "ok") : badge("수동 시작", "w")}<div class="row"><button data-a="whstart">${auto ? "지금 시작(선택)" : "시작"}</button><button class="sec" data-a="whstop">중지</button><button class="ghost" disabled title="${free ? "Free Edition에서는 웨어하우스를 만들 수 없습니다(실제 화면도 Create 비활성)" : "이 시뮬레이터는 웨어하우스 생성을 제공하지 않습니다"}">Create SQL warehouse</button></div>
+    <div class="sub">내 entitlement: ${(me.entitlements || []).join(", ")} · UC 권한만으로는 Warehouse가 실행되지 않습니다. ${auto ? "서버리스는 SQL을 실행하면 꺼져 있어도 자동으로 시작됩니다(중지 후 다시 실행해 보세요)." : "시작에는 몇 번의 명령 뒤 RUNNING 으로 전이됩니다(결정적)."}</div></div>
     <div class="card"><b>모의 사용량 지수</b>${pretty(ST.usage_index)}</div>`;
   },
   async conn() {
@@ -1064,7 +1237,7 @@ order version: 주문 변경마다 +1 (낙관적 잠금)</pre><div class="sub">g
     const pr = ST.principals;
     return `<h2>UI-15 권한 · 관리</h2><div class="sub">로그인 성공 ≠ 권한. principal/group/entitlement/UC privilege/소유자/run-as를 별도 저장합니다. 권한 해결은 티켓으로 요청하고 관리자 역할이 최소권한으로 처리합니다.</div>
     <div class="card"><b>Principal</b>${table(["principal", "종류", "그룹", "entitlement"], Object.entries(pr).map(([k, v]) => [k, v.kind + (v.admin ? " (admin)" : ""), v.groups.join(","), v.entitlements.join(",")]))}</div>
-    <div class="card"><b>UC 권한 (grants)</b>${table(["주체", "권한", "대상"], ST.grants)}</div>
+    <div class="card"><b>UC 권한 (grants)</b>${table(["주체", "권한", "대상"], ST.grants.map(g => g.map(T)))}</div>
     <div class="card"><b>권한 요청</b><div class="row"><input id="t_sec" value="schema:food_dev.silver" size="26"><input id="t_priv" value="USE SCHEMA" size="14"><input id="t_reason" placeholder="사유(구체적으로)" style="flex:1"><button data-a="ticket">요청 제출</button></div>
     <div class="sub">형식: catalog:이름 | schema:cat.sch | table:cat.sch.tbl | connection:이름. ALL PRIVILEGES 같은 과도한 요청은 반려됩니다.</div></div>
     <div class="card"><b>티켓</b>${ST.tickets.length ? table(["ID", "요청자", "대상", "권한", "상태", "처리"], ST.tickets.map(t => [t.ticket_id, t.grantee, t.securable, t.privilege + (t.over_broad ? " ⚠과도" : ""), t.status, t.status === "OPEN" && ["admin", "instructor"].includes(ME.role) ? `<a href="#" data-a="resolve" data-id="${t.ticket_id}" data-dec="approve">승인</a> | <a href="#" data-a="resolve" data-id="${t.ticket_id}" data-dec="reject">반려</a>` : ""])) : '<span class="mute">없음</span>'}${["admin", "instructor"].includes(ME.role) ? "" : '<div class="sub">승인은 UC 관리자/강사 로그인(다른 브라우저 탭 권장)에서 처리합니다. 강사의 대리 처리는 평가에 기록됩니다.</div>'}</div>`;
@@ -1094,7 +1267,7 @@ order version: 주문 변경마다 +1 (낙관적 잠금)</pre><div class="sub">g
     const t = await api(`/api/sessions/${SID}/track`);
     return `<h2>프로젝트 트랙 · 8주 모듈</h2><div class="sub">${esc(t.note)} 전체 ${t.percent}%</div>
     <div class="grid2">${t.modules.map(m => `<div class="card"><b>${m.week} · ${esc(m.module)}</b> <span class="b ${m.percent === 100 ? "ok" : m.percent ? "w" : ""}">${m.percent}%</span><div class="bar2"><i style="width:${m.percent}%"></i></div>
-    ${m.steps.map(s => `<div class="rel ${s.status}"><b>${s.no}단계 · ${esc(s.title)}</b><small>${s.status === "done" ? "완료" : s.status === "current" ? "진행 중" : "대기"}</small></div>`).join("")}<div class="mute">${m.done}/${m.total} 항목</div></div>`).join("")}</div>`;
+    ${m.steps.map(s => `<div class="rel ${s.status}"><b>${s.no}단계 · ${esc(s.title)}</b><small>${s.status === "done" ? "완료" : s.status === "current" ? "진행 중" : "대기"}</small></div>`).join("")}<div class="mute">${m.done}/${m.total} 항목</div></div>`).join("")}</div>${academyCard()}`;
   },
   async demo() {
     const d = await api(`/api/sessions/${SID}/demo`);
