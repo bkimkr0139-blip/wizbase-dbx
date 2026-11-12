@@ -371,6 +371,8 @@ def warehouse_cmd(S, actor, payload, principal):
             return "failed", {"state": "FAILED", "error": {"code": "WAREHOUSE_START_FAILED", "message": "웨어하우스 시작 실패(주입된 장애). 강사/관리자에 quota·용량 확인을 요청하세요."}}
         if not (set(w["acl"]) & expand(S, principal)) and not is_admin(S, principal):
             return "failed", {"error": {"code": "NO_CAN_USE", "message": "Warehouse CAN USE 권한이 없습니다. UC 권한만으로는 실행되지 않습니다."}}
+        if wh_state(S) in ("STARTING", "RUNNING"):   # 이미 시작 중/실행 중이면 다시 눌러도 시작 시계를 되돌리지 않는다(재클릭으로 영원히 STARTING에 머무는 문제 방지)
+            return "ok", {"state": w["state"], "note": "이미 시작 중이거나 실행 중입니다. 몇 번의 명령 뒤 RUNNING이 됩니다."}
         w["state"] = "STARTING"
         w["ready_rev"] = S["revision"] + 2
         return "ok", {"state": "STARTING"}

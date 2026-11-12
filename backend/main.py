@@ -420,6 +420,7 @@ def guide_get(sid: str, authorization: Optional[str] = Header(None)):
 class GuideMsg(BaseModel):
     message: str
     session_id: Optional[str] = None
+    view: Optional[str] = None
 
 
 @app.post("/api/guide/chat")
@@ -430,8 +431,8 @@ def guide_chat(b: GuideMsg, authorization: Optional[str] = Header(None)):
         raise ApiError(400, "TOO_LONG", "500자 이내")
     if S:
         with core.lock_for(S["id"]):
-            return guide.chat(S, a, b.message, S["learning_mode"] in ("real", "demo"))
-    return guide.chat(None, a, b.message)
+            return guide.chat(S, a, b.message, S["learning_mode"] in ("real", "demo"), b.view)
+    return guide.chat(None, a, b.message, False, b.view)
 
 
 @app.get("/api/sessions/{sid}/audit")

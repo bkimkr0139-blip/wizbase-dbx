@@ -188,3 +188,26 @@ pre{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padd
 .aitab.helptab{top:calc(42% - 62px)}
 .aitab:not(.helptab):not(.axostab){top:42%}
 .aitab.axostab{top:calc(42% + 62px)}
+
+/* ---- 오류 해결 안내 · 다음 단계 바 */
+.remedy{border:1px solid var(--line);border-left:4px solid var(--bad,#dc2626);border-radius:8px;padding:10px 12px;margin:8px 0;background:var(--panel)}
+.remedy .rmh{display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}.remedy .rmw{margin:6px 0}.remedy ol{margin:4px 0 6px 18px;padding:0}.remedy li{margin:2px 0}
+.remedy .rma{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+button.hfail{cursor:pointer;border:none}
+.logfix{float:right;margin-left:10px;background:#fbbf24;color:#1f2937;border:none;border-radius:6px;padding:3px 10px;font-weight:700;cursor:pointer}
+.nextbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 16px;background:var(--acc-soft);border-bottom:1px solid var(--line);font-size:12.5px}
+.nextbar .nbk{background:var(--acc);color:#fff;border-radius:10px;padding:1px 9px;font-weight:700;font-size:11px}.nextbar .nbsp{flex:1}
+
+/* ---- 역량·등급 프로필 카드 */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:8px}
+.pcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel)}
+.pc-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.pc-n{width:20px;height:20px;border-radius:50%;background:var(--acc);color:#fff;display:inline-grid;place-items:center;font-size:11px;font-weight:700}
+.pc-b{margin-top:6px}.pc-s{margin-top:6px;color:var(--mute);font-size:12px;line-height:1.5}.pc-a{margin-top:8px}
+/* ---- 읽기 쉬운 값 표시 */
+.pbox{margin:6px 0}.ptab{border-collapse:collapse;width:100%;font-size:13px}.ptab th{text-align:left;vertical-align:top;width:180px;padding:4px 10px 4px 0;color:var(--ink2);font-weight:600;border-bottom:1px solid var(--line2)}
+.ptab td{padding:4px 0;border-bottom:1px solid var(--line2)}.pchip{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:0 8px;margin:1px;font-size:12px}
+.pul{margin:2px 0 2px 18px;padding:0}.ptab .tw{margin:2px 0}
+
+/* ---- 연결(내비게이션) */
+a.golink{color:var(--acc);font-weight:600;text-decoration:none;border-bottom:1px dotted var(--acc)}a.golink:hover{background:var(--acc-soft)}
+.vfoot{margin:22px 0 8px;padding:10px 12px;border-top:2px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}

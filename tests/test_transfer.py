@@ -205,3 +205,14 @@ def test_version_policy_pre_release(env):
     assert sysinfo.VERSION.startswith("0.") and sysinfo.SHELL_VERSION.startswith("0.")           # 정식 전환 전에는 MAJOR=0
     assert sysinfo.CHANGELOG[0]["version"] == sysinfo.VERSION and all(r["version"].startswith("0.") for r in sysinfo.CHANGELOG)
     assert "version_policy" in env["c"].get("/api/system/info", headers=env["L"]).json()
+
+
+def test_every_sql_error_code_has_a_remedy_in_ui():
+    """실패 → 해결 안내: 서버가 내는 모든 SQL 오류 코드는 화면에 해결 안내(REMEDY)가 있어야 한다."""
+    import re, pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    core = root.joinpath("backend", "core.py").read_text(encoding="utf-8")
+    js = root.joinpath("static", "app.js").read_text(encoding="utf-8")
+    codes = set(re.findall(r'sql_error\(\s*"([A-Z_]+)"', core)) | {"WAREHOUSE_START_FAILED"}
+    have = set(re.findall(r"^\s{2}([A-Z_]+): e =>", js, re.M))
+    assert codes - have == set(), f"해결 안내 없는 오류 코드: {sorted(codes - have)}"

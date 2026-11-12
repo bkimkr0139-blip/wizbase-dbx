@@ -19,21 +19,22 @@ async function api(path, o = {}) {
   if (!r.ok) { const e = new Error(j?.error?.message || r.statusText); e.data = j?.error; e.status = r.status; throw e }
   return j;
 }
-function log(t, bad) { LASTLOG = (new Date().toLocaleTimeString()) + " " + t + "\n" + LASTLOG.slice(0, 2500); const l = $("#log"); if (l) { l.textContent = LASTLOG; l.style.color = bad ? "#fca5a5" : "#cbd5e1" } }
+const fixBtn = () => LASTERR ? `<button class="logfix" data-a="remedyopen">해결 방법 보기 ▸ ${esc(LASTERR.code || "")}</button>` : "";
+function log(t, bad, err) { if (bad && err && err.code) LASTERR = err; else if (!bad) LASTERR = null; LASTLOG = (new Date().toLocaleTimeString()) + " " + t + "\n" + LASTLOG.slice(0, 2500); const l = $("#log"); if (l) { l.innerHTML = fixBtn() + `<span>${esc(LASTLOG)}</span>`; l.style.color = bad ? "#fca5a5" : "#cbd5e1" } }
 async function cmd(type, payload = {}, quiet) {
   try {
     const ex = await api(`/api/sessions/${SID}/commands`, { body: { command_type: type, payload } });
     const bad = ex.status !== "ok";
-    log(`${type} → ${ex.status} [${ex.evidence_level}] ${bad ? summarize(ex.result) : ""}`, bad);
+    log(`${type} → ${ex.status} [${ex.evidence_level}] ${bad ? summarize(ex.result) : ""}`, bad, ex.result?.error || ex.result?.result?.error);
     await refresh(); return ex;
-  } catch (e) { log(`${type} ✗ ${e.message}`, true); if (!quiet) toast(e.message); return null }
+  } catch (e) { log(`${type} ✗ ${e.message}`, true, e.data); if (!quiet) toast(e.message); return null }
 }
 function summarize(r) { const e = r?.error || r?.result?.error; return e ? `${e.code}: ${e.message}` : (r?.stderr || "") }
 function toast(m) { log("⚠ " + m, true) }
 const fmtKst = t => t ? new Date(t * 1000).toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }).slice(0, 16) : "-";
 const badge = (t, c) => `<span class="b ${c || ""}">${esc(t)}</span>`;
 const lv = l => badge(l, l === "LOCAL_EXECUTED" ? "ok" : "w");
-function table(cols, rows, untrusted) { if (!rows || !rows.length) return `<div class="mute">(없음)</div>`; return `<div class="tw"><table><tr>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr>${rows.map(r => `<tr>${r.map(c => `<td>${typeof c === "object" && c !== null ? `<pre>${J(c)}</pre>` : (!untrusted && typeof c === "string" && /^<(a|button|input|span)\b/.test(c) ? c : esc(c))}</td>`).join("")}</tr>`).join("")}</table></div>` }
+function table(cols, rows, untrusted) { if (!rows || !rows.length) return `<div class="mute">(없음)</div>`; return `<div class="tw"><table><tr>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr>${rows.map(r => `<tr>${r.map(c => `<td>${typeof c === "object" && c !== null ? pretty(c, 2) : (!untrusted && typeof c === "string" && /^<(a|button|input|span)\b/.test(c) ? c : ((!untrusted && autoLink(c)) || esc(c)))}</td>`).join("")}</tr>`).join("")}</table></div>` }
 const val = id => $("#" + id)?.value;
 const PV = v => ({ unknown: "미확인", to_be_pinned: "미지정(확정 전)", to_be_recorded: "미기록", not_applicable: "해당 없음", serverless: "서버리스", training: "교육용", aws: "AWS", en: "영어(en)", DOC_CHECKED: "문서 확인만 완료" })[v] ?? (v === null || v === undefined ? "기록 없음" : v === true ? "예" : v === false ? "아니오" : String(v));
 function profileHtml(p) {
@@ -108,18 +109,18 @@ async function render(soft) {
     <div class="chips">${GUIDE ? `<span class="chip" title="전체 진행"><i></i>진행 ${GUIDE.percent}%</span>` : ""}${mode ? `<span class="chip ${mode === "B" ? "ok" : "w"}"><i></i>모드 ${mode} · ${mode === "A" ? "SIMULATED" : "LOCAL_EXECUTED"}</span>` : ""}<span class="chip" title="${esc(META.profile.profile_id)}">${esc(META.profile.cloud.toUpperCase())} · ${esc(META.profile.region)}</span><span class="chip w" title="문서 확인만 완료, 워크스페이스 실측·SA 검토 없음">${esc(META.profile.evidence_status)}</span>${ST ? `<span class="chip" title="실행 신원">${esc(ST.principal.split("@")[0])}</span><span class="chip mono">${esc(ST.clock.slice(0, 16).replace("T", " "))}</span>` : ""}</div>
     <div class="user"><span class="av">${esc(ME.name.slice(0, 1))}</span><div><b>${esc(ME.name)}</b><small>${ME.role === "admin" ? "admin · 수퍼유저" : ME.role}</small></div><button class="ghost" data-a="logout">로그아웃</button></div></header>
     <div class="strip">WIZBASE(Databricks 파트너)의 실제 PoC 준비와 파트너 레벨 상향을 위한 인증 시험 준비를 지원하는 교육·훈련 환경입니다. Databricks 공식 제품·인증·교육과정이 아니며 합성 데이터만 사용합니다. 모의 결과와 실제 DBX 검증 결과는 구분해 표시됩니다.</div>
-    ${menubarHtml()}${sysPop()}
+    ${menubarHtml()}${nextBar()}${sysPop()}
     <div class="wrap">
     <main id="main"></main></div>
     <button class="aitab helptab ${AI_OPEN && PANEL === "help" ? "on" : ""}" data-a="helptoggle" aria-label="도움말 열기">${ICON.help}<span>HELP</span></button>
     <button class="aitab ${AI_OPEN && PANEL === "ai" ? "on" : ""}" data-a="aitoggle" aria-label="AI 지원 열기">${ICON.spark}<span>AI 지원</span>${GUIDE && GUIDE.next ? '<i class="pulse"></i>' : ""}</button>
     <button class="aitab axostab ${AI_OPEN && PANEL === "axos" ? "on" : ""}" data-a="axostoggle" aria-label="AXOS 피드백 열기">${ICON.axos}<span>AXOS</span>${FB_UNSEEN ? '<i class="pulse"></i>' : ""}</button>
     <aside id="ai" class="${AI_OPEN ? "open" : ""}">${aiHtml()}</aside>
-    <div class="log" id="log">${esc(LASTLOG) || "실행 로그 · 오류 · 증거 수준이 여기에 표시됩니다."}</div>`;
+    <div class="log" id="log">${fixBtn()}<span>${esc(LASTLOG) || "실행 로그 · 오류 · 증거 수준이 여기에 표시됩니다."}</span></div>`;
   const needSess = !["env", "exam", "prof", "plan", "map", "tutor", "lab", "qual", "partner", "conf", "vmx", "inst", "rvw", "ko", "xfer", "fbq"].includes(VIEW);
   const main = $("#main");
   if (needSess && !SID) { main.innerHTML = `<div class="empty"><h2>세션이 필요합니다</h2><p>먼저 <a href="#" data-a="nav" data-v="env">환경 점검</a>에서 세션을 시작하세요.</p></div>`; }
-  else { try { main.innerHTML = await (V[VIEW] || V.env)() } catch (e) { main.innerHTML = err(e) } }
+  else { try { main.innerHTML = (await (V[VIEW] || V.env)()) + viewFooter(VIEW) } catch (e) { main.innerHTML = err(e) } }
   if (PREFILL) { for (const [id, v] of Object.entries(PREFILL)) { const el = $("#" + id); if (el) { el.value = v; el.classList.add("flash") } } PREFILL = null }
   else if (soft) main.scrollTop = keepScroll;
   try { const mb = document.querySelector(".menubar"); if (mb) document.documentElement.style.setProperty("--aitop", Math.round(mb.getBoundingClientRect().bottom) + "px") } catch { }
@@ -179,7 +180,7 @@ document.addEventListener("keydown", ev => {
     if (n >= nm) return; menuSet(n); if (n >= 0) menuFocus(n, 0); return;
   }
   if (ev.altKey && ev.shiftKey && !ev.ctrlKey && HOTKEYS[code]) { const a = HOTKEYS[code]; if (a === "sysdoc" && (IS_APP || ME?.role !== "admin")) return; ev.preventDefault(); H[a]({}); return }
-  if (MENUOPEN < 0) { if (ev.key === "Escape" && SYSPOP) { SYSPOP = ""; render(true) } return }
+  if (MENUOPEN < 0) { if (ev.key === "Escape" && (SYSPOP || REMEDY_POP)) { SYSPOP = ""; REMEDY_POP = null; render(true) } return }
   const nm = SYS.menu.length + 1;
   if (ev.key === "Escape") { ev.preventDefault(); menuSet(-1); return }
   if (ev.key === "ArrowRight") { ev.preventDefault(); const n = (MENUOPEN + 1) % nm; menuSet(n); menuFocus(n, 0); return }
@@ -212,7 +213,13 @@ function updateCardHtml(u, shell) {
   else if (shell) parts.push(`<div class="updbox"><b>PC 앱 새 버전 ${esc(u.app.shell_version)}</b> (현재 ${esc(APP_VER)})<div class="sub">앱 자체(실행 파일)가 갱신되었습니다. 내려받아 실행하면 기존 앱을 교체 설치합니다.</div><p><button class="primary" data-a="appdl">새 버전 내려받기</button> <button data-a="syspopclose">나중에</button></p></div>`);
   return `<h3 style="margin-top:0">업데이트 알림</h3>${parts.join("")}`;
 }
+function nextBar() {
+  if (!GUIDE || !GUIDE.next) return "";
+  const n = GUIDE.next;
+  return `<div class="nextbar"><span class="nbk">다음 단계 ${n.step_no}/${GUIDE.steps.length}</span><b>${esc(n.title)}</b><span class="mute">${esc(n.sub)}</span>${scBtn(n.shortcut, true)}<a href="#" data-a="stepsopen">전체 단계 보기</a><span class="nbsp"></span><span class="mute">F1 도움말 · Alt+Shift+A AI 지원</span></div>`;
+}
 function sysPop() {
+  if (REMEDY_POP) return `<div class="syspop"><div class="syscard"><h3 style="margin-top:0">오류 해결 안내</h3>${remedyHtml(REMEDY_POP)}<div style="text-align:right;margin-top:12px"><button data-a="syspopclose">닫기</button></div></div></div>`;
   if (!SYSPOP) return "";
   return `<div class="syspop"><div class="syscard">${SYSPOP}<div style="text-align:right;margin-top:12px"><button data-a="syspopclose">닫기</button></div></div></div>`;
 }
@@ -307,6 +314,14 @@ function stepsHtml() {
 }
 function scBtn(sc, primary) { SCS.push(sc); return `<button class="sc ${primary ? "primary" : ""}" data-a="sc" data-i="${SCS.length - 1}">${esc(sc.label)} ${ICON.arrow}</button>` }
 async function runShortcut(sc) {
+  if (sc.type === "ai") { REMEDY_POP = null; SYSPOP = ""; AI_OPEN = true; PANEL = "ai"; AI_TAB = "chat"; ls.set("ai", "1"); ls.set("panel", "ai"); await aiAsk(sc.q); return }
+  if (sc.type === "help") { REMEDY_POP = null; SYSPOP = ""; AI_OPEN = true; PANEL = "help"; ls.set("ai", "1"); ls.set("panel", "help"); await render(true); return }
+  if (sc.type === "axos") {
+    REMEDY_POP = null; SYSPOP = ""; FB.kind = sc.kind || "OTHER"; if (sc.err) { FB.title = `오류 ${sc.err.code}`; FB.text = `발생 화면: ${viewLabel(VIEW)}\n오류: ${sc.err.code} — ${sc.err.message}\n\n(기대한 동작 / 재현 절차를 적어 주세요)\n` }
+    AXTAB = "fb"; AI_OPEN = true; PANEL = "axos"; ls.set("ai", "1"); ls.set("panel", "axos"); await render(true); return
+  }
+  if (sc.type === "reload") { location.reload(); return }
+  REMEDY_POP = null; SYSPOP = "";
   if (sc.type === "nav") { VIEW = sc.view; ls.set("view", VIEW); PREFILL = sc.prefill || null; if (sc.prefill && sc.prefill.sqlbox) LAST.sqlq = sc.prefill.sqlbox; await render(true); return }
   if (sc.type === "cmd") {
     const ex = await cmd(sc.command_type, sc.payload || {});
@@ -318,7 +333,7 @@ async function runShortcut(sc) {
 async function aiAsk(q) {
   q = (q || "").trim(); if (!q || BUSY) return;
   CHAT.push({ r: "me", t: q }); BUSY = true; saveChat(); AI_SCROLL = "bottom"; render(true);
-  try { const r = await api("/api/guide/chat", { body: { message: q, session_id: SID } }); CHAT.push({ r: "ai", t: r.answer, s: r.shortcuts }) } catch (e) { CHAT.push({ r: "ai", t: "응답 오류: " + e.message }) }
+  try { const r = await api("/api/guide/chat", { body: { message: q, session_id: SID, view: VIEW } }); CHAT.push({ r: "ai", t: r.answer, s: r.shortcuts }) } catch (e) { CHAT.push({ r: "ai", t: "응답 오류: " + e.message }) }
   BUSY = false; saveChat(); AI_SCROLL = "bottom"; await render(true); const mi = $("#aimsg"); if (mi) mi.focus();
 }
 function renderLogin(app) {
@@ -333,7 +348,7 @@ function renderLogin(app) {
 }
 document.addEventListener("click", async ev => {
   if (MENUOPEN >= 0 && !ev.target.closest(".menubar")) menuSet(-1);
-  if (ev.target.classList && ev.target.classList.contains("syspop")) { SYSPOP = ""; render(true); return }
+  if (ev.target.classList && ev.target.classList.contains("syspop")) { SYSPOP = ""; REMEDY_POP = null; render(true); return }
   const t = ev.target.closest("[data-a]"); if (!t) return; ev.preventDefault();
   const a = t.dataset.a; const h = H[a]; if (h) { try { await h(t.dataset, t) } catch (e) { log(`✗ ${e.message}`, true); const x = $("#lerr"); if (x) x.textContent = e.message } }
 });
@@ -421,7 +436,11 @@ window.H = {
       <div class="sub">${esc(u.how)}</div><details><summary><b>최근 변경</b></summary>${u.changelog.map(r => `<div><b>${esc(r.version)}</b> ${esc(r.date)}<ul>${r.notes.map(n => `<li>${esc(n)}</li>`).join("")}</ul></div>`).join("")}</details>`; render(true)
   },
   sysreload() { location.reload() },
-  syspopclose() { SYSPOP = ""; render(true) },
+  stepsopen() { AI_OPEN = true; PANEL = "ai"; AI_TAB = "steps"; ls.set("ai", "1"); ls.set("panel", "ai"); AI_SCROLL = "top"; render(true) },
+  syspopclose() { SYSPOP = ""; REMEDY_POP = null; render(true) },
+  remedyopen() { REMEDY_POP = LASTERR; render(true) },
+  hfix(d) { HFIX = HFIX === +d.i ? -1 : +d.i; render(true) },
+  hreuse(d) { const h = HIST.sql[+d.i]; if (h) { LAST.sqlq = h.q; render(true) } },
   async sysdoc() { if (IS_APP || ME?.role !== "admin") { log("시스템 문서는 PC 앱에 포함되지 않습니다. 웹에서 내려받으세요.", true); return } await download("/api/system/document", "시스템문서.md") },
   async rvmanual() { await download("/api/review/manual", "검토자_매뉴얼.md") },
   async seeddl(d) { const j = await api(`/api/transfer-seeds/${d.id}/files`); for (const [n, t] of Object.entries(j.files)) { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([t], { type: "text/csv;charset=utf-8" })); a.download = `${d.id}_${n}`; document.body.appendChild(a); a.click(); a.remove() } log(`${d.id} CSV ${Object.keys(j.files).length}개 다운로드`) },
@@ -453,7 +472,7 @@ window.H = {
   async opensess(d) { SID = d.id; ls.set("sid", SID); ST = null; GUIDE = null; loadChat(); await refresh() },
   async hint() { const j = await api(`/api/sessions/${SID}/hints`); $("#hint").textContent = `[${j.level}/5] ${j.hint}`; await refresh() },
   async c(d, el) { const p = d.p ? JSON.parse(d.p) : {}; await cmd(d.t, p) },
-  async sql() { const ex = await cmd("sql.execute", { sql: val("sqlbox"), as_principal: val("asp") || undefined }); LAST.sql = ex; HIST.sql.unshift({ q: val("sqlbox"), s: ex?.status }); render(true) },
+  async sql() { const ex = await cmd("sql.execute", { sql: val("sqlbox"), as_principal: val("asp") || undefined }); LAST.sql = ex; HIST.sql.unshift({ q: val("sqlbox"), s: ex?.status, err: ex?.result?.error || null }); HFIX = ex?.result?.error ? 0 : -1; render(true) },
   async whstart() { await cmd("warehouse", { action: "start" }) }, async whstop() { await cmd("warehouse", { action: "stop" }) },
   async ticket() { await api("/api/permission-requests", { body: { session_id: SID, securable: val("t_sec"), privilege: val("t_priv"), reason: val("t_reason") } }).then(() => { log("권한 요청 티켓 생성"); return refresh() }).catch(e => log("✗ " + e.message, true)) },
   async resolve(d) { await api(`/api/sessions/${SID}/tickets/${d.id}/resolve`, { body: { decision: d.dec, note: "" } }).then(() => log("티켓 " + d.dec)).catch(e => log("✗ " + e.message, true)); await refresh() },
@@ -465,6 +484,7 @@ window.H = {
   async conntest() { await cmd("connection", { action: "test", host: val("chost") || undefined, password: val("cpass") || undefined }) },
   async pipe(d) { await cmd("pipeline", { action: d.x }) },
   async pipeedit() { await cmd("pipeline", { action: "edit", source_sql: val("plsql") }) },
+  async pipeall() { await cmd("pipeline", { action: "edit", source_sql: val("plsql") }); await cmd("pipeline", { action: "validate" }); await cmd("pipeline", { action: "run" }) },
   async pipeas() { await cmd("pipeline", { action: "set_run_as", run_as: val("plas") }) },
   async job(d) { await cmd("job", { action: d.x }) },
   async jobas() { await cmd("job", { action: "set_run_as", run_as: val("jobas") }) },
@@ -518,11 +538,117 @@ window.H = {
   async covsel() { LAST.cov = val("covx"); render(true) },
 };
 const LAST = {}, HIST = { sql: [], cli: [] };
+/* ------------------------------------------------------------ 오류 해결 안내 (실패 → 원인 → 해결 순서 → 바로가기) */
+const SCN = (label, view, prefill) => ({ type: "nav", label, view, prefill }), SCR = (label, ct, payload, view) => ({ type: "cmd", label, command_type: ct, payload, view }), SCA = (label, q) => ({ type: "ai", label, q });
+let LASTERR = null, REMEDY_POP = null, HFIX = -1;
+const EX_SQL = ["SELECT * FROM food_dev.silver.orders LIMIT 5", "SELECT product_id, SUM(on_hand_qty-reserved_qty-damaged_qty) AS available_qty FROM food_dev.silver.inventory GROUP BY product_id"];
+const REMEDY = {
+  WAREHOUSE_NOT_RUNNING: e => ({ why: "SQL은 SQL Warehouse가 RUNNING일 때만 실행됩니다. 지금은 꺼져 있거나 시작하는 중입니다.", steps: ["[Warehouse 시작]을 누릅니다. 시작은 단계적으로 진행되므로 상태가 RUNNING이 될 때까지 몇 번 더 눌러 확인합니다.", "Compute 화면에서 상태가 RUNNING인지 확인합니다.", "SQL Editor로 돌아와 같은 SQL을 다시 실행합니다."], actions: [SCR("Warehouse 시작", "warehouse", { action: "start" }, "comp"), SCN("Compute 화면에서 상태 보기", "comp"), SCN("SQL Editor로 돌아가기", "sql")] }),
+  WAREHOUSE_START_FAILED: e => ({ why: "Warehouse 시작이 실패했습니다(용량·quota 문제 등). 실제 현장에서도 흔한 상황입니다.", steps: ["오류 메시지의 원인(quota/용량)을 확인합니다.", "강사/관리자에게 quota·용량 확인을 요청합니다(요청 내용은 AXOS 피드백이 아니라 담당자에게 직접).", "해결 후 Compute 화면에서 다시 시작합니다."], actions: [SCN("Compute 화면으로", "comp"), SCA("AI 지원에게 물어보기", "Warehouse 시작이 실패했어. 어떻게 해?")] }),
+  NO_CAN_USE: e => ({ why: "이 Warehouse를 사용할 수 있는 CAN USE 권한이 내 신원에 없습니다. UC 테이블 권한과는 별개의 권한입니다.", steps: ["Compute 화면에서 CAN USE 대상 그룹을 확인합니다.", "권한 요청 화면에서 Warehouse 사용 권한을 요청합니다(사유를 구체적으로)."], actions: [SCN("Compute에서 CAN USE 확인", "comp"), SCN("권한 요청하러 가기", "perm", { t_sec: "warehouse:wz-training-wh", t_priv: "CAN USE", t_reason: "SQL 실행을 위해 Warehouse 사용 필요" })] }),
+  NO_SQL_ENTITLEMENT: e => ({ why: "Databricks SQL 사용 자격(entitlement)이 없습니다. 로그인 성공과 SQL 사용 권한은 다릅니다.", steps: ["권한·관리 화면의 Principal 표에서 내 entitlement를 확인합니다.", "관리자에게 Databricks SQL access 부여를 요청합니다."], actions: [SCN("권한·관리 화면으로", "perm"), SCA("AI 지원에게 물어보기", "SQL entitlement 오류는 어떻게 해결해?")] }),
+  INSUFFICIENT_PERMISSIONS: e => { const m = e.missing || {}; return ({ why: `Unity Catalog 권한이 부족합니다${m.privilege ? ` — ${m.securable} 에 ${m.privilege} 권한이 필요합니다` : ""}. 부모(catalog/schema)의 USE 권한과 테이블 SELECT는 별개입니다.`, steps: ["필요한 권한(대상·권한 종류)을 확인합니다.", "권한 요청 화면에 아래 내용이 미리 채워집니다. 사유를 구체적으로 보완해 제출합니다(ALL PRIVILEGES 같은 과도한 요청은 반려).", "관리자가 처리해 승인되면 SQL Editor에서 다시 실행합니다."], actions: [SCN("권한 요청하러 가기 (자동 입력)", "perm", { t_sec: m.securable || "schema:food_dev.silver", t_priv: m.privilege || "USE SCHEMA", t_reason: "SQL 조회를 위해 필요한 최소 권한" }), SCN("Catalog에서 권한 확인", "cat"), SCN("SQL Editor로 돌아가기", "sql")] }) },
+  TABLE_OR_VIEW_NOT_FOUND: e => ({ why: "테이블이나 뷰를 찾을 수 없습니다. 이름이 틀렸거나, 권한이 없어 보이지 않는 것일 수 있습니다. 이름은 3단계(catalog.schema.table)로 씁니다.", steps: ["Catalog Explorer에서 실제 테이블 이름과 내가 볼 수 있는 범위를 확인합니다.", "SQL의 catalog.schema.table 철자를 고칩니다.", "그래도 안 보이면 권한 문제일 수 있으니 권한 요청을 확인합니다."], actions: [SCN("Catalog에서 이름 찾기", "cat"), SCN("예제 SQL로 다시 시작", "sql", { sqlbox: EX_SQL[0] }), SCN("권한 확인", "perm")] }),
+  PARSE_ERROR: e => ({ why: "SQL 문법을 해석하지 못했습니다(괄호·쉼표·키워드 철자 등).", steps: ["메시지의 위치 주변에서 철자·괄호·쉼표를 확인합니다.", "아래 예제 SQL로 동작을 먼저 확인한 뒤 조금씩 바꿔 봅니다."], actions: [SCN("예제 SQL 불러오기 (조회)", "sql", { sqlbox: EX_SQL[0] }), SCN("예제 SQL 불러오기 (집계)", "sql", { sqlbox: EX_SQL[1] }), SCA("AI 지원에게 물어보기", "SQL 문법 오류가 났어. 어떻게 고쳐?")] }),
+  UNSUPPORTED_SQL: e => ({ why: "이 시뮬레이터가 지원하지 않는 SQL입니다(실제 Databricks에서는 될 수 있습니다). 지원: SELECT/JOIN/GROUP BY/CTE/CASE, CREATE SCHEMA/TABLE/VIEW, INSERT, UPDATE/DELETE/MERGE, GRANT/REVOKE(관리자).", steps: ["지원 범위 안의 문장으로 바꿔 봅니다.", "정말 필요한 기능이면 AXOS 탭에서 \"기능 추가 요청\"으로 알려 주세요."], actions: [SCN("지원 예제로 시작", "sql", { sqlbox: EX_SQL[0] }), { type: "axos", label: "기능 추가 요청하기 (AXOS)", kind: "FEATURE" }] }),
+  SIMULATOR_UNSUPPORTED: e => REMEDY.UNSUPPORTED_SQL(e),
+  TRANSPILE_ERROR: e => REMEDY.UNSUPPORTED_SQL(e),
+  EXECUTION_ERROR: e => ({ why: "SQL은 해석됐지만 실행 중 오류가 났습니다(컬럼 이름, 타입, 데이터 문제 등).", steps: ["컬럼·테이블 이름을 Catalog에서 다시 확인합니다.", "작은 조건(LIMIT 5)으로 줄여 어디서 실패하는지 좁혀 봅니다."], actions: [SCN("Catalog에서 컬럼 확인", "cat"), SCN("LIMIT 예제로 시작", "sql", { sqlbox: EX_SQL[0] }), SCA("AI 지원에게 물어보기", "SQL 실행 오류가 났어. 원인이 뭐야?")] }),
+  FEATURE_UNVERIFIED: e => ({ why: "아직 확인되지 않은 기능이라 모의로도 실행하지 않습니다(확인되지 않은 것을 된다고 하지 않기 위해).", steps: ["환경 점검의 기능 목록에서 확인 상태와 '사용 가능'을 봅니다.", "확인이 필요하면 검토자가 실제 워크스페이스에서 대조합니다."], actions: [SCN("기능 목록 보기", "env")] }),
+  UNKNOWN_FEATURE: e => REMEDY.FEATURE_UNVERIFIED(e),
+  CONNECTION_NOT_READY: e => ({ why: "외부 연결(Connection)이 준비되지 않았습니다.", steps: ["수집 화면에서 연결 테스트 결과를 확인합니다.", "자격증명·네트워크 항목을 점검하고 다시 테스트합니다."], actions: [SCN("연결 화면으로", "conn")] }),
+  PIPELINE_SOURCE_INVALID: e => ({ why: "파이프라인 입력(source)이 올바르지 않습니다.", steps: ["Pipelines 화면의 source 설정을 확인합니다."], actions: [SCN("Pipelines 화면으로", "pipe")] }),
+  PIPELINE_PARSE_ERROR: e => REMEDY.PIPELINE_SOURCE_INVALID(e),
+  SESSION_PAUSED: e => ({ why: "세션이 일시정지 상태입니다(강사가 멈춘 경우).", steps: ["강사에게 재개를 요청하거나 잠시 기다립니다."], actions: [SCN("환경 점검으로", "env")] }),
+  SESSION_NOT_FOUND: e => ({ why: "세션을 찾을 수 없습니다(삭제되었거나 다른 사용자의 세션).", steps: ["환경 점검에서 새 세션을 시작하세요."], actions: [SCN("새 세션 시작하러 가기", "env")] }),
+  NOT_READY: e => ({ why: "이 작업에 필요한 앞 단계가 아직 끝나지 않았습니다.", steps: ["AI 지원의 '전체 단계'에서 지금 해야 할 다음 단계를 확인합니다.", "앞 단계를 마친 뒤 다시 시도합니다."], actions: [{ type: "ai", label: "다음에 뭐 해?", q: "다음에 뭐 해?" }] }),
+  FORBIDDEN: e => ({ why: "이 작업은 내 역할로는 할 수 없습니다(권한 모델: 교육 역할과 DBX 권한은 별개).", steps: ["필요한 역할(강사/관리자/검토자)을 오류 메시지에서 확인합니다.", "권한 요청 화면에서 요청하거나 담당자에게 문의합니다."], actions: [SCN("권한·관리 화면으로", "perm")] }),
+  BAD_ACTION: e => ({ why: "요청한 동작을 이 화면에서 지원하지 않습니다.", steps: ["화면의 버튼으로 다시 시도합니다.", "계속되면 AXOS로 알려 주세요."], actions: [] }),
+  BAD_MODE: e => ({ why: "현재 학습 모드에서는 허용되지 않는 동작입니다(모드는 실행 중 전환할 수 없음).", steps: ["환경 점검에서 원하는 모드로 새 세션을 시작합니다."], actions: [SCN("환경 점검으로", "env")] }),
+  UNKNOWN_PRINCIPAL: e => ({ why: "알 수 없는 실행 신원(principal)입니다.", steps: ["권한·관리 화면의 Principal 표에 있는 이름을 사용합니다."], actions: [SCN("Principal 목록 보기", "perm")] }),
+  CELL_NOT_FOUND: e => ({ why: "노트북에서 해당 셀을 찾을 수 없습니다.", steps: ["Notebook 화면을 새로 불러와 셀 목록을 확인합니다."], actions: [SCN("Notebook으로", "nb")] }),
+  REAL_HOST_BLOCKED: e => ({ why: "이 환경은 실제 외부 호스트 접속을 막습니다(안전을 위한 격리).", steps: ["합성 데이터와 내장 연결만 사용하세요.", "실제 연결이 필요하면 검토자와 별도 환경을 협의합니다."], actions: [SCN("수집 화면으로", "conn")] }),
+  PYTHON_ISOLATION_NOT_CONFIGURED: e => ({ why: "Python 코드 실행용 격리 환경이 아직 구성되지 않아 실행하지 않습니다(안전 때문에 차단).", steps: ["SQL 셀로 같은 작업을 해 봅니다.", "Python 실행이 꼭 필요하면 AXOS에서 기능 추가를 요청해 주세요."], actions: [SCN("Notebook(SQL)으로", "nb"), { type: "axos", label: "기능 추가 요청하기 (AXOS)", kind: "FEATURE" }] }),
+  REVISION_CONFLICT: e => ({ why: "다른 화면에서 같은 세션이 먼저 바뀌어 충돌했습니다.", steps: ["화면을 새로 불러온 뒤 다시 시도합니다."], actions: [{ type: "reload", label: "화면 새로 고침" }] })
+};
+function remedyOf(err) {
+  const f = REMEDY[err?.code]; const r = f ? f(err) : { why: "자세한 해결 안내가 아직 없는 오류입니다. 아래 순서로 확인해 보세요.", steps: ["오류 메시지와 힌트를 읽어 원인을 확인합니다.", "AI 지원에게 \"왜 실패했어?\"라고 물어보면 현재 상태 기준으로 원인과 다음 행동을 알려 줍니다.", "계속 이상하면 AXOS 탭에서 오류 내용을 피드백으로 보내 주세요."], actions: [] };
+  r.actions = [...(r.actions || []), SCA("AI 지원: 왜 실패했어?", "왜 실패했어?"), { type: "help", label: "이 화면 도움말(HELP)" }, { type: "axos", label: "이 오류가 이상해요 (피드백)", kind: "DBX_MISMATCH", err }];
+  return r;
+}
+function remedyHtml(err, opt = {}) {
+  const r = remedyOf(err);
+  return `<div class="remedy"><div class="rmh"><b class="bad">${esc(err.code || "오류")}</b> <span>${esc(err.message || "")}</span></div>
+    ${err.hint ? `<div class="warnc">힌트: ${esc(err.hint)}</div>` : ""}
+    <div class="rmw"><b>왜 이런가요?</b> ${esc(r.why)}</div>
+    <div class="rms"><b>해결 순서</b><ol>${r.steps.map(x => `<li>${esc(x)}</li>`).join("")}</ol></div>
+    <div class="rma">${r.actions.map(a => scBtn(a)).join("")}</div></div>`;
+}
+const kvText = v => v === null || v === undefined ? "-" : typeof v === "object" ? (Array.isArray(v) ? v.map(kvText).join(", ") : Object.entries(v).map(([a, b]) => `${a}: ${kvText(b)}`).join(" · ")) : String(v);
+const kvTable = o => table(["항목", "값"], Object.entries(o).map(([k, v]) => [k, kvText(v)]));
+function profCards(p) {
+  const cred = (p.official_credentials || []).filter(c => c.status && c.status !== "NONE_RECORDED"), empty = o => !o || (typeof o === "object" && !Object.keys(o).length);
+  const card = (n, title, state, tone, body, hint, act) => `<div class="pcard"><div class="pc-h"><span class="pc-n">${n}</span><b>${title}</b>${badge(state, tone)}</div>${body ? `<div class="pc-b">${body}</div>` : ""}<div class="pc-s">${hint}</div>${act || ""}</div>`;
+  const go = (label, view) => `<div class="pc-a">${scBtn(SCN(label, view))}</div>`;
+  const ready = Object.entries(p.readiness || {});
+  return `<div class="pgrid">
+    ${card(1, "내부 등급", empty(p.internal_grades) ? "아직 평가 전" : "평가됨", empty(p.internal_grades) ? "w" : "ok", empty(p.internal_grades) ? "" : kvTable(p.internal_grades), "WIZBASE 내부 기준의 등급입니다. 시험센터의 모의시험·실습을 마치면 강사/검토자가 결정합니다. 공식 자격이 아닙니다.", empty(p.internal_grades) ? go("시험센터로 가서 시작하기", "exam") : "")}
+    ${card(2, "내부 재평가", empty(p.internal_reassessment) ? "해당 없음" : "대상", empty(p.internal_reassessment) ? "" : "w", empty(p.internal_reassessment) ? "" : kvTable(p.internal_reassessment), "내부 등급을 받은 뒤 일정 기간이 지나면 다시 확인하는 절차입니다. 등급이 없으면 해당 사항이 없습니다.", "")}
+    ${card(3, "공식 자격", cred.length ? `${cred.length}건 등록` : "등록된 자격 없음", cred.length ? "ok" : "w", cred.length ? table(["자격", "상태"], cred.map(c => [c.name || c.credential_ref || "-", c.status])) : "", "Databricks 공식 자격은 본인이 신고하면 '확인대기'가 되고, 검토자가 발급기관 확인 URL·credential ID로 검증해야 유효가 됩니다. 아래 '공식 자격 등록'에서 신고합니다.", "")}
+    ${card(4, "응시 준비(내부 판정)", ready.length ? `${ready.length}개 시험 판정됨` : "판정 전", ready.length ? "ok" : "w", ready.length ? table(["시험", "내부 판정"], ready) : "", "공식 합격선·합격 확률이 아닙니다. 내부 기준(문항 정답률·실습 증거 등)을 충족했는지만 보여줍니다. 아래 '응시준비 판정'에서 실행합니다.", "")}
+    ${card(5, "승인된 실제 실습", (p.labs_approved || []).length ? `${p.labs_approved.length}건` : "승인된 실습 없음", (p.labs_approved || []).length ? "ok" : "w", (p.labs_approved || []).length ? p.labs_approved.map(x => badge(x, "ok")).join(" ") : "", "실제 Databricks 워크스페이스에서 한 실습의 증거를 검토자가 승인한 것만 표시됩니다. 모의 실행은 포함되지 않습니다.", (p.labs_approved || []).length ? "" : go("실습 증거함으로 가기", "lab"))}
+    ${card(6, "고객 투입 승인", "별도 승인", "", "", `${esc(typeof p.assignment_authorization === "string" ? p.assignment_authorization : "별도 승인(자동 부여 없음)")} — 내부 등급이나 자격과 관계없이 별도 절차로만 부여됩니다. 아래 '투입 승인' 카드에서 확인합니다.`, "")}</div>`;
+}
+const dimTable = d => !d || !Object.keys(d).length ? `<div class="mute">아직 평가된 차원이 없습니다. 시험센터에서 문항을 풀면 지식·실기·복구·설명 차원별 숙련도가 여기에 표시됩니다.</div>${scBtn(SCN("시험센터로 가기", "exam"))}` : table(["차원", "숙련도"], Object.entries(d).map(([k, v]) => [k, kvText(v)]));
+/* ------------------------------------------------------------ 읽기 쉬운 값 표시 (JSON 코드가 그대로 보이지 않게) */
+const KL = { usage_index: "모의 사용량 지수", usage: "사용량", unit: "단위", weights: "가중치", approvals: "승인", proposals: "제안", ax_actions: "실행 기록", tickets: "권한 티켓", score: "점수", counts: "건수", count: "건수", by_domain: "영역별", recalls: "회수 이력", families: "문항 묶음(family)", company_program: "회사 파트너 프로그램", partner_status: "파트너 상태", poc: "PoC", purpose: "목적", tier: "등급(tier)", note: "비고", status: "상태", state: "상태", reason: "사유", name: "이름", title: "제목", id: "ID", total: "전체", correct: "정답", pct: "비율(%)", rows: "행 수", columns: "컬럼", sha256: "SHA-256", created: "생성", created_at: "생성 일시", updated_at: "갱신 일시", owner: "소유자", role: "역할", kind: "종류", type: "유형", version: "버전", ok: "정상", passed: "통과", failed: "실패", missing: "부족한 항목", privilege: "권한", securable: "대상", evidence_level: "증거 수준", release_gate_ok: "출시 게이트", blockers: "차단 사유", pilot: "파일럿", learners: "학습자 수", sessions: "세션 수", items: "문항", approved: "승인됨", pending: "대기", rejected: "반려", completed: "완료", percent: "진행률(%)", exam_id: "시험", domain: "영역", domains: "영역", mastery: "숙련도", detail: "상세", result: "결과", recon: "정합성 대조", expected: "기대값", actual: "실제값", diff: "차이", message: "메시지", code: "코드", hint: "힌트" };
+const keyLabel = k => KL[k] || String(k).replace(/_/g, " ");
+const isObj = v => v && typeof v === "object" && !Array.isArray(v);
+function pretty(v, depth = 0) {
+  if (v === null || v === undefined || v === "") return `<span class="mute">-</span>`;
+  if (typeof v === "boolean") return badge(v ? "예" : "아니오", v ? "ok" : "w");
+  if (typeof v === "number") return `<b>${esc(Number.isInteger(v) ? v.toLocaleString("ko-KR") : String(Math.round(v * 1000) / 1000))}</b>`;
+  if (typeof v === "string") return esc(v);
+  if (Array.isArray(v)) {
+    if (!v.length) return `<span class="mute">(없음)</span>`;
+    if (v.every(x => x === null || typeof x !== "object")) return v.map(x => `<span class="pchip">${esc(x)}</span>`).join(" ");
+    if (v.every(isObj) && depth < 3) { const cols = [...new Set(v.flatMap(o => Object.keys(o)))].slice(0, 8); return `<div class="tw"><table><tr>${cols.map(c => `<th>${esc(keyLabel(c))}</th>`).join("")}</tr>${v.slice(0, 50).map(o => `<tr>${cols.map(c => `<td>${depth < 2 ? pretty(o[c], depth + 1) : esc(kvText(o[c]))}</td>`).join("")}</tr>`).join("")}</table></div>${v.length > 50 ? `<div class="mute">… 외 ${v.length - 50}건</div>` : ""}` }
+    return `<ul class="pul">${v.slice(0, 50).map(x => `<li>${pretty(x, depth + 1)}</li>`).join("")}</ul>`;
+  }
+  const es = Object.entries(v);
+  if (!es.length) return `<span class="mute">(없음)</span>`;
+  if (depth >= 3) return esc(kvText(v));
+  return `<table class="ptab">${es.map(([k, x]) => `<tr><th>${esc(keyLabel(k))}</th><td>${pretty(x, depth + 1)}</td></tr>`).join("")}</table>`;
+}
+const prettyBox = (v, rawToo) => `<div class="pbox">${pretty(v)}</div>${rawToo ? `<details><summary class="mute">원본 데이터(JSON) 보기</summary><pre>${J(v)}</pre></details>` : ""}`;
+/* ------------------------------------------------------------ 연결(내비게이션): 표의 항목 → 관련 화면, 모든 화면 하단 '이어서' */
+const EV_NAV = [[/^(SQL|QUERY)/, "sql"], [/^WAREHOUSE/, "comp"], [/^PIPELINE/, "pipe"], [/^(JOB|RUN_|REPAIR)/, "jobs"], [/^(NOTEBOOK|CELL)/, "nb"], [/^(CONN|FOREIGN)/, "conn"], [/^(GRANT|REVOKE|PERMISSION|TICKET|UC_|PRIVILEGE)/, "perm"], [/^(ORDER|AX_|APPROVAL|PROPOSAL|POLICY|PAYLOAD)/, "agent"], [/^GENIE/, "genie"], [/^(BUNDLE|GIT|CLI|DEPLOY)/, "bundle"], [/^CDC/, "cdc"], [/^(TRACE|EVAL)/, "trace"], [/^(EXAM|ATTEMPT)/, "exam"], [/^LAB/, "lab"], [/^(SESSION|ENV|PROFILE)/, "env"], [/^(OBJECTIVE|COVERAGE)/, "map"], [/^(ITEM|QUESTION)/, "qual"]];
+const KIND_NAV = { "Notebook cell": "nb", File: "bundle", Pipeline: "pipe", Job: "jobs", Warehouse: "comp", Connection: "conn", Genie: "genie", Agent: "agent" };
+const STAFF_VIEWS = new Set(["rvw", "vmx", "inst", "partner", "conf"]);
+const canGo = v => v === "fbq" ? ME?.role === "admin" : STAFF_VIEWS.has(v) ? staff() : true;
+const goLink = (v, label, tip) => `<a href="#" class="golink" data-a="nav" data-v="${v}" title="${esc(tip || (viewLabel(v) + " 화면으로 이동"))}">${esc(label)} ›</a>`;
+function autoLink(c) {
+  if (typeof c !== "string" || !c || c.length > 64) return null;
+  let v = KIND_NAV[c];
+  if (!v && /^[A-Z][A-Z0-9_]{3,}$/.test(c)) v = (EV_NAV.find(([re]) => re.test(c)) || [])[1];
+  if (!v && /^LAB-[A-Z0-9-]+$/.test(c)) v = "lab";
+  if (!v && /^FB-\d+$/.test(c)) v = "fbq";
+  if (!v && /^s_[0-9a-f]{8,}$/.test(c)) return `<a href="#" class="golink" data-a="opensess" data-id="${esc(c)}" title="이 세션 열기">${esc(c)} ›</a>`;
+  return v && v !== VIEW && canGo(v) ? goLink(v, c) : null;
+}
+const NEXTV = { env: "req", req: "comp", ws: "cat", cat: "sql", sql: "perm", nb: "pipe", comp: "cat", conn: "pipe", pipe: "jobs", cdc: "jobs", jobs: "nb", genie: "agent", agent: "trace", trace: "bundle", bundle: "perm", perm: "sql", track: "demo", demo: "evid", xfer: "prof", prof: "plan", plan: "map", map: "tutor", ko: "tutor", tutor: "exam", exam: "lab", lab: "qual", qual: "partner", partner: "conf", conf: "vmx", vmx: "rvw", rvw: "vmx", fbq: "evid", inst: "evid", evid: "prof" };
+function viewFooter(v) {
+  let n = NEXTV[v]; if (n && !canGo(n)) n = ["evid", "prof", "env"].find(x => x !== v && canGo(x));
+  const b = [];
+  if (n) b.push(scBtn(SCN(`다음 화면: ${viewLabel(n)}`, n), true));
+  b.push(scBtn(SCA("이 화면은 뭐야? (AI 지원)", "이 화면은 뭐야?")), scBtn({ type: "help", label: "이 화면 도움말(F1)" }));
+  return `<div class="vfoot"><span class="mute">이어서</span> ${b.join(" ")}</div>`;
+}
 function resBox(ex) {
   if (!ex) return ""; const r = ex.result || ex; const e = r.error;
-  if (e) return `<div class="card"><b class="bad">${esc(e.code)}</b> ${esc(e.message)}${e.hint ? `<div class="warnc">힌트: ${esc(e.hint)}</div>` : ""}${e.missing ? `<pre>${J(e.missing)}</pre>` : ""} ${ex.evidence_level ? lv(ex.evidence_level) : ""}</div>`;
+  if (e) return `<div class="card"><b class="bad">${esc(e.code)}</b> ${esc(e.message)}${e.hint ? `<div class="warnc">힌트: ${esc(e.hint)}</div>` : ""}${e.missing ? pretty(e.missing) : ""} ${ex.evidence_level ? lv(ex.evidence_level) : ""}${remedyHtml(e)}</div>`;
   if (r.columns) return `<div class="card">${lv(ex.evidence_level || "LOCAL_EXECUTED")} 행 ${r.rows?.length} · hash ${esc((r.sql_hash || "").slice(0, 10))}${table(r.columns, r.rows, true)}</div>`;
-  return `<div class="card"><pre>${J(r)}</pre></div>`;
+  return `<div class="card">${prettyBox(r, true)}</div>`;
 }
 
 /* ------------------------------------------------------------ views */
@@ -565,7 +691,7 @@ const V = {
     const sk = LAST.seedkey;
     return `<h2>전이 산업 시드 · 협업 훈련</h2><div style="margin:-2px 0 10px"><button class="primary" data-a="axos" data-t="dom">원하는 도메인 신청</button> <span class="mute">원하는 산업 도메인이 없나요? 신청하면 담당자에게 전달되어 추가됩니다.</span></div><div class="sub">식자재 주문에서 익힌 규칙을 다른 산업 데이터에 옮겨 보는 과제용 합성 CSV입니다. 본인 교육용 워크스페이스 볼륨에 올려 사용하세요.</div>
     <div class="card"><b>전이 시드</b>${table(["시드", "용도", "파일", ""], seeds.map(s => [s.title, s.use, Object.entries(s.files).map(([n, f]) => `${n} (${f.rows}행, ${f.sha256.slice(0, 8)}…)`).join("<br>"), `<button data-a="seeddl" data-id="${s.seed_id}">CSV 받기</button>${staff() ? ` <button class="ghost" data-a="seedkey" data-id="${s.seed_id}">정답표</button>` : ""}`]))}
-    ${sk ? `<div class="sub"><b>${esc(sk.id)} 정답표(직원 전용)</b></div><pre>${J(sk.key)}</pre>` : ""}</div>
+    ${sk ? `<div class="sub"><b>${esc(sk.id)} 정답표(직원 전용)</b></div>${prettyBox(sk.key, true)}` : ""}</div>
     <div class="card"><b>협업 훈련: ${esc(sc.title)}</b><div class="sub">${esc(sc.brief)}</div>${table(["작업", "역할", "선행", "산출물", "인계 대상"], sc.tasks.map(t => [t.task_id + " " + t.title, t.role, t.after.join(", ") || "-", t.produce, t.handoff_to || "-"]))}
       <div class="row"><input id="tm_name" placeholder="팀 이름"><button data-a="teamnew">팀 만들기</button><input id="tm_id" placeholder="팀 ID" value="${esc(LAST.team || "")}"><button class="ghost" data-a="teamload">불러오기</button></div>
       ${team ? `<div class="row"><select id="tm_role">${["DBA", "DATA_ENGINEER", "AX", "REVIEWER"].map(r => `<option>${r}</option>`).join("")}</select><button data-a="teamjoin">이 역할로 참여</button></div>
@@ -619,20 +745,21 @@ order version: 주문 변경마다 +1 (낙관적 잠금)</pre><div class="sub">g
     return `<h2>UI-05 SQL Editor</h2><div class="sub">Warehouse ${esc(ST.warehouse.state)} · 구문 분석(AST) → 지원 범위 → UC 권한 → Warehouse → 격리 실행 → 감사. 지원: SELECT/JOIN/GROUP BY/CTE/CASE, CREATE SCHEMA/TABLE/VIEW, INSERT, GRANT/REVOKE(관리자). Spark와 의미가 다를 수 있음.</div>
     <div class="card"><textarea id="sqlbox">${esc(LAST.sqlq || "SELECT * FROM food_dev.silver.orders LIMIT 5")}</textarea><div class="row"><button data-a="sql">실행</button>${ME.role === "instructor" || ME.role === "admin" ? `<select id="asp"><option value="">내 신원</option><option>uc-admin@wizbase.training</option><option>svc-runner</option><option>analyst-b@wizbase.training</option></select>` : ""}<button class="sec" data-a="whstart">Warehouse 시작</button>
     <span class="mute">예: SELECT product_id, SUM(on_hand_qty-reserved_qty-damaged_qty) AS available_qty FROM food_dev.silver.inventory GROUP BY product_id</span></div></div>
-    ${resBox(LAST.sql)}<h3>실행 이력</h3>${table(["SQL", "상태"], HIST.sql.slice(0, 10).map(h => [h.q.slice(0, 90), h.s]), true)}`;
+    ${resBox(LAST.sql)}<h3>실행 이력</h3><div class="sub">실패(failed)를 누르면 원인과 해결 순서, 바로가기가 펼쳐집니다. 성공한 문장은 [다시 쓰기]로 편집기에 불러옵니다.</div>
+    <div class="tw"><table><tr><th>SQL</th><th>상태</th><th></th></tr>${HIST.sql.slice(0, 10).map((h, i) => `<tr><td><code>${esc(h.q.slice(0, 90))}</code></td><td>${h.s === "ok" ? badge("ok", "ok") : `<button class="b bad hfail" data-a="hfix" data-i="${i}" title="원인과 해결 방법 보기">${esc(h.s || "failed")} ▸ ${HFIX === i ? "접기" : "해결 방법"}</button>`}</td><td><button class="ghost" data-a="hreuse" data-i="${i}">다시 쓰기</button></td></tr>${HFIX === i && h.err ? `<tr><td colspan="3">${remedyHtml(h.err)}</td></tr>` : ""}`).join("") || `<tr><td colspan="3" class="mute">(없음)</td></tr>`}</table></div>`;
   },
   async nb() {
     const nb = ST.notebook;
     return `<h2>UI-06 Notebook</h2><div class="sub">셀별 실행 순서·코드 해시·stale 표시. Python 셀은 격리 실행기 미구성으로 차단됩니다(가짜 spark 없음).</div>
     <div class="row"><button data-a="nbadd" data-lang="sql">+ SQL 셀</button><button class="sec" data-a="nbadd" data-lang="python">+ Python 셀</button><button class="danger" data-a="nbrestart">커널 재시작</button></div>
     ${nb.cells.map(c => `<div class="card"><b>[${c.exec_order ?? " "}] ${c.id} ${c.lang}</b> ${c.stale ? badge("STALE: 위 셀 수정됨", "bad") : ""} ${c.status === "failed" ? badge("failed", "bad") : c.status === "ok" ? badge("ok", "ok") : ""}<textarea id="cell_${c.id}">${esc(c.code)}</textarea><div class="row"><button data-a="nbrun" data-id="${c.id}">실행</button><button class="sec" data-a="nbedit" data-id="${c.id}">수정 저장</button></div>${c.output ? (c.output.error ? resBox({ result: { error: c.output.error } }) : table(c.output.columns, c.output.rows)) : ""}</div>`).join("")}
-    <h3>변수 상태 (-- as: 이름)</h3><pre>${J(nb.vars)}</pre><div class="mute">재시작 ${nb.restarts}회 · 메모리 변수 초기화, 영속 테이블 유지</div>`;
+    <h3>변수 상태 (-- as: 이름)</h3>${Object.keys(nb.vars || {}).length ? pretty(nb.vars) : `<div class="mute">(저장된 변수 없음 — 셀에 <code>-- as: 이름</code>을 쓰면 결과가 변수로 저장됩니다)</div>`}<div class="mute">재시작 ${nb.restarts}회 · 메모리 변수 초기화, 영속 테이블 유지</div>`;
   },
   async comp() {
     const w = ST.warehouse; const me = ST.principals[ST.principal] || {};
     return `<h2>UI-07 Compute / SQL Warehouses</h2><div class="card"><b>${esc(w.name)}</b> 상태 ${badge(w.state, w.state === "RUNNING" ? "ok" : w.state === "FAILED" ? "bad" : "w")} CAN USE: ${w.acl.join(", ")}<div class="row"><button data-a="whstart">시작</button><button class="sec" data-a="whstop">중지</button></div>
     <div class="sub">내 entitlement: ${(me.entitlements || []).join(", ")} · UC 권한만으로는 Warehouse가 실행되지 않습니다. 시작에는 몇 번의 명령 후 RUNNING 으로 전이됩니다(결정적).</div></div>
-    <div class="card"><b>모의 사용량 지수</b><pre>${J(ST.usage_index)}</pre></div>`;
+    <div class="card"><b>모의 사용량 지수</b>${pretty(ST.usage_index)}</div>`;
   },
   async conn() {
     const c = ST.connections.oracle_food_conn; const cats = ["NETWORK", "AUTH", "SOURCE_PRIVILEGE", "UC_PRIVILEGE", "UNSUPPORTED", "CDC_PREREQ", "INCREMENTAL", "SCHEMA_DRIFT"];
@@ -645,9 +772,9 @@ order version: 주문 변경마다 +1 (낙관적 잠금)</pre><div class="sub">g
   async pipe() {
     const p = ST.pipelines.orders_pipeline;
     return `<h2>UI-09 Pipelines</h2><div class="sub">선언적 데이터셋 정의(SQL Editor DDL과 별도 검증기). 상태 ${badge(p.state, p.state === "SUCCEEDED" ? "ok" : p.state === "FAILED" ? "bad" : "w")} · 대상 ${esc(p.target)} · run_as ${esc(p.run_as)}. 검증 성공 ≠ 실행 성공 ≠ 업무 정합성.</div>
-    <div class="card"><textarea id="plsql">${esc(p.source_sql)}</textarea><div class="row"><button data-a="pipeedit">소스 저장</button><button class="sec" data-a="pipe" data-x="validate">Validate</button><button data-a="pipe" data-x="run">Run</button><select id="plas"><option>${esc(p.run_as)}</option><option>trainee@wizbase.training</option><option>svc-runner</option></select><button class="sec" data-a="pipeas">run_as 변경</button></div></div>
+    <div class="card"><textarea id="plsql">${esc(p.source_sql)}</textarea><div class="row"><button data-a="pipeedit">소스 저장</button><button class="sec" data-a="pipe" data-x="validate">Validate</button><button data-a="pipe" data-x="run">Run</button><button class="primary" data-a="pipeall" title="소스 저장 → 검증 → 실행을 순서대로 한 번에">저장 → 검증 → 실행 (한 번에)</button><select id="plas"><option>${esc(p.run_as)}</option><option>trainee@wizbase.training</option><option>svc-runner</option></select><button class="sec" data-a="pipeas">run_as 변경</button></div></div>
     <div class="card"><b>품질 결과 (마지막 실행)</b>${table(["규칙", "컬럼", "조치", "위반"], (p.last_quality || []).map(q => [q.rule, q.col, q.action, q.violations]))}<div class="sub">공식 expectation: 경고(EXPECT, 기본) · DROP ROW · FAIL UPDATE. 이 화면의 block≈FAIL UPDATE, warn≈EXPECT이며, <b>quarantine은 공식 내장 동작이 아니라 WIZBASE 격리 패턴</b>입니다. 실제 파이프라인은 streaming table/materialized view 정의에 CONSTRAINT … EXPECT 절을 사용합니다(이 시뮬레이터는 단순화한 SELECT 정의).</div></div>
-    <div class="card"><b>실행 이력</b>${table(["rev", "상태", "사유/결과"], p.history.slice().reverse().map(h => [h.rev, h.state, h.reason || (h.recon ? J(h.recon) : "")]))}</div>
+    <div class="card"><b>실행 이력</b>${table(["rev", "상태", "사유/결과"], p.history.slice().reverse().map(h => [h.rev, h.state, h.reason || (h.recon ? kvText(h.recon) : "")]))}</div>
     <div class="card"><b>의존 그래프</b><div>bronze.raw_orders → [${esc(p.name)}] → silver.orders_pl → job:orders_job</div></div>`;
   },
   async cdc() {
@@ -656,7 +783,7 @@ order version: 주문 변경마다 +1 (낙관적 잠금)</pre><div class="sub">g
     <div class="card"><b>이벤트 로그</b><div class="sub">bronze.cdc_events(event_id, customer_id, op, city, seq) · 다음 배치 도착 전/후로 달라집니다. 목표: silver.customers_cdc(customer_id, city) = 각 고객의 <b>seq 최신 상태</b>(삭제 제외).</div>
     <div class="row"><button class="sec" data-a="cdcview">이벤트 보기</button><button class="sec" data-a="c" data-t="cdc.next_batch">다음 배치 도착</button><button data-a="cdccheck">정합성 검사</button></div>
     <textarea id="cdcsql" style="min-height:130px">${esc(LAST.cdcsql || "")}</textarea><div class="row"><button data-a="cdcrun">이 SQL 실행(CREATE OR REPLACE TABLE …)</button></div>
-    ${key ? `<pre>${J(key)}</pre>` : ""}${LAST.cdcrows ? table(LAST.cdcrows.columns, LAST.cdcrows.rows, true) : ""}</div>`;
+    ${key ? prettyBox(key, true) : ""}${LAST.cdcrows ? table(LAST.cdcrows.columns, LAST.cdcrows.rows, true) : ""}</div>`;
   },
   async jobs() {
     const j = ST.jobs.orders_job;
@@ -682,7 +809,7 @@ order version: 주문 변경마다 +1 (낙관적 잠금)</pre><div class="sub">g
     ${pr ? `<h3>정책 결정: ${badge(pr.policy?.decision, pr.policy?.decision === "REQUIRES_APPROVAL" ? "w" : "bad")}</h3><pre>${esc((pr.policy?.reasons || []).join("\n"))}</pre>${table(["대안", "라벨"], (pr.policy?.alternatives || []).map(a => [a.type, a.label]))}` : ""}</div>
     <div class="card"><b>제안·승인</b>${props.length ? table(["제안", "상태", "payload", ""], props.map(p => [p.proposal_id, p.status, p.payload, p.status === "PENDING" ? `hash <input id="ph_${p.proposal_id}" value="${p.payload_hash}" size="12"> <button data-a="approve" data-id="${p.proposal_id}">승인(리뷰어)</button>` : ""]).map(r => r)) : '<span class="mute">제안 없음</span>'}</div>
     <div class="card"><b>가상 AX API 실행</b><div class="row"><select id="axap">${aps.map(a => `<option>${a.approval_id}</option>`).join("") || "<option></option>"}</select>멱등키 <input id="axk" value="idem-${Math.floor(Math.random() * 9999)}" size="10">expected_version <input id="axv" type="number" value="${f ? f.order_version : 1}" style="width:60px"><button data-a="ax">실행</button></div>
-    <div class="sub">payload(수정해 변조를 시험할 수 있음 — 서버가 차단하고 감사 이벤트를 남김)</div><textarea id="axpl">${esc(JSON.stringify((props.filter(p => p.status === "APPROVED").slice(-1)[0] || props.slice(-1)[0] || { payload: {} }).payload, null, 1))}</textarea>${LAST.ax ? `<pre>${J(LAST.ax)}</pre>` : ""}</div>
+    <div class="sub">payload(수정해 변조를 시험할 수 있음 — 서버가 차단하고 감사 이벤트를 남김)</div><textarea id="axpl">${esc(JSON.stringify((props.filter(p => p.status === "APPROVED").slice(-1)[0] || props.slice(-1)[0] || { payload: {} }).payload, null, 1))}</textarea>${LAST.ax ? prettyBox(LAST.ax, true) : ""}</div>
     <div class="card"><b>정책 (WIZBASE 정책 엔진, Databricks 설정 아님) v${ST.policy.active}</b><textarea id="polyaml">${esc(`rule_id: ${rule.rule_id}\nrequires_approval: ${rule.requires_approval}\nprohibited_if: [${rule.prohibited_if.join(", ")}]\nrevalidate_before_execution: [${rule.revalidate_before_execution.join(", ")}]`)}</textarea><div class="row"><button class="sec" data-a="policydraft">초안 테스트</button><button data-a="policyact">활성화(테스트 통과 시)</button></div>${ST.policy.draft ? table(["케이스", "결정", "통과"], ST.policy.draft.tests.map(t => [t.case, t.decision, t.pass ? "✅" : "❌"])) : ""}</div>`;
   },
   async trace() {
@@ -690,7 +817,7 @@ order version: 주문 변경마다 +1 (낙관적 잠금)</pre><div class="sub">g
     return `<h2>UI-13 Tracing / 평가</h2><div class="sub">WIZBASE 교육용 모사입니다(MLflow 호환 내보내기 미검증). 정답은 정책 결정·데이터 결과로 분리하며 문장 유사도로 통과시키지 않습니다.</div>
     <div class="card"><button data-a="evalrun">평가셋 40건 실행 (정책 v${ST.policy.active})</button> ${e ? badge(`${e.passed}/${e.total} 통과`, e.passed === e.total ? "ok" : "bad") : ""}${e ? table(["ID", "분류", "결정", "부족", "기대", "통과"], e.cases.map(c => [c.id, c.category, c.decision, c.shortage, c.expect + (c.expect_shortage != null ? "/" + c.expect_shortage : ""), c.pass ? "✅" : "❌"])) : ""}${ST.eval_runs.length ? `<div class="mute">이전 실행: ${ST.eval_runs.map(r => `v${r.policy_version}:${r.passed}/${r.total}`).join(", ")}</div>` : ""}</div>
     <div class="card"><b>Trace 타임라인</b>${table(["시각", "trace", "유형", "주체", "결과", "코드해시"], a.slice(-40).reverse().map(x => [x.scenario_clock.slice(11, 19), x.trace_id || "-", x.event_type, x.effective_principal, x.outcome, (x.code_hash || "").slice(0, 8)]))}</div>
-    <div class="card"><b>비용(가상)</b> <span class="mute">${esc(ST.cost.components_note)}</span><pre>${J({ usage: ST.cost.usage, 단위: ST.cost.unit, 지수: ST.cost.usage_index_units, 가중치: ST.cost.weights })}</pre>
+    <div class="card"><b>비용(가상)</b> <span class="mute">${esc(ST.cost.components_note)}</span>${pretty({ usage: ST.cost.usage, unit: ST.cost.unit, usage_index: ST.cost.usage_index_units, weights: ST.cost.weights })}
     ${ST.cost.estimate ? `<div class="b ok">환산 ${ST.cost.estimate.amount} ${esc(ST.cost.estimate.currency)}</div> <span class="mute">${esc(ST.cost.estimate.basis)}</span>` : `<div class="warnc">${esc(ST.cost.note || "")}</div>`}
     <div class="row"><input id="cp_price" type="number" step="0.01" placeholder="단가" style="width:90px"><input id="cp_cur" placeholder="통화" value="USD" style="width:70px"><input id="cp_src" placeholder="단가 출처(필수)" style="flex:1"><input id="cp_asof" placeholder="기준일 YYYY-MM-DD(필수)" style="width:150px"><button class="sec" data-a="costprofile">단가 프로필 등록</button></div></div>`;
   },
@@ -722,13 +849,13 @@ order version: 주문 변경마다 +1 (낙관적 잠금)</pre><div class="sub">g
     <div class="row"><button class="sec" data-a="pause" data-sid="${SID}" data-p="1">일시정지</button><button class="sec" data-a="pause" data-sid="${SID}" data-p="0">재개</button><button class="sec" data-a="ckpt" data-sid="${SID}">체크포인트</button><button class="sec" data-a="restore" data-sid="${SID}">복원</button><button class="danger" data-a="reset" data-sid="${SID}">초기화</button><button data-a="replay" data-sid="${SID}">결정적 재생 검증</button></div>
     <div class="sub">진행 중 장애: ${esc((ST.faults || []).join(", ") || "없음")} · 대리 처리 ${ST.session.admin_assisted}회 (독립 수행 점수와 구분)</div>
     <div class="row">설명·인수 점수(0-15, 평가자 입력) <input id="exs" type="number" min="0" max="15" style="width:70px"><button data-a="explain" data-sid="${SID}">평가 저장</button></div>
-    ${LAST.replay ? `<pre>${J(LAST.replay)}</pre>` : ""}</div>` : ""}${SID ? await scoreBox(SID) : ""}`;
+    ${LAST.replay ? prettyBox(LAST.replay, true) : ""}</div>` : ""}${SID ? await scoreBox(SID) : ""}`;
   },
   async evid() {
     const e = await api(`/api/sessions/${SID}/evidence`);
     return `<h2>증거 보고서</h2><div class="banner">${esc(e.report)}</div><div class="card"><pre>모드 ${e.mode} / ${e.learning_mode}\n프로필 ${e.profile.profile_id} (${e.profile.evidence_status}, SA 검토 ${e.profile.sa_reviewed_at || "없음"})\n시드 ${e.seed} · 기준 ${e.scenario_clock_base}\n데이터 digest 초기 ${e.data_digest_initial.slice(0, 16)} → 현재 ${e.data_digest_current.slice(0, 16)}\n정책 버전 ${e.policy_version}\n${e.verification_levels_note}</pre></div>
-    <div class="card"><b>점수/통제</b><pre>${J(e.score)}</pre></div><div class="card"><b>제한 사항</b><ul>${e.limitations.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
-    <div class="card"><b>승인 · 가상 API 결과</b><pre>${J({ approvals: e.approvals, proposals: e.proposals, ax_actions: e.ax_actions, tickets: e.tickets })}</pre></div>
+    <div class="card"><b>점수/통제</b>${pretty(e.score)}</div><div class="card"><b>제한 사항</b><ul>${e.limitations.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+    <div class="card"><b>승인 · 가상 API 결과</b>${pretty({ approvals: e.approvals, proposals: e.proposals, ax_actions: e.ax_actions, tickets: e.tickets })}</div>
     <div class="card"><b>SQL 증거(코드 해시)</b>${table(["해시", "결과", "주체", "시각", "수준"], e.sql_evidence.slice(-30).map(s => [(s.code_hash || "").slice(0, 12), s.outcome, s.principal, s.clock.slice(11, 19), s.level]))}</div>
     <div class="card"><b>타임라인</b>${table(["시각", "유형", "주체", "결과", "수준", "trace"], e.timeline.slice(-60).map(t => [t.t.slice(11, 19), t.type, t.principal, t.outcome, t.level, t.trace || ""]))}</div>`;
   },
@@ -759,12 +886,12 @@ order version: 주문 변경마다 +1 (낙관적 잠금)</pre><div class="sub">g
   async prof() {
     const p = await api("/api/learners/me/profile"); const sk = await api("/api/learners/me/skills");
     return `<h2>UI-17 역량 · 등급 프로필</h2><div class="banner">${esc(p.disclaimer)}</div>
-    <div class="card"><b>분리된 상태 필드</b><pre>${J({ 내부등급: p.internal_grades, 내부재평가: p.internal_reassessment, 공식자격: p.official_credentials, 응시준비: p.readiness, 승인된_실제실습: p.labs_approved, 투입승인: p.assignment_authorization })}</pre><div class="sub">${esc(p.separation_note)}</div></div>
+    <div class="card"><b>내 현재 상태 — 서로 다른 6가지는 일부러 따로 표시합니다</b><div class="sub">${esc(p.separation_note)} 하나가 올라가도 다른 것이 자동으로 올라가지 않습니다.</div>${profCards(p)}</div>
     <div class="card"><b>공식 자격 등록(자기 신고 → 확인대기)</b><div class="row"><input id="crn" placeholder="자격명" style="flex:1"><button data-a="credadd">등록</button></div><div class="sub">자기 신고만으로는 유효 상태가 되지 않으며 리뷰어가 발급기관 확인 URL·credential ID로 검증합니다. 계정 비밀번호·시험 토큰은 수집하지 않습니다.</div></div>
     <div class="card"><b>공식 Academy 이수 이력</b> <span class="mute">(확인대기 → 검토자 원본 확인)</span><div class="row"><input id="ac_course" placeholder="과정명" style="flex:1"><input id="ac_date" placeholder="이수일" style="width:120px"><input id="ac_proof" placeholder="증빙 참조(배지 ID 등)" style="width:200px"><button class="sec" data-a="academyadd">등록</button></div>${table(["ID", "과정", "상태"], (await api("/api/learners/me/academy")).map(r => [r.record_id, r.course, r.status]))}</div>
     <div class="card"><b>투입 승인(고객 투입)</b> <span class="mute">내부 등급·공식 자격과 별개, 자동 부여 없음</span>${table(["ID", "역할", "범위", "유효 기한", "상태"], (await api("/api/learners/me/assignments")).map(r => [r.authorization_id, r.role, r.scope, r.valid_until, r.effective ? "유효" : r.status]))}</div>
     <div class="card"><b>내 데이터 (열람·삭제)</b><div class="sub">열람/삭제는 즉시 처리됩니다. 승인된 증거·등급·투입 승인·감사는 보존됩니다. 정책은 법무 검토 전 초안입니다.</div><div class="row"><button class="sec" data-a="privexport">내 데이터 내려받기</button><button class="danger" data-a="privdelete">학습 활동 데이터 삭제</button></div></div>
-    <div class="card"><b>objective 차원별 숙련도 (평균으로 합치지 않음)</b><pre>${J(sk.dimensions)}</pre></div>
+    <div class="card"><b>objective 차원별 숙련도 (평균으로 합치지 않음)</b>${dimTable(sk.dimensions)}</div>
     <div class="card"><b>응시준비 판정(내부)</b><div class="row"><select id="rdx"><option>DE-A</option><option>DE-P</option><option>GEN-A</option></select><button data-a="readiness">판정 실행</button></div>${LAST.ready ? `<h3>${esc(LAST.ready.exam_id)}: ${badge(LAST.ready.label, LAST.ready.label.includes("충족") ? "ok" : "bad")}</h3>${table(["기준", "충족", "상세"], LAST.ready.criteria.map(c => [c.criterion, c.met ? "✅" : "❌", c.detail]))}<div class="sub">${esc(LAST.ready.note)}</div>` : ""}</div>`;
   },
   async plan() {
@@ -779,7 +906,7 @@ order version: 주문 변경마다 +1 (낙관적 잠금)</pre><div class="sub">g
     return `<h2>UI-19 공식 목표 지도</h2><div class="banner">내부 objective ID는 공식 코드가 아닙니다. 현재 레코드는 <b>도메인 단위 자리표시</b>이며 공식 가이드의 bullet 단위 전수 적재·검토는 미수행입니다(출시 게이트 차단).</div>
     <div class="row"><select id="covx">${profs.map(p => `<option ${p.exam_id === ex ? "selected" : ""}>${p.exam_id}</option>`).join("")}</select><button data-a="covsel">보기</button></div>
     ${profs.filter(p => p.exam_id === ex).map(p => `<div class="card"><b>${esc(p.title)}</b><div class="sub">가이드 ${esc(p.guide_revision)} · 공식 ${p.official_questions}문항/${p.duration_min}분 · 언어 ${esc(p.language)} · 비중합 ${p.sum_weight}% · 내부 모의 ${p.sum_internal_items}문항 ${p.open_conflicts.length ? badge("미해결 상충 " + p.open_conflicts.join(","), "bad") : ""}</div>${p.sources.map(s => `<a href="${s.url}" target="_blank" rel="noopener">${s.id} ${esc(s.title)}</a>`).join(" · ")}</div>`).join("")}
-    <div class="card">출시 게이트 ${badge(c.release_gate_ok ? "통과" : "차단", c.release_gate_ok ? "ok" : "bad")}<ul>${c.blockers.map(b => `<li class="bad">${esc(b)}</li>`).join("")}</ul>상태 집계 <pre>${J(c.counts)}</pre>
+    <div class="card">출시 게이트 ${badge(c.release_gate_ok ? "통과" : "차단", c.release_gate_ok ? "ok" : "bad")}<ul>${c.blockers.map(b => `<li class="bad">${esc(b)}</li>`).join("")}</ul>상태 집계 ${pretty(c.counts)}
     ${table(["objective(내부)", "요약", "비중", "문항", "실습", "coverage", "상충"], c.objectives.map(o => [o.objective_id_internal, o.objective_summary, o.domain_weight, o.question_ids.length, o.lab_ids.join(","), o.coverage_status, o.conflict_status]))}</div>`;
   },
   async tutor() {
@@ -792,7 +919,7 @@ order version: 주문 변경마다 +1 (낙관적 잠금)</pre><div class="sub">g
     const profs = await api("/api/exam-profiles"); const a = LAST.att;
     const body = !a ? "" : `<div class="card"><b>${a.exam_id} ${a.kind}</b> ${badge(a.status, a.status === "IN_PROGRESS" ? "w" : "ok")} 남은 시간 ${Math.floor(a.remaining_s / 60)}분 · 서버 시간 기준 · 도움: ${esc(a.profile_lock.assist_tools)} · readiness 증거 ${a.readiness_eligible ? "예" : "아니오(연습/부분 시험지)"}
       ${a.items.map((i, n) => `<div class="card"><b>${n + 1}. [${i.domain}] ${esc(i.stem)}</b> ${i.type === "multi" ? badge(`${i.select_count}개 선택 · ${i.scoring_rule}`, "w") : ""}${i.choices.map(c => `<div><label><input type="${i.type === "multi" ? "checkbox" : "radio"}" name="q_${i.item_id}" value="${c.id}" ${(a.responses[i.item_id]?.answer || []).includes(c.id) ? "checked" : ""}> ${c.id}. ${esc(c.text)}</label>${c.why ? `<div class="mute"> ↳ ${esc(c.why)}</div>` : ""}</div>`).join("")}${a.status === "IN_PROGRESS" ? `<button class="sec" data-a="examans" data-i="${i.item_id}">저장</button>` : `<div>정답: ${(i.correct || ["(봉인: 비공개)"]).join(",")}</div>`}</div>`).join("")}
-      ${a.status === "IN_PROGRESS" ? `<button data-a="examsubmit">제출 (제출 후 수정 불가)</button>` : `<h3>결과 ${a.result.correct}/${a.result.total} (${a.result.pct}%)</h3><pre>${J(a.result.by_domain)}</pre><div class="sub">${esc(a.result.scoring_rule)}</div>`}<div class="sub">${esc(a.disclaimer)}</div></div>`;
+      ${a.status === "IN_PROGRESS" ? `<button data-a="examsubmit">제출 (제출 후 수정 불가)</button>` : `<h3>결과 ${a.result.correct}/${a.result.total} (${a.result.pct}%)</h3>${pretty(a.result.by_domain)}<div class="sub">${esc(a.result.scoring_rule)}</div>`}<div class="sub">${esc(a.disclaimer)}</div></div>`;
     return `<h2>UI-21 시험센터</h2><div class="banner">모든 현재 문항은 AI 보조 초안(DRAFT)으로 인간 검수 전입니다 → 봉인 시험지는 구성되지 않으며 연습 모드(readiness 증거 제외)만 가능합니다. 숨은 공식 채점 규칙을 재현하지 않습니다.</div>
     <div class="card"><div class="row"><select id="exid">${profs.map(p => `<option ${p.domains.length && p.exam_id !== "DE-P-WEB" ? "" : "disabled"}>${p.exam_id}</option>`).join("")}</select><select id="exk"><option value="practice">연습(해설 제공)</option><option value="sealed">봉인 모의시험(제출 전 정답 비공개)</option></select> 최대 문항 <input id="exmax" type="number" style="width:60px"><button data-a="examstart">시작</button></div><div class="sub">프로필·가이드·언어·시간이 시작 시 고정됩니다. DE-P 웹 프로필은 혼합 금지로 시작할 수 없습니다.</div></div>${body}`;
   },
@@ -823,15 +950,15 @@ python dbx_lab_runner.py bundle-evidence --dir &lt;bundle 경로&gt; --workspace
   async qual() {
     if (!staff() || ME.role === "admin") return `<h2>UI-23 콘텐츠 품질관리</h2><p class="mute">리뷰어/강사 전용입니다.</p>`;
     const q = await api("/api/content-quality"); const its = await api("/api/items");
-    return `<h2>UI-23 콘텐츠 품질관리</h2><div class="sub">DRAFT→TECH_REVIEWED→ASSESSMENT_REVIEWED→PILOTED→ACTIVE→RETIRED. 기술 검토자와 출제 검토자는 분리됩니다(서로 다른 로그인). 표본이 작으면 난이도 보정 완료를 주장하지 않습니다. 현재 상태 집계: ${J(q.bank_size_by_status)}</div>
+    return `<h2>UI-23 콘텐츠 품질관리</h2><div class="sub">DRAFT→TECH_REVIEWED→ASSESSMENT_REVIEWED→PILOTED→ACTIVE→RETIRED. 기술 검토자와 출제 검토자는 분리됩니다(서로 다른 로그인). 표본이 작으면 난이도 보정 완료를 주장하지 않습니다. 현재 상태 집계: ${pretty(q.bank_size_by_status)}</div>
     <div class="card">${table(["문항", "시험", "영역", "상태", "노출", "n", "정답률", "플래그", "검수"], q.items.map(i => [i.item_id, i.exam, i.domain, i.status, i.exposure, i.n, i.p_correct ?? "-", i.flags.join("; "), `<a href="#" data-a="itemrev" data-id="${i.item_id}" data-s="${{ DRAFT: "tech", TECH_REVIEWED: "assessment", ASSESSMENT_REVIEWED: "pilot", PILOTED: "activate" }[i.status] || ""}">다음 단계</a>`]))}</div>
-    <div class="card"><b>회수 이력</b><pre>${J(q.recalls)}</pre></div><div class="card"><b>문항 family</b><pre>${J(q.families)}</pre></div>`;
+    <div class="card"><b>회수 이력</b>${pretty(q.recalls)}</div><div class="card"><b>문항 family</b>${pretty(q.families)}</div>`;
   },
   async partner() {
     if (!staff() || ME.role === "admin") return `<h2>UI-24 전문인력 · 파트너 운영</h2><p class="mute">리뷰어/강사 전용입니다.</p>`;
     const p = await api("/api/partner-dashboard");
-    return `<h2>UI-24 전문인력 · 파트너 운영</h2><div class="card"><b>회사 파트너 프로그램</b><pre>${J(p.company_program)}</pre><div class="sub">${esc(p.note)}</div><a href="${p.kb_url}" target="_blank" rel="noopener">공식 KB: Partner Portal 인증 연결</a></div>
-    <div class="card"><b>파일럿 지표 (수집 가능한 항목만)</b><pre>${J(await api("/api/pilot-report"))}</pre></div>
+    return `<h2>UI-24 전문인력 · 파트너 운영</h2><div class="card"><b>회사 파트너 프로그램</b>${pretty(p.company_program)}<div class="sub">${esc(p.note)}</div><a href="${p.kb_url}" target="_blank" rel="noopener">공식 KB: Partner Portal 인증 연결</a></div>
+    <div class="card"><b>파일럿 지표 (수집 가능한 항목만)</b>${pretty(await api("/api/pilot-report"))}</div>
     <div class="card"><b>인력 현황</b>${table(["학습자", "내부 등급", "공식 credential", "승인 실습"], p.learners.map(l => [l.learner, l.grades.join(",") || "-", l.official_credentials.join(","), l.labs_approved]))}</div>`;
   },
   async conf() {

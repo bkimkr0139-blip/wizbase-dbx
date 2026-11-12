@@ -138,6 +138,22 @@ def journey(S):
     for i, st in enumerate(JOURNEY):
         subs = []
         for key, text, done, sc in st["subs"]:
+            if key == "fix" and st["id"] == "job":   # run-as를 이미 나로 바꿨다면 다음은 '재실행'
+                jb = next(iter(S["jobs"].values()), None)
+                if jb and jb.get("run_as") == core.TRAINEE:
+                    sc = run("Job 재실행(run-as 변경 후)", "job", {"action": "run"}, "jobs")
+            if key == "fcat_ticket":   # 권한 2개가 필요한 단계: 이미 받은 권한은 건너뛰고 '아직 없는 권한'의 요청서를 안내한다
+                have = {(g[1], g[2]) for g in S["grants"]}
+                open_t = {(t["privilege"], t["securable"]) for t in S["tickets"] if t["status"] == "OPEN"}
+                need = [(p_, sec_) for p_, sec_ in (("CREATE FOREIGN CATALOG", "connection:oracle_food_conn"), ("CREATE CATALOG", "metastore:main")) if (p_, sec_) not in have]
+                pend = [x for x in need if x not in open_t]
+                if not need:     # 권한 2개를 모두 받았으면 이제 foreign catalog를 만든다
+                    sc = run("Foreign catalog 생성", "connection", {"action": "create_foreign_catalog"}, "conn")
+                elif not pend:
+                    sc = nav("관리자 승인 대기 중 — 권한·관리 화면에서 티켓 상태 확인", "perm")
+                elif pend:
+                    p_, sec_ = pend[0]
+                    sc = nav(f"권한 요청서 열기(자동 입력): {p_}", "perm", prefill={"t_sec": sec_, "t_priv": p_, "t_reason": ("foreign catalog 생성 실습 — connection 최소권한" if p_ == "CREATE FOREIGN CATALOG" else "foreign catalog 생성에 필요한 metastore 권한(최소권한)")})
             subs.append({"key": key, "text": text, "done": bool(done(S)), "shortcut": sc})
         n_done = sum(s["done"] for s in subs)
         status = "done" if n_done == len(subs) else ("current" if cur is None else "pending")
@@ -208,7 +224,13 @@ def _next_answer(S, J):
     return txt, [n["shortcut"]] + [s["shortcut"] for s in st["subs"] if not s["done"]][1:3]
 
 
-def chat(S, actor, message, mode_real=False):
+def chat(S, actor, message, mode_real=False, view=None):
+    """자연어 질문 응답 — 의도 분류 엔진(assistant.py)에 위임한다. 이전 단순 키워드 방식은 _legacy_chat 으로 보존."""
+    from . import assistant
+    return assistant.answer(S, actor, message, mode_real, view)
+
+
+def _legacy_chat(S, actor, message, mode_real=False):
     q = (message or "").strip()
     ql = q.lower()
     if S is None:
