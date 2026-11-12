@@ -16,7 +16,7 @@ LOCK = threading.Lock()
 RETENTION_DAYS = 180
 _LAST_PURGE = [0.0]
 KINDS = {"login_ok": "로그인 성공", "login_fail": "로그인 실패", "view": "화면 열기", "cmd": "명령 실행", "session_new": "세션 생성", "session_del": "세션 삭제", "chat": "AI 지원 질문",
-         "feedback": "피드백 제출", "download": "앱 다운로드", "api_error": "API 오류", "real_conn": "실제 연결 설정", "real_sql": "실제 연결 SQL", "feedback_admin": "피드백 관리(수정·삭제 등)"}
+         "feedback": "피드백 제출", "download": "앱 다운로드", "api_error": "API 오류", "real_conn": "실제 연결 설정", "real_sql": "실제 연결 SQL", "feedback_admin": "피드백 관리(수정·삭제 등)", "app_start": "설치형 앱 실행", "app_update": "설치형 앱 업데이트"}
 
 
 def _path():
@@ -125,7 +125,9 @@ def _kpi(evs):
     cmds = [e for e in evs if e["e"] == "cmd"]
     return {"logins": sum(1 for e in evs if e["e"] == "login_ok"), "users": len(users), "login_fail": sum(1 for e in evs if e["e"] == "login_fail"), "sessions": sum(1 for e in evs if e["e"] == "session_new"),
             "cmds": len(cmds), "cmd_fail": sum(1 for e in cmds if e["d"].get("status") != "ok"), "views": sum(1 for e in evs if e["e"] == "view"), "chats": sum(1 for e in evs if e["e"] == "chat"),
-            "feedback": sum(1 for e in evs if e["e"] == "feedback"), "downloads": sum(1 for e in evs if e["e"] == "download"), "errors": sum(1 for e in evs if e["e"] == "api_error")}
+            "feedback": sum(1 for e in evs if e["e"] == "feedback"), "downloads": sum(1 for e in evs if e["e"] == "download"), "errors": sum(1 for e in evs if e["e"] == "api_error"),
+            "app_pcs": len({e["d"].get("inst") for e in evs if e["e"] == "app_start" and e["d"].get("inst")}), "update_ok": sum(1 for e in evs if e["e"] == "app_update" and e["d"].get("result") == "applied"),
+            "update_fail": sum(1 for e in evs if e["e"] == "app_update" and e["d"].get("result") == "failed")}
 
 
 def fingerprint() -> str:
@@ -138,6 +140,47 @@ def fingerprint() -> str:
 
 
 _SUM_CACHE: dict = {}
+
+
+def _installs(evs):
+    """설치 ID(앞 12자)별로 묶은 설치형 앱 현황."""
+    agg = {}
+    for e in evs:
+        inst = e["d"].get("inst")
+        if not inst:
+            continue
+        a = agg.setdefault(inst, {"inst": inst, "platform": "", "os": "", "version": "", "first_t": e["t"], "last_t": e["t"], "events": 0, "starts": 0, "downloads": 0, "feedback": 0, "update_ok": 0, "update_fail": 0, "ip": ""})
+        a["events"] += 1
+        a["first_t"], a["last_t"] = min(a["first_t"], e["t"]), max(a["last_t"], e["t"])
+        k = e["e"]
+        if k == "app_start":
+            a["starts"] += 1
+            a["platform"], a["os"], a["version"] = e["d"].get("plat", a["platform"]), e["d"].get("os", a["os"]), e["d"].get("ver", a["version"])
+        elif k == "app_update":
+            a["update_ok"] += 1 if e["d"].get("result") == "applied" else 0
+            a["update_fail"] += 1 if e["d"].get("result") == "failed" else 0
+            a["version"] = e["d"].get("to") or a["version"]
+        elif k == "download":
+            a["downloads"] += 1
+        elif k == "feedback":
+            a["feedback"] += 1
+        if e["ip"]:
+            a["ip"] = e["ip"]
+    return agg
+
+
+def installs(days: int = 30, q: str = "", offset: int = 0, limit: int = 15):
+    days = max(1, min(int(days or 30), RETENTION_DAYS))
+    agg = _installs(_read(time.time() - days * 86400))
+    L = sorted(agg.values(), key=lambda a: -a["last_t"])
+    q = (q or "").strip().lower()
+    if q:
+        L = [a for a in L if q in a["inst"] or q in (a["platform"] or "").lower() or q in (a["os"] or "").lower() or q in (a["version"] or "").lower() or q in (a["ip"] or "")]
+    total = len(L)
+    limit = max(5, min(int(limit or 15), 100))
+    off = max(0, int(offset))
+    fmt = lambda t: datetime.fromtimestamp(t, KST).strftime("%Y-%m-%d %H:%M")
+    return {"total": total, "items": [{**a, "first": fmt(a["first_t"]), "last": fmt(a["last_t"])} for a in L[off:off + limit]]}
 
 
 def summary(days: int = 30):
@@ -209,6 +252,13 @@ def _summary(days: int):
             u["cmds"] += 1 if k == "cmd" else 0
             if e["t"] >= u["last"]:
                 u["last"], u["role"], u["client"] = e["t"], e["r"] or u["role"], e["c"] or u["client"]
+    ins = _installs(cur)
+    vers = Counter(a["version"] for a in ins.values() if a["version"])
+    plats = Counter(a["platform"] for a in ins.values() if a["platform"])
+    upd = Counter(e["d"].get("result", "?") for e in cur if e["e"] == "app_update")
+    updk = Counter(e["d"].get("kind", "?") for e in cur if e["e"] == "app_update" and e["d"].get("result") == "applied")
+    app_info = {"installs": len(ins), "versions": vers.most_common(10), "platforms": dict(plats), "updates": dict(upd), "update_kinds": dict(updk),
+                "download_via": dict(Counter(e["d"].get("via", "web") for e in cur if e["e"] == "download"))}
     series = [{**r, "users": len(r["users"])} for r in daily.values()]
     top_users = sorted(users.values(), key=lambda u: -u["events"])[:15]
     for u in top_users:
@@ -217,7 +267,7 @@ def _summary(days: int):
     return {"days": days, "generated": datetime.fromtimestamp(now, KST).strftime("%Y-%m-%d %H:%M"), "kpi": _kpi(cur), "prev": _kpi(prev), "daily": series, "hourly": hourly, "heat": heat,
             "roles": dict(roles), "clients": dict(clients), "views": views.most_common(12), "cmds": sorted(([k, v[0], v[1]] for k, v in cmds.items()), key=lambda x: -(x[1] + x[2]))[:12],
             "chat": chat.most_common(10), "downloads": dict(dl), "errors": err_codes.most_common(8), "top_users": top_users,
-            "login_fail_ips": Counter(e["ip"] for e in fails if e["ip"]).most_common(5), "total_events": len(cur), "kinds": KINDS, "retention_days": RETENTION_DAYS}
+            "login_fail_ips": Counter(e["ip"] for e in fails if e["ip"]).most_common(5), "total_events": len(cur), "app": app_info, "kinds": KINDS, "retention_days": RETENTION_DAYS}
 
 
 def users(days: int = 30, q: str = "", offset: int = 0, limit: int = 15):

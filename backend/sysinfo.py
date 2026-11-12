@@ -6,7 +6,7 @@ from pathlib import Path
 from . import core, labs, pack, transfer, v11
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.4.13"
+VERSION = "0.4.14"
 RELEASED = "2026-11-12"
 SHELL_VERSION = "0.1.1"  # PC 앱(desktop/dbx_app.py APP_VERSION)의 최신 버전 — 새 exe를 배포할 때 함께 올린다
 APP_FILE = ROOT / "dist_app" / "release" / "WIZBASE-DBX-Rehearsal.exe"
@@ -32,13 +32,24 @@ def _sha(p):
     return _SHA[str(p)][1]
 
 
+def _tel_headers():
+    try:
+        from . import telemetry
+        return telemetry.headers()
+    except Exception:
+        return {}
+
+
+_OFFERED: set = set()
+
+
 def central_manifest():
     """단독형: 운영자 서버의 최신 배포 정보(10분 캐시, 실패 시 None=오프라인)."""
     if time.time() - _CENTRAL["t"] < 600:
         return _CENTRAL["v"]
     try:
         import json as _j, urllib.request
-        with urllib.request.urlopen(urllib.request.Request(os.environ.get("DBX_CENTRAL_URL", "https://dbx.wizbase.ai.kr").rstrip("/") + "/api/app/manifest", headers={"User-Agent": "DBXDesktop-Standalone"}), timeout=4) as r:
+        with urllib.request.urlopen(urllib.request.Request(os.environ.get("DBX_CENTRAL_URL", "https://dbx.wizbase.ai.kr").rstrip("/") + "/api/app/manifest", headers={"User-Agent": "DBXDesktop-Standalone", **_tel_headers()}), timeout=4) as r:
             v = _j.loads(r.read().decode("utf-8"))
     except Exception:
         v = None
@@ -47,6 +58,7 @@ def central_manifest():
 PURPOSE = ("WIZBASE(Databricks 파트너)의 실제 PoC 준비와 파트너 레벨 상향을 위한 인증 시험 준비를 지원하는 교육·훈련 환경. "
            "Databricks 공식 제품·교육·시험이 아니며 합격·자격·투입을 보증하지 않음.")
 CHANGELOG = [
+    {"version": "0.4.14", "date": "2026-11-12", "notes": ["설치형 앱 사용 신호를 운영 서버로 전달(인터넷 연결 시): 앱 실행·업데이트 알림/적용/실패(설치 ID·버전·OS), 다운로드·업데이트 확인 요청의 구분 헤더, AXOS 피드백(설치 정보 포함)이 서버 접속·사용 기록과 피드백 관리 큐에 기록", "접속·사용 기록에 '설치형 앱 현황'(버전 분포·플랫폼·업데이트 결과·다운로드 경로·설치 PC 목록 검색/쪽 나누기)과 지표 3종 추가, 앱 정보에서 신호 전송 끄기/켜기"]},
     {"version": "0.4.13", "date": "2026-11-12", "notes": ["UI-01 환경 점검의 전체 세션(admin) 목록에 검색(세션 ID·사용자·레슨·모드)과 쪽 나누기(쪽당 10~100개), 조건에 맞는 세션 모두 선택, 다른 쪽에서 고른 세션 선택 유지"]},
     {"version": "0.4.12", "date": "2026-11-12", "notes": ["모바일 최적화(≤820px): 상단 바 + ☰ 전체 메뉴(아코디언), 도움말·AI 지원·피드백 아이콘, 한 열 레이아웃·터치 크기 컨트롤, 패널 전체 화면, 모바일 첫 접속 시 패널 닫힘, 차트·표·목록 모바일 표시, 휴대폰에서는 PC 앱 다운로드 대신 모바일 이용 안내"]},
     {"version": "0.4.11", "date": "2026-11-12", "notes": ["피드백 관리·개발큐와 접속·사용 기록에 검색·쪽 나누기(처음/이전/쪽 번호/다음/마지막, 쪽당 10·25·50·100건) 추가, 조건에 맞는 건 모두 선택, 사용자별 활동 전체 목록 검색", "상단 바 로고를 어두운 바탕에 흰 글자로 통일"]},
@@ -149,6 +161,13 @@ def update_check(client_build):
             kind, size, latest = "pack", pk.get("size", 0), pk.get("version", "")     # 화면·서버 코드만 교체(작은 파일)
         elif rm and not mine_compat and sa.get("available") and sa.get("sha256") != os.environ.get("DBX_EXE_SHA", "~"):
             kind, size, latest = "exe", sa.get("size", 0), sa.get("version", "")      # 구형 앱(호환 정보 없음)은 전체 교체
+        if kind and (kind, latest) not in _OFFERED:      # 새 업데이트를 알린 것을 한 번만 서버에 알린다
+            _OFFERED.add((kind, latest))
+            try:
+                from . import telemetry
+                telemetry.report("update_offered", kind=kind, to_version=latest)
+            except Exception:
+                pass
         app = {"shell_version": VERSION, "standalone": True, "offline": rm is None, "latest_version": latest, "update_available": bool(kind), "kind": kind, "size": size}
         return {"server_version": VERSION, "server_build": cur, "client_build": client_build, "update_available": False, "changelog": CHANGELOG[:3], "app": app,
                 "how": "단독 설치형은 운영자 서버에 새 설치 파일이 올라오면 알림을 표시하고, 선택하면 내려받아 교체합니다(내 학습 데이터는 유지)."}
@@ -171,7 +190,7 @@ def system_document():
          "- **AI 지원(규칙 기반, 생성형 AI 아님)**: 우측 탭에서 자연어로 질문하면 의도를 분류해 답한다 — 인사·사용법, 현재 화면 설명(화면을 인식), 화면 이동, 용어 사전(Unity Catalog·메달리온·Warehouse 등 40여 개), 작업 방법(SQL 실행·권한 요청·세션 삭제·업데이트·앱 설치 등 FAQ), 오류 원인과 해결(최근 실패 분석), 진행률·다음 단계. 근거가 없으면 지어내지 않고 '확인 필요'로 답하며 후속 질문 칩과 바로가기 버튼을 함께 제시. 실전형은 정답 위치를 안내하지 않음. 초보자 질문 113건을 자동 시험으로 점검.",
          "- **연결(내비게이션)**: 모든 화면 하단의 '이어서' 바(다음 화면·AI 지원·도움말), 표 안의 이벤트·세션·실습 ID는 관련 화면으로 연결되는 링크, 오류에는 원인·해결 순서·바로가기. 모든 버튼의 동작과 이동 대상 화면, 화면별 HELP(F1) 존재 여부를 자동 시험으로 점검.",
          "- **실제 환경 연결(훈련·시연 > 실제 환경 연결)**: 세 가지 방법. A) 내 PC 어댑터가 내 워크스페이스에서 실습 팩을 실행하고 결과 해시를 실습 증거함에 제출(설치 불필요). B) **설치형 앱에서만** 내 교육용(비운영) Databricks SQL Warehouse에 Statement Execution API로 직접 SQL 실행 — Databricks 공식 도메인(https)만 허용, 기본 읽기 전용(SELECT·SHOW·DESCRIBE·EXPLAIN), 쓰기는 명시적으로 켠 경우만, DROP·TRUNCATE·GRANT 등 위험 문장은 매번 확인, 한 번에 한 문장·최대 1000행, 운영으로 보이는 이름(prod 등)은 비운영 확인 필요, 토큰은 Windows DPAPI(그 외 OS는 600 권한 파일, 암호화 아님)로 이 PC에만 저장하고 화면·로그·사용 기록·감사에 남기지 않음, 연결 테스트로 확인된 계정 표시, 실행 결과 해시(증거 수준 REAL_WORKSPACE_EXECUTED) 제공. 웹 서버는 사용자 토큰 보관·임의 호스트 요청(SSRF) 위험 때문에 직접 연결을 막음(운영자가 DBX_REAL_ALLOW=1로만 예외). C) 다른 DB·특수 환경은 연결 신청(AXOS CONNECT_REQUEST)으로 접수해 개발큐에서 검토.",
-         "- **접속·사용 기록(admin 전용, 검토·운영 > 접속·사용 기록)**: 웹 서버에 접속한 사용자의 활동을 집계해 보여준다. 핵심 지표 10종(로그인·고유 사용자·명령 실행/실패·세션·화면 열기·AI 질문·피드백·다운로드·로그인 실패, 이전 기간 대비), 차트(일별 접속 꺾은선, 일별 명령 성공/실패 누적 막대, 시간대별 막대, 요일×시간 히트맵, 화면·명령·AI 질문·API 오류 순위, 역할·단말·다운로드 구성비)와 활동 많은 사용자·최근 기록(종류/이름/IP 검색, 쪽 이동). 기간 7/30/90일, [새로고침] 버튼, 사용자별 활동·최근 기록의 검색과 쪽 나누기, 자동 갱신(새 기록이 있을 때만·30초마다 가벼운 확인, 변경이 없으면 집계를 재사용해 서버 부하 최소화). 모든 차트는 값 툴팁과 '표로 보기'를 제공. 기록 항목은 시각·표시명·역할·이벤트 종류·화면/명령 종류와 결과·단말 구분·마스킹 IP이며, 접근 코드·토큰·SQL·입력 본문·피드백 내용·AI 질문 본문은 저장하지 않고 180일 뒤 자동 삭제. 단독 설치형 앱 안의 사용은 사용자 PC에만 남아 포함되지 않는다(다운로드·업데이트 요청만 기록).",
+         "- **접속·사용 기록(admin 전용, 검토·운영 > 접속·사용 기록)**: 웹 서버에 접속한 사용자의 활동을 집계해 보여준다. 핵심 지표 10종(로그인·고유 사용자·명령 실행/실패·세션·화면 열기·AI 질문·피드백·다운로드·로그인 실패, 이전 기간 대비), 차트(일별 접속 꺾은선, 일별 명령 성공/실패 누적 막대, 시간대별 막대, 요일×시간 히트맵, 화면·명령·AI 질문·API 오류 순위, 역할·단말·다운로드 구성비)와 활동 많은 사용자·최근 기록(종류/이름/IP 검색, 쪽 이동). 기간 7/30/90일, [새로고침] 버튼, 설치형 앱 현황(설치 PC 목록·버전 분포·업데이트 결과), 사용자별 활동·최근 기록의 검색과 쪽 나누기, 자동 갱신(새 기록이 있을 때만·30초마다 가벼운 확인, 변경이 없으면 집계를 재사용해 서버 부하 최소화). 모든 차트는 값 툴팁과 '표로 보기'를 제공. 기록 항목은 시각·표시명·역할·이벤트 종류·화면/명령 종류와 결과·단말 구분·마스킹 IP이며, 접근 코드·토큰·SQL·입력 본문·피드백 내용·AI 질문 본문은 저장하지 않고 180일 뒤 자동 삭제. 단독 설치형 앱 안의 사용(SQL·세션 등)은 사용자 PC에만 남아 포함되지 않지만, 앱이 인터넷에 연결되면 **실행·업데이트 알림/적용/실패 신호(설치 ID·버전·OS)**, 다운로드(웹/앱 업데이트 구분)·업데이트 확인 요청, AXOS 피드백(설치 정보 포함)이 서버 기록과 피드백 관리 큐에 들어온다. 설치 ID는 설치마다 만든 무작위 값이며 사용자는 앱 정보에서 신호 전송을 끌 수 있다(끄면 신호만 중단).",
          "- **모바일**: 화면 폭 820px 이하에서 상단 바(☰ 메뉴·현재 화면·도움말/AI/피드백 아이콘)와 전체 화면 메뉴로 바뀌고, 입력·버튼은 터치에 맞는 크기, 표는 좌우 스크롤, 도움말·AI·피드백 패널은 전체 화면으로 열린다. 모든 화면과 작업을 웹에서 모바일로 할 수 있다(설치형 앱은 PC 전용).",
          "- **다음 단계 바**: 세션이 있으면 메뉴 바 아래에 지금 해야 할 단계와 바로가기가 항상 표시됨.",
          "- **우측 탭(HELP·AI 지원·AXOS)**: 작은 세로 탭 3개. AXOS 탭에서 현재 화면에 대한 피드백(텍스트+이미지)·전이 도메인 신청·내 피드백 진행 상태를 확인.",

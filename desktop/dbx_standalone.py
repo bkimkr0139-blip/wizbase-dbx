@@ -68,6 +68,14 @@ class OverlayFinder:
         return None
 
 
+def tel_headers():
+    try:
+        from backend import telemetry
+        return telemetry.headers()
+    except Exception:
+        return {}
+
+
 def baked_content_id():
     for base in (getattr(sys, "_MEIPASS", None), str(Path(__file__).parent)):
         if base and (Path(base) / "content_id.txt").is_file():
@@ -219,21 +227,28 @@ class Api:
 
     def _download(self):
         try:
-            m = json.loads(urllib.request.urlopen(urllib.request.Request(CENTRAL + "/api/app/manifest", headers={"User-Agent": "DBXDesktop-Standalone"}), timeout=10).read())
+            m = json.loads(urllib.request.urlopen(urllib.request.Request(CENTRAL + "/api/app/manifest", headers={"User-Agent": "DBXDesktop-Standalone", **tel_headers()}), timeout=10).read())
             self._m = m
             sa, pk = m["standalone"], m.get("pack") or {}
             if int(sa.get("compat", 0)) != EXE_COMPAT:
+                self._kind = "exe"
                 self._download_exe(sa)
             elif pk.get("available"):
+                self._kind = "pack"
                 self._download_pack(pk)
             else:
                 raise RuntimeError("운영자 서버에 업데이트 파일이 아직 없습니다.")
         except Exception as e:
             STATE.update(state="error", msg=f"업데이트 실패: {e}")
+            try:
+                from backend import telemetry
+                telemetry.report("update_failed", kind=getattr(self, "_kind", ""), error=str(e)[:80])      # 실패도 서버 기록에 남긴다(인터넷 연결 시)
+            except Exception:
+                pass
 
     def _fetch(self, url, dest, size, sha, label):
         h = hashlib.sha256()
-        with urllib.request.urlopen(urllib.request.Request(CENTRAL + url, headers={"User-Agent": "DBXDesktop-Standalone"}), timeout=30) as r, open(dest, "wb") as f:
+        with urllib.request.urlopen(urllib.request.Request(CENTRAL + url, headers={"User-Agent": "DBXDesktop-Standalone", **tel_headers()}), timeout=30) as r, open(dest, "wb") as f:
             got = 0
             while True:
                 b = r.read(1 << 18)

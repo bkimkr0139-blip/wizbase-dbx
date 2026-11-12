@@ -383,10 +383,15 @@ window.H = {
   mnavopen() { const e = document.querySelector("#mnav"); if (e) e.classList.add("open") },
   mnavclose() { const e = document.querySelector("#mnav"); if (e) e.classList.remove("open") },
   mnavpick(d) { H.mnavclose(); menuPick(+d.n, +d.k) },
-  usagedays(d) { USG.days = +d.n; USG.page = 0; USG.upage = 0; render(true) },
+  usagedays(d) { USG.days = +d.n; USG.page = 0; USG.upage = 0; USG.ipage = 0; render(true) },
   usagefilter() { USG.kind = val("uskind") || ""; USG.q = val("usq") || ""; USG.page = 0; render(true) },
   usagepage(d) { USG.page = Math.max(0, +d.p); render(true) },
   usagepagesize(v) { USG.size = +v; USG.page = 0; render(true) },
+  installsearch() { USG.iq = (val("usiq") || "").trim(); USG.ipage = 0; render(true) },
+  installsearchclear() { USG.iq = ""; USG.ipage = 0; render(true) },
+  installpage(d) { USG.ipage = Math.max(0, +d.p); render(true) },
+  installpagesize(v) { USG.isize = +v; USG.ipage = 0; render(true) },
+  async telemset(d) { try { await api("/api/app/telemetry-setting", { body: { on: d.on === "1" } }); H.appinfo() } catch (e) { toast(e.message) } },
   usageclear() { USG.kind = ""; USG.q = ""; USG.page = 0; render(true) },
   usersearch() { USG.uq = (val("usuq") || "").trim(); USG.upage = 0; render(true) },
   usersearchclear() { USG.uq = ""; USG.upage = 0; render(true) },
@@ -483,7 +488,8 @@ window.H = {
   },
   async appinfo() {
     const u = await api("/api/system/update-check?build=" + encodeURIComponent(CLIENT_BUILD || ""));
-    SYSPOP = IS_SA ? `<h3 style="margin-top:0">단독 설치형 앱 정보</h3>${table(["항목", "값"], [["앱 버전", APP_VER], ["최신 버전", u.app.offline ? "(확인 불가 — 오프라인)" : (u.app.latest_version || "?")], ["내 데이터 폴더", SYS.data_dir || "-"], ["서버", "이 PC 안(127.0.0.1)에서만 실행"]])}<div class="sub">서버가 앱에 포함되어 있어 인터넷 없이도 학습할 수 있습니다. 인터넷이 연결되면 새 버전 확인과 AXOS 피드백 전달이 이루어집니다. 시스템 문서와 admin 기능은 포함되지 않습니다.</div>${u.app.update_available ? `<p><button class="primary" data-a="appupdate">지금 업데이트</button></p>` : ""}`
+    let tel = null; if (IS_SA) { try { tel = await api("/api/app/telemetry-setting") } catch { } }
+    SYSPOP = IS_SA ? `<h3 style="margin-top:0">단독 설치형 앱 정보</h3>${table(["항목", "값"], [["앱 버전", APP_VER], ["최신 버전", u.app.offline ? "(확인 불가 — 오프라인)" : (u.app.latest_version || "?")], ["내 데이터 폴더", SYS.data_dir || "-"], ["서버", "이 PC 안(127.0.0.1)에서만 실행"], ["설치 ID", tel ? tel.install + "…" : "-"]])}${tel ? `<div class="sub" style="margin-top:8px"><b>운영 서버로 보내는 신호:</b> ${tel.enabled ? "켜짐" : "꺼짐"} — 설치 ID(무작위 값)·앱 버전·OS 이름·실행/업데이트 결과를 보냅니다(인터넷 연결 시). 서버는 IP 일부(마지막 자리 숨김)와 함께 설치 PC를 구분해 기록하며, 학습 데이터·SQL은 보내지 않습니다. 앱 다운로드·업데이트 확인·AXOS 피드백 전달에는 구분 헤더가 함께 갑니다.<p><button data-a="telemset" data-on="${tel.enabled ? "0" : "1"}">${tel.enabled ? "신호 전송 끄기" : "신호 전송 켜기"}</button></p></div>` : ""}<div class="sub">서버가 앱에 포함되어 있어 인터넷 없이도 학습할 수 있습니다. 인터넷이 연결되면 새 버전 확인과 AXOS 피드백 전달이 이루어집니다. 시스템 문서와 admin 기능은 포함되지 않습니다.</div>${u.app.update_available ? `<p><button class="primary" data-a="appupdate">지금 업데이트</button></p>` : ""}`
       : `<h3 style="margin-top:0">PC 앱 정보</h3>${table(["항목", "값"], [["앱 버전", APP_VER], ["최신 앱 버전", u.app ? u.app.shell_version : "?"], ["접속 주소", location.origin], ["서버 버전", u.server_version]])}<div class="sub">이 앱은 ${esc(location.origin)} 사이트를 PC 창으로 여는 접속형 앱입니다.</div>${u.app && verCmp(u.app.shell_version, APP_VER) > 0 ? `<p><button class="primary" data-a="appdl" data-k="shell">새 앱 내려받기</button></p>` : ""}`; render(true)
   },
   async sysinfo() {
@@ -780,7 +786,7 @@ function heatmap(m) {
   document.addEventListener("touchstart", e => { if (tip && !(e.target.closest && e.target.closest("[data-tip]"))) tip.style.display = "none" }, { passive: true });
   document.addEventListener("mousemove", e => { if (tip && tip.style.display === "block") { tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 14) + "px"; tip.style.top = (e.clientY + 16 + tip.offsetHeight > innerHeight ? e.clientY - tip.offsetHeight - 10 : e.clientY + 16) + "px" } });
 })();
-let USG = { days: 30, kind: "", q: "", page: 0, size: 25, upage: 0, usize: 15, uq: "", fp: "", at: 0, auto: true, timer: null };
+let USG = { days: 30, kind: "", q: "", page: 0, size: 25, iq: "", ipage: 0, isize: 10, upage: 0, usize: 15, uq: "", fp: "", at: 0, auto: true, timer: null };
 function usageWatch() {
   if (USG.timer) return;
   USG.timer = setInterval(async () => {
@@ -833,7 +839,7 @@ const V = {
   async usage() {
     if (ME.role !== "admin") return `<div class="empty"><h2>admin(수퍼유저) 전용 화면입니다</h2><p>접속·사용 기록은 admin 계정으로 로그인한 경우에만 볼 수 있습니다.</p></div>`;
     usageWatch();
-    const [d, ev, pl, us] = await Promise.all([api(`/api/usage/summary?days=${USG.days}`), api(`/api/usage/events?limit=${USG.size}&offset=${USG.page * USG.size}&kind=${encodeURIComponent(USG.kind)}&q=${encodeURIComponent(USG.q)}&days=${USG.days}`), api("/api/usage/pulse"), api(`/api/usage/users?days=${USG.days}&q=${encodeURIComponent(USG.uq)}&offset=${USG.upage * USG.usize}&limit=${USG.usize}`)]);
+    const [d, ev, pl, us, ins] = await Promise.all([api(`/api/usage/summary?days=${USG.days}`), api(`/api/usage/events?limit=${USG.size}&offset=${USG.page * USG.size}&kind=${encodeURIComponent(USG.kind)}&q=${encodeURIComponent(USG.q)}&days=${USG.days}`), api("/api/usage/pulse"), api(`/api/usage/users?days=${USG.days}&q=${encodeURIComponent(USG.uq)}&offset=${USG.upage * USG.usize}&limit=${USG.usize}`), api(`/api/usage/installs?days=${USG.days}&q=${encodeURIComponent(USG.iq)}&offset=${USG.ipage * USG.isize}&limit=${USG.isize}`)]);
     USG.fp = pl.fp; USG.at = Date.now();
     const k = d.kpi, p = d.prev, dates = d.daily.map(r => r.date);
     const okc = d.daily.map(r => r.cmds - r.cmd_fail), failc = d.daily.map(r => r.cmd_fail);
@@ -844,7 +850,7 @@ const V = {
     return `<h2>접속·사용 기록 <span class="mute" style="font-size:12px">admin 전용</span></h2>
     <div class="sub">웹 서버에 접속한 사용자의 로그인·화면 이동·명령 실행·오류·세션·피드백·다운로드 기록입니다. 이름·역할·화면/명령 종류·결과만 기록하고 <b>접근 코드, SQL·입력 본문, 피드백 내용은 저장하지 않으며</b> IP는 일부만 저장합니다. 최대 ${d.retention_days}일 보관 후 자동 삭제됩니다. 단독 설치형 앱 안의 사용은 사용자 PC에만 있어 포함되지 않습니다(다운로드·업데이트 요청만 기록).</div>
     <div class="vfilters"><span class="mute">기간</span>${[7, 30, 90].map(n => `<button class="${USG.days === n ? "primary" : ""}" data-a="usagedays" data-n="${n}">최근 ${n}일</button>`).join("")}<button data-a="usagerefresh" title="최신 기록으로 다시 불러오기">↻ 새로고침</button><label class="mute"><input type="checkbox" id="usauto" ${USG.auto ? "checked" : ""} onchange="USG.auto=this.checked"> 자동 갱신(새 기록이 있을 때만, 30초마다 확인)</label><span class="mute" style="margin-left:auto">집계 ${esc(d.generated)} (KST) · 이벤트 ${nf(d.total_events)}건 · 마지막 갱신 ${new Date().toLocaleTimeString("ko-KR")}</span></div>
-    <div class="kpis">${kpiTile("로그인", k.logins, p.logins)}${kpiTile("고유 사용자(이름 기준)", k.users, p.users, { unit: "명" })}${kpiTile("명령 실행", k.cmds, p.cmds)}${kpiTile("명령 실패", k.cmd_fail, p.cmd_fail)}${kpiTile("세션 생성", k.sessions, p.sessions)}${kpiTile("화면 열기", k.views, p.views)}${kpiTile("AI 지원 질문", k.chats, p.chats)}${kpiTile("피드백", k.feedback, p.feedback)}${kpiTile("앱 다운로드", k.downloads, p.downloads)}${kpiTile("로그인 실패", k.login_fail, p.login_fail)}</div>
+    <div class="kpis">${kpiTile("로그인", k.logins, p.logins)}${kpiTile("고유 사용자(이름 기준)", k.users, p.users, { unit: "명" })}${kpiTile("명령 실행", k.cmds, p.cmds)}${kpiTile("명령 실패", k.cmd_fail, p.cmd_fail)}${kpiTile("세션 생성", k.sessions, p.sessions)}${kpiTile("화면 열기", k.views, p.views)}${kpiTile("AI 지원 질문", k.chats, p.chats)}${kpiTile("피드백", k.feedback, p.feedback)}${kpiTile("앱 다운로드", k.downloads, p.downloads)}${kpiTile("로그인 실패", k.login_fail, p.login_fail)}${kpiTile("설치형 앱 사용 PC", k.app_pcs, p.app_pcs, { unit: "대" })}${kpiTile("앱 업데이트 성공", k.update_ok, p.update_ok)}${kpiTile("앱 업데이트 실패", k.update_fail, p.update_fail)}</div>
     <div class="vgrid2"><div class="card vc"><b>일별 접속</b><div class="sub">로그인 수와 고유 사용자 수</div>${lineChart(dates, [{ name: "로그인", color: SER[0], values: d.daily.map(r => r.logins) }, { name: "고유 사용자", color: SER[1], values: d.daily.map(r => r.users) }], { label: "일별 로그인과 고유 사용자" })}${tableView(["날짜", "로그인", "고유 사용자"], d.daily.map(r => [r.date, r.logins, r.users]))}</div>
     <div class="card vc"><b>일별 명령 실행</b><div class="sub">성공 / 실패</div>${barChart(dates, [{ name: "성공", icon: "✓", color: "var(--vgood)", values: okc }, { name: "실패", icon: "✕", color: "var(--vbad)", values: failc }], { fmt: x => x.slice(5), label: "일별 명령 실행 성공·실패" })}${tableView(["날짜", "성공", "실패"], d.daily.map((r, i) => [r.date, okc[i], failc[i]]))}</div></div>
     <div class="vgrid2"><div class="card vc"><b>시간대별 사용량</b><div class="sub">모든 이벤트, 한국 시간</div>${barChart(hourEntries.map(e => String(e[0])), [{ name: "이벤트", color: SER[0], values: d.hourly }], { fmt: h => h + "시", maxLabels: 12, label: "시간대별 사용량" })}</div>
@@ -856,6 +862,12 @@ const V = {
     <div class="card vc"><b>앱 다운로드</b>${segBar(Object.entries(d.downloads).map(([r, n]) => [DLL[r] || r, n]))}</div></div>
     <div class="vgrid2"><div class="card vc"><b>AI 지원 질문 종류</b><div class="sub">질문 내용은 저장하지 않고 분류만 기록</div>${hbars(d.chat)}</div>
     <div class="card vc"><b>API 오류 코드</b><div class="sub">서버가 거절·실패로 응답한 요청(인증 만료 제외)</div>${hbars(d.errors, { color: "var(--vbad)" })}${d.login_fail_ips.length ? `<div class="sub" style="margin-top:8px">로그인 실패 많은 IP(일부 마스킹): ${d.login_fail_ips.map(([ip, n]) => `${esc(ip)} ${n}회`).join(" · ")}</div>` : ""}</div></div>
+    <div class="card"><b>설치형 앱 현황</b> <span class="mute">서버에 연결된 설치 PC가 보내는 실행·업데이트 신호와 다운로드 기록 · 최근 ${USG.days}일</span>
+      <div class="vgrid3" style="margin-top:8px"><div><div class="sub">앱 버전 분포(설치 PC 수)</div>${hbars((d.app.versions || []).map(([v, n]) => ["v" + v, n]))}</div>
+        <div><div class="sub">플랫폼</div>${segBar(Object.entries(d.app.platforms || {}).map(([k, n]) => [({ win: "Windows", mac_arm64: "Mac(Apple Silicon)", mac_x64: "Mac(Intel)" })[k] || k, n]))}<div class="sub" style="margin-top:10px">업데이트 결과</div>${segBar(Object.entries(d.app.updates || {}).map(([k, n]) => [({ offered: "알림", applied: "적용됨", failed: "실패" })[k] || k, n]), ["var(--vs1)", "var(--vgood)", "var(--vbad)"])}</div>
+        <div><div class="sub">다운로드 경로</div>${segBar(Object.entries(d.app.download_via || {}).map(([k, n]) => [k === "app" ? "앱(업데이트)" : "웹(직접)", n]))}<div class="sub" style="margin-top:10px">적용된 업데이트 방식</div>${segBar(Object.entries(d.app.update_kinds || {}).map(([k, n]) => [k === "pack" ? "기능 업데이트" : k === "exe" ? "앱 전체 교체" : k, n]))}</div></div>
+      <div class="vfilters"><input id="usiq" value="${esc(USG.iq)}" placeholder="설치 ID·플랫폼·OS·버전·IP 검색" style="width:260px" onkeydown="if(event.key==='Enter')H.installsearch()"><button data-a="installsearch">검색</button>${USG.iq ? `<button class="ghost" data-a="installsearchclear">검색 지우기</button>` : ""}<span class="mute">설치 PC ${nf(ins.total)}대</span></div>
+      ${table(["설치 ID", "플랫폼", "OS", "버전", "최초 확인", "최근 확인", "IP(일부)", "실행", "다운로드", "피드백", "업데이트 성공/실패"], ins.items.map(i => [i.inst, ({ win: "Windows", mac_arm64: "Mac(Apple Silicon)", mac_x64: "Mac(Intel)" })[i.platform] || i.platform || "-", i.os || "-", i.version ? "v" + i.version : "-", i.first, i.last, i.ip || "-", i.starts, i.downloads, i.feedback, `${i.update_ok}/${i.update_fail}`]), true)}${pagerHtml(ins.total, USG.ipage, USG.isize, "installpage")}</div>
     <div class="card"><b>사용자별 활동</b> <span class="mute">이름 기준 · 이벤트 많은 순 · 최근 ${USG.days}일</span>
       <div class="vfilters"><input id="usuq" value="${esc(USG.uq)}" placeholder="이름·역할 검색" style="width:220px" onkeydown="if(event.key==='Enter')H.usersearch()"><button data-a="usersearch">검색</button>${USG.uq ? `<button class="ghost" data-a="usersearchclear">검색 지우기</button>` : ""}</div>
       ${table(["이름", "역할", "이벤트", "로그인", "명령", "명령 실패", "최근", "단말"], us.items.map(u => [u.name, ROLEL[u.role] || u.role, u.events, u.logins, u.cmds, u.cmd_fail, u.last, CLIL[u.client] || u.client || "-"]), true)}${pagerHtml(us.total, USG.upage, USG.usize, "userpage")}</div>
@@ -868,7 +880,7 @@ const V = {
     if (ME.role !== "admin") return `<div class="empty"><h2>admin(수퍼유저) 전용 화면입니다</h2><p>피드백 관리와 개발큐는 admin 계정으로 로그인한 경우에만 사용할 수 있습니다.</p></div>`;
     const d = await api(`/api/feedback/admin?status=${FBQ.status}&q=${encodeURIComponent(FBQ.q)}&page=${FBQ.page}&size=${FBQ.size}`); FBQ.page = d.page; FBQ.ids = d.ids;
     const chips = [["", "전체", Object.values(d.counts).reduce((a, b) => a + b, 0)], ...Object.entries(d.status_labels).map(([k, l]) => [k, l, d.counts[k] || 0])].map(([k, l, n]) => `<button class="${FBQ.status === k ? "primary" : ""}" data-a="fbfilter" data-s="${k}">${esc(l)} ${n}</button>`).join(" ");
-    const rows = d.items.map(f => `<tr><td><input type="checkbox" class="fbchk" data-id="${esc(f.id)}" ${FBQ.checked.has(f.id) ? "checked" : ""} aria-label="${esc(f.id)} 선택"></td><td>${esc(f.id)}</td><td>${esc(f.kind_label)}</td><td>${esc(f.title)}</td><td>${esc(f.view)}</td><td>${esc(f.submitted_by_name)}</td><td>${esc(fmtIso(f.created))}</td><td>${esc(f.priority || "")}</td><td>${fbBadge(f.status)}</td><td><button data-a="fbopen" data-id="${esc(f.id)}">열기</button></td></tr>`).join("");
+    const rows = d.items.map(f => `<tr><td><input type="checkbox" class="fbchk" data-id="${esc(f.id)}" ${FBQ.checked.has(f.id) ? "checked" : ""} aria-label="${esc(f.id)} 선택"></td><td>${esc(f.id)}</td><td>${esc(f.kind_label)}</td><td>${esc(f.title)}</td><td>${esc(f.view)}</td><td>${esc(f.submitted_by_name)}${f.source === "standalone" ? ` <span class="b">단독형</span>` : ""}</td><td>${esc(fmtIso(f.created))}</td><td>${esc(f.priority || "")}</td><td>${fbBadge(f.status)}</td><td><button data-a="fbopen" data-id="${esc(f.id)}">열기</button></td></tr>`).join("");
     let det = "";
     if (FBQ.sel) {
       try {
@@ -876,7 +888,7 @@ const V = {
         const imgs = await Promise.all(f.images.map(async im => { const r = await fetch(`/api/feedback/${f.id}/image/${im.n}`, { headers: { Authorization: "Bearer " + TOKEN } }); return r.ok ? URL.createObjectURL(await r.blob()) : "" }));
         const nxt = d.flow[f.status] || [];
         det = `<div class="card"><div style="display:flex;justify-content:space-between"><b>${esc(f.id)} · ${esc(f.title)}</b><button class="ghost" data-a="fbclose">닫기</button></div>
-          <div class="sub">${esc(f.kind_label)} · ${fbBadge(f.status)} · 제출 ${esc(f.submitted_by_name)} (${esc(f.role)}) · 접수 ${esc(fmtIso(f.created))}${f.edited_at ? " · 수정 " + esc(fmtIso(f.edited_at)) : ""}<br>화면 <code>${esc(f.view)}</code> · ${esc(f.context.view_label || "")} · v${esc(f.context.version || "")} · 빌드 ${esc(f.context.build || "")} · ${esc(f.context.client || "")} · ${esc(f.context.viewport || "")}</div>
+          <div class="sub">${esc(f.kind_label)} · ${fbBadge(f.status)} · 제출 ${esc(f.submitted_by_name)} (${esc(f.role)}) · 접수 ${esc(fmtIso(f.created))}${f.edited_at ? " · 수정 " + esc(fmtIso(f.edited_at)) : ""}${f.install ? `<br>설치형 앱 · 설치 ID <code>${esc(f.install.id)}</code> · v${esc(f.install.version || "?")} · ${esc(f.install.platform || "?")} · ${esc(f.install.os || "")}` : ""}<br>화면 <code>${esc(f.view)}</code> · ${esc(f.context.view_label || "")} · v${esc(f.context.version || "")} · 빌드 ${esc(f.context.build || "")} · ${esc(f.context.client || "")} · ${esc(f.context.viewport || "")}</div>
           <pre style="white-space:pre-wrap">${esc(f.text)}</pre>
           ${f.domain ? `<div class="sub"><b>도메인 신청</b>: ${esc(f.domain.domain)} · 목적 ${esc(f.domain.purpose)} · 데이터 ${esc(f.domain.data)} · 문제 ${esc(f.domain.issues)} · 시기 ${esc(f.domain.when)}</div>` : ""}
           <div class="fbthumbs">${imgs.map(u => u ? `<a href="${u}" target="_blank" rel="noopener"><img src="${u}" alt="첨부" style="max-width:220px;max-height:160px"></a>` : "").join("")}</div>

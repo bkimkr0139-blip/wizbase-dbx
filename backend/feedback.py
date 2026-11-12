@@ -74,6 +74,8 @@ def _brief(f, full=False):
     d["source"] = f.get("source", "local")
     if f.get("edited_at"):
         d["edited_at"] = f["edited_at"]
+    if f.get("install") and full:
+        d["install"] = f["install"]
     if standalone():
         d["remote_state"] = "SENT" if f.get("remote") else "PENDING"
     if full:
@@ -330,10 +332,18 @@ def standalone():
     return os.environ.get("DBX_STANDALONE") == "1"
 
 
+def _hdrs():
+    try:
+        from . import telemetry
+        return telemetry.headers()
+    except Exception:
+        return {}
+
+
 def _http(method, path, body=None, timeout=8):
     """중앙 서버 호출(테스트에서 이 함수를 교체한다)."""
     req = urllib.request.Request(CENTRAL_URL.rstrip("/") + path, method=method, data=_json.dumps(body).encode("utf-8") if body is not None else None,
-                                 headers={"Content-Type": "application/json", "User-Agent": "DBXDesktop-Standalone"})
+                                 headers={"Content-Type": "application/json", "User-Agent": "DBXDesktop-Standalone", **_hdrs()})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return _json.loads(r.read().decode("utf-8"))
 
@@ -365,6 +375,9 @@ def intake(ip, b):
     receipt = secrets.token_urlsafe(16)
     f = _F()[r["id"]]
     f["source"], f["receipt_hash"] = "standalone", hashlib.sha256(receipt.encode()).hexdigest()
+    ins = b.get("install") or {}
+    if isinstance(ins, dict) and ins.get("install"):
+        f["install"] = {"id": str(ins.get("install"))[:12], "version": str(ins.get("app_version", ""))[:20], "platform": str(ins.get("platform", ""))[:20], "os": str(ins.get("os", ""))[:60]}
     _INTAKE_HITS[ip] = hits + [now]
     _INTAKE_HITS["*"] = allh + [now]
     v11.save()
@@ -385,7 +398,8 @@ def _payload(f):
         p = _dir() / im["file"]
         if p.exists():
             imgs.append({"name": im["orig"], "data": base64.b64encode(p.read_bytes()).decode()})
-    d = {"name": f["submitted_by_name"], "kind": f["kind"], "title": f["title"], "text": f["text"], "view": f["view"], "context": f["context"], "images": imgs}
+    from . import telemetry
+    d = {"install": telemetry.meta() if telemetry.enabled() else {}, "name": f["submitted_by_name"], "kind": f["kind"], "title": f["title"], "text": f["text"], "view": f["view"], "context": f["context"], "images": imgs}
     if f.get("domain"):
         d["domain"] = f["domain"]
     return d

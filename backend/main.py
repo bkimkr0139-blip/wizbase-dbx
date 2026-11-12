@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from . import core, v11, v11_ext, guide, labs, transfer, ko_guide, sysinfo, feedback
 from . import pack as pack_mod
 from . import real
+from . import telemetry
 from . import usage
 from . import content as C
 from .core import ApiError
@@ -59,6 +60,8 @@ def _save_tokens():
 def _startup():
     core.load_all()
     v11.init()
+    if telemetry.standalone():
+        threading.Thread(target=telemetry.startup_report, daemon=True).start()
 
 
 @app.exception_handler(ApiError)
@@ -1057,13 +1060,25 @@ def app_manifest():
     return sysinfo.app_manifest()
 
 
+def _dl_log(request: Request, what: str):
+    """다운로드 기록: 웹에서 받았는지, 설치형 앱이 업데이트로 받았는지(설치 ID·버전 헤더)를 함께 남긴다."""
+    h = request.headers
+    inst = (h.get("x-dbx-install") or "")[:32]
+    ok = bool(re.fullmatch(r"[0-9a-f]{32}", inst))
+    usage.log("download", None, request, what=what, inst=inst[:12] if ok else None, app=(h.get("x-dbx-app") or "")[:40] or None, via="app" if ok else "web")
+
+
 @app.post("/api/feedback/intake")
 async def fb_intake(request: Request):
     """중앙 서버 전용: 단독형 앱의 피드백 접수(비로그인, 한도 있음)."""
     if int(request.headers.get("content-length", "0") or 0) > 25 * 1024 * 1024:
         raise ApiError(413, "TOO_LARGE", "요청이 너무 큽니다.")
     ip = (request.headers.get("x-forwarded-for") or request.headers.get("x-real-ip") or (request.client.host if request.client else "?")).split(",")[0].strip()
-    return feedback.intake(ip, await request.json())
+    body = await request.json()
+    r = feedback.intake(ip, body)
+    ins = body.get("install") if isinstance(body, dict) else None
+    usage.log("feedback", {"name": str(body.get("name", ""))[:40], "role": "standalone"}, request, kind=str(body.get("kind", ""))[:20], source="standalone", inst=(str(ins.get("install"))[:12] if isinstance(ins, dict) and ins.get("install") else None))
+    return r
 
 
 @app.get("/api/feedback/intake/{fid}")
@@ -1073,7 +1088,7 @@ def fb_intake_status(fid: str, receipt: str = ""):
 
 @app.get("/download/pack")
 def download_pack(request: Request):
-    usage.log("download", None, request, what="pack")
+    _dl_log(request, "pack")
     from fastapi.responses import Response
     data, mf = pack_mod.build(sysinfo.VERSION, sysinfo.STANDALONE_COMPAT, sysinfo.ROOT)
     return Response(data, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="dbx-pack-{mf["content_id"]}.zip"', "Cache-Control": "no-store"})
@@ -1081,13 +1096,13 @@ def download_pack(request: Request):
 
 @app.get("/download/standalone-mac-arm64")
 def download_mac_arm64(request: Request):
-    usage.log("download", None, request, what="mac_arm64")
+    _dl_log(request, "mac_arm64")
     return _mac_file("mac_arm64")
 
 
 @app.get("/download/standalone-mac-x64")
 def download_mac_x64(request: Request):
-    usage.log("download", None, request, what="mac_x64")
+    _dl_log(request, "mac_x64")
     return _mac_file("mac_x64")
 
 
@@ -1100,15 +1115,64 @@ def _mac_file(k):
 
 @app.get("/download/standalone")
 def download_standalone(request: Request):
-    usage.log("download", None, request, what="windows_standalone")
+    _dl_log(request, "windows_standalone")
     if not sysinfo.STANDALONE_FILE.is_file():
         raise ApiError(404, "APP_NOT_BUILT", "단독 설치형 파일이 아직 준비되지 않았습니다.")
     return FileResponse(str(sysinfo.STANDALONE_FILE), media_type="application/octet-stream", filename=sysinfo.STANDALONE_FILE.name)
 
 
+_TEL_HITS: dict = {}
+_TEL_EVENTS = {"start": "app_start", "update_offered": "app_update", "update_applied": "app_update", "update_failed": "app_update"}
+
+
+@app.post("/api/app/telemetry")
+def app_telemetry(b: Free, request: Request):
+    """설치형 앱의 실행·업데이트 신호 수신(비로그인, 한도 있음). 서버 접속 기록(usage)에 남는다."""
+    d = b.model_dump()
+    ev = str(d.get("event", ""))
+    inst = str(d.get("install", ""))
+    if ev not in _TEL_EVENTS or not re.fullmatch(r"[0-9a-f]{32}", inst):
+        raise ApiError(400, "BAD_TELEMETRY", "형식이 올바르지 않습니다.")
+    ip = usage.ip_of(request) or "?"
+    now = time.time()
+    for key in (inst, "ip:" + ip):
+        hits = [t for t in _TEL_HITS.get(key, []) if now - t < 3600]
+        if len(hits) >= (60 if key == inst else 300):
+            raise ApiError(429, "TOO_MANY", "잠시 후 다시 시도하세요.")
+        _TEL_HITS[key] = hits + [now]
+    plat = str(d.get("platform", ""))[:20]
+    detail = {"inst": inst[:12], "ver": str(d.get("app_version", ""))[:20], "plat": plat if re.fullmatch(r"[a-z0-9_]{1,20}", plat) else "?", "os": str(d.get("os", ""))[:60], "cid": str(d.get("content_id", ""))[:16]}
+    if ev != "start":
+        detail.update(result={"update_offered": "offered", "update_applied": "applied", "update_failed": "failed"}[ev], kind=str(d.get("kind", ""))[:8], frm=str(d.get("from_version", ""))[:20],
+                      to=str(d.get("to_version", ""))[:20], err=str(d.get("error", ""))[:80] or None)
+    usage.log(_TEL_EVENTS[ev], None, request, **detail)
+    return {"ok": True}
+
+
+@app.get("/api/app/telemetry-setting")
+def telemetry_get(authorization: Optional[str] = Header(None)):
+    A(authorization)
+    return {"standalone": telemetry.standalone(), "enabled": telemetry.enabled(), "install": telemetry.install_id()[:8] if telemetry.standalone() else ""}
+
+
+@app.post("/api/app/telemetry-setting")
+def telemetry_set(b: Free, authorization: Optional[str] = Header(None)):
+    A(authorization)
+    if not telemetry.standalone():
+        raise ApiError(400, "NOT_STANDALONE", "설치형 앱에서만 설정할 수 있습니다.")
+    telemetry.set_enabled(bool(b.model_dump().get("on")))
+    return {"standalone": True, "enabled": telemetry.enabled(), "install": telemetry.install_id()[:8]}
+
+
+@app.get("/api/usage/installs")
+def usage_installs(days: int = 30, q: str = "", offset: int = 0, limit: int = 15, authorization: Optional[str] = Header(None)):
+    staff_only(A(authorization), "admin")
+    return usage.installs(days, q, offset, limit)
+
+
 @app.get("/download/app")
 def download_app(request: Request):
-    usage.log("download", None, request, what="windows_shell")
+    _dl_log(request, "windows_shell")
     if not sysinfo.APP_FILE.is_file():
         raise ApiError(404, "APP_NOT_BUILT", "설치 파일이 아직 준비되지 않았습니다.")
     return FileResponse(str(sysinfo.APP_FILE), media_type="application/octet-stream", filename=sysinfo.APP_FILE.name)
