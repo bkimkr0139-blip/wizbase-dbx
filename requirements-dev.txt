@@ -1,0 +1,6 @@
+-r requirements.txt
+pytest>=8
+httpx>=0.27
+# Windows 앱(exe) 빌드
+pywebview>=6
+pyinstaller>=6

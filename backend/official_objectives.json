@@ -1,0 +1,1773 @@
+{
+ "extracted": "2026-11-11",
+ "method": "공식 PDF 텍스트 추출(pypdf, 격리 실행) + 요약은 WIZBASE 작성. 원문 bullet은 저장하지 않고 sha256만 보관(검토자가 PDF와 대조).",
+ "exams": {
+  "DE-A": {
+   "guide_sha256": "9714ef0b0625324e88826ef7794a01dbf3478ef04baa75a12e70dd342eb50d7a",
+   "source_url": "https://www.databricks.com/sites/default/files/2026-10/Databricks-Certified-Data-Engineer-Associate-Exam-Guide-August-2026.pdf",
+   "objectives": [
+    {
+     "oid": "OBJ-DE-A-s1b1",
+     "section_no": 1,
+     "section_name": "Databricks Intelligence Platform",
+     "weight": 6,
+     "domain_key": "platform",
+     "index": 1,
+     "summary": "Databricks 플랫폼 핵심 구성(아키텍처·Delta Lake·Unity Catalog) 이해",
+     "packs": [
+      "CORE-01"
+     ],
+     "source_text_sha256": "11a924ed2199901f0de1c078ebb999c8226440d8848e96709aaa1b8dcdb77996"
+    },
+    {
+     "oid": "OBJ-DE-A-s1b2",
+     "section_no": 1,
+     "section_name": "Databricks Intelligence Platform",
+     "weight": 6,
+     "domain_key": "platform",
+     "index": 2,
+     "summary": "컴퓨트 서비스의 특성·한계·비용 모델을 알고 워크로드별로 선택",
+     "packs": [
+      "CORE-01"
+     ],
+     "source_text_sha256": "00ff273c0c5e48416512741c82c76dbb54a938b6a624b2f33137adb34d077d78"
+    },
+    {
+     "oid": "OBJ-DE-A-s2b1",
+     "section_no": 2,
+     "section_name": "Data Ingestion and Loading",
+     "weight": 21,
+     "domain_key": "ingest",
+     "index": 1,
+     "summary": "배치·스트리밍·증분 수집 패턴을 구분하고 로컬 파일/Lakeflow Connect 커넥터로 가져오기",
+     "packs": [
+      "DE-01"
+     ],
+     "source_text_sha256": "94911ace9a6083e355d713aa1bf3f34d9713d9b093fdceb7039c5eba398f6e89"
+    },
+    {
+     "oid": "OBJ-DE-A-s2b2",
+     "section_no": 2,
+     "section_name": "Data Ingestion and Loading",
+     "weight": 21,
+     "domain_key": "ingest",
+     "index": 2,
+     "summary": "COPY INTO로 클라우드 스토리지 파일을 UC 테이블에 증분 적재",
+     "packs": [
+      "DE-01"
+     ],
+     "source_text_sha256": "91d0ab3105548386b200da8feae5efb1d580b321c032aaef38df3069c900c84e"
+    },
+    {
+     "oid": "OBJ-DE-A-s2b3",
+     "section_no": 2,
+     "section_name": "Data Ingestion and Loading",
+     "weight": 21,
+     "domain_key": "ingest",
+     "index": 3,
+     "summary": "Auto Loader(스키마 강제·진화, 배치 모드)로 UC 테이블에 적재",
+     "packs": [
+      "DE-01"
+     ],
+     "source_text_sha256": "09d77bcffd20278e81c5397b2f772e09eb11cc616e38e5d66811d1c0d8b90fd8"
+    },
+    {
+     "oid": "OBJ-DE-A-s2b4",
+     "section_no": 2,
+     "section_name": "Data Ingestion and Loading",
+     "weight": 21,
+     "domain_key": "ingest",
+     "index": 4,
+     "summary": "Lakeflow Connect로 엔터프라이즈 소스를 안정적으로 수집하도록 구성",
+     "packs": [
+      "DE-01"
+     ],
+     "source_text_sha256": "dba55f7df1a99bed833b70dc11bf87c74ca1713f336e07be4a019d0b44c61e0c"
+    },
+    {
+     "oid": "OBJ-DE-A-s2b5",
+     "section_no": 2,
+     "section_name": "Data Ingestion and Loading",
+     "weight": 21,
+     "domain_key": "ingest",
+     "index": 5,
+     "summary": "JDBC/ODBC·REST 클라이언트로 노트북에서 적재하고 Jobs로 스케줄",
+     "packs": [
+      "DE-01",
+      "DE-06"
+     ],
+     "source_text_sha256": "a61eafb5455d302f2fd929ab6c813d0212520d440ba9c1a43ba3049767179cb8"
+    },
+    {
+     "oid": "OBJ-DE-A-s2b6",
+     "section_no": 2,
+     "section_name": "Data Ingestion and Loading",
+     "weight": 21,
+     "domain_key": "ingest",
+     "index": 6,
+     "summary": "Auto Loader·Lakeflow Connect·파트너 커넥터 등을 요구사항에 따라 선택",
+     "packs": [
+      "DE-01"
+     ],
+     "source_text_sha256": "6f4726d587c4fabaece69797dfa5e2baae9dd91dcc9d4487f6de6c9de0b29cce"
+    },
+    {
+     "oid": "OBJ-DE-A-s2b7",
+     "section_no": 2,
+     "section_name": "Data Ingestion and Loading",
+     "weight": 21,
+     "domain_key": "ingest",
+     "index": 7,
+     "summary": "반정형·비정형(JSON·중첩) 데이터를 커넥터로 UC Delta 테이블에 수집",
+     "packs": [
+      "DE-01"
+     ],
+     "source_text_sha256": "df2b7bb61feb416b3aecac6f6d33eeae202cc825ef790adf1febf85931867ebc"
+    },
+    {
+     "oid": "OBJ-DE-A-s3b1",
+     "section_no": 3,
+     "section_name": "Data Transformation and Modeling",
+     "weight": 22,
+     "domain_key": "transform",
+     "index": 1,
+     "summary": "bronze→silver 정제(null 정리·타입 표준화·silver 작성)",
+     "packs": [
+      "DE-02"
+     ],
+     "source_text_sha256": "b75885f60fc2ba74e8a4b15fea747b7505c47026ee0d0ba6707524b66c11bf93"
+    },
+    {
+     "oid": "OBJ-DE-A-s3b2",
+     "section_no": 3,
+     "section_name": "Data Transformation and Modeling",
+     "weight": 22,
+     "domain_key": "transform",
+     "index": 2,
+     "summary": "DataFrame 결합(inner/left/broadcast/다중 키/cross, union/union all)",
+     "packs": [
+      "DE-02"
+     ],
+     "source_text_sha256": "02389fb72805111cc5d65845e0912ebe93ea1430f3ea8903746536c94490abcc"
+    },
+    {
+     "oid": "OBJ-DE-A-s3b3",
+     "section_no": 3,
+     "section_name": "Data Transformation and Modeling",
+     "weight": 22,
+     "domain_key": "transform",
+     "index": 3,
+     "summary": "컬럼·행·구조 조작(추가·삭제·분할·이름변경·필터·explode)",
+     "packs": [
+      "DE-02"
+     ],
+     "source_text_sha256": "61649b5bbf6374b5f9c2b894cac6dbe7467cdb9f6011899f58e0cf8ecc79140d"
+    },
+    {
+     "oid": "OBJ-DE-A-s3b4",
+     "section_no": 3,
+     "section_name": "Data Transformation and Modeling",
+     "weight": 22,
+     "domain_key": "transform",
+     "index": 4,
+     "summary": "중복 제거와 집계(count·approx count distinct·mean·summary)",
+     "packs": [
+      "DE-02"
+     ],
+     "source_text_sha256": "b9ce0462237b0ebdb5206d53761b8d6a256177f90fa29e6c951f0087c2c7f4ef"
+    },
+    {
+     "oid": "OBJ-DE-A-s3b5",
+     "section_no": 3,
+     "section_name": "Data Transformation and Modeling",
+     "weight": 22,
+     "domain_key": "transform",
+     "index": 5,
+     "summary": "기본 튜닝 파라미터 이해와 성능 재측정",
+     "packs": [
+      "DE-07"
+     ],
+     "source_text_sha256": "3238400eef448dac64be85bf4c367178c14db0d91a4290bdbb5d7d568b1da124"
+    },
+    {
+     "oid": "OBJ-DE-A-s3b6",
+     "section_no": 3,
+     "section_name": "Data Transformation and Modeling",
+     "weight": 22,
+     "domain_key": "transform",
+     "index": 6,
+     "summary": "Gold 객체(materialized view·view·streaming table·table) 차이와 구축",
+     "packs": [
+      "DE-05"
+     ],
+     "source_text_sha256": "c189fe0e2745dc287f698c8ea7d4550ee217155b08dbca1285eef62aa426d9b9"
+    },
+    {
+     "oid": "OBJ-DE-A-s3b7",
+     "section_no": 3,
+     "section_name": "Data Transformation and Modeling",
+     "weight": 22,
+     "domain_key": "transform",
+     "index": 7,
+     "summary": "Silver/Gold 신뢰성을 위한 데이터 품질 검사·검증 규칙",
+     "packs": [
+      "DE-05"
+     ],
+     "source_text_sha256": "d03be0d65b1893d5a1be4eaaac62a8ee7c067ac2ca2643db82f022a7649a63e3"
+    },
+    {
+     "oid": "OBJ-DE-A-s4b1",
+     "section_no": 4,
+     "section_name": "Working with Lakeflow Jobs",
+     "weight": 16,
+     "domain_key": "jobs",
+     "index": 1,
+     "summary": "Jobs 제어 흐름(재시도·분기·반복)",
+     "packs": [
+      "DE-06"
+     ],
+     "source_text_sha256": "54e78df89534f672426e657e5fddbce2778c94aeda096cd46d99a2536b834a4c"
+    },
+    {
+     "oid": "OBJ-DE-A-s4b2",
+     "section_no": 4,
+     "section_name": "Working with Lakeflow Jobs",
+     "weight": 16,
+     "domain_key": "jobs",
+     "index": 2,
+     "summary": "공통 task(노트북·SQL·대시보드·pipeline)와 DAG 의존성 구성",
+     "packs": [
+      "DE-06"
+     ],
+     "source_text_sha256": "2391791b18226bea79e998d9c033cd20d3a0c4a6613f28ddf83a3b578668a6ed"
+    },
+    {
+     "oid": "OBJ-DE-A-s4b3",
+     "section_no": 4,
+     "section_name": "Working with Lakeflow Jobs",
+     "weight": 16,
+     "domain_key": "jobs",
+     "index": 3,
+     "summary": "Jobs 스케줄·트리거 유형(예약·파일 도착·테이블 업데이트)",
+     "packs": [
+      "DE-06"
+     ],
+     "source_text_sha256": "3c6721dee9b9f7c66baa3a9d591b1818430e4c0aeb5f46c38733b33e27e4491a"
+    },
+    {
+     "oid": "OBJ-DE-A-s4b4",
+     "section_no": 4,
+     "section_name": "Working with Lakeflow Jobs",
+     "weight": 16,
+     "domain_key": "jobs",
+     "index": 4,
+     "summary": "시간 기반 vs 데이터 기반 트리거 선택",
+     "packs": [
+      "DE-06"
+     ],
+     "source_text_sha256": "d53d8b3936a257696e7a5b6bb76500b073cb28a0c3d12b654c7e9233a58fe8b2"
+    },
+    {
+     "oid": "OBJ-DE-A-s5b1",
+     "section_no": 5,
+     "section_name": "Implementing CI/CD",
+     "weight": 10,
+     "domain_key": "cicd",
+     "index": 1,
+     "summary": "Git folders에서 브랜치·커밋·푸시·PR 등 개발 워크플로 관리",
+     "packs": [
+      "DE-12"
+     ],
+     "source_text_sha256": "f48a6fc02b5585ed3463cd607bf3534ce62568cd2a297aa651a2fc617697b672"
+    },
+    {
+     "oid": "OBJ-DE-A-s5b2",
+     "section_no": 5,
+     "section_name": "Implementing CI/CD",
+     "weight": 10,
+     "domain_key": "cicd",
+     "index": 2,
+     "summary": "Bundle 변수·override로 환경별 구성 관리",
+     "packs": [
+      "DE-12"
+     ],
+     "source_text_sha256": "3fc9b535f32a24ae952c7cfc6f41adb76ac269e0aa72b3ce06fd9360fbe6844e"
+    },
+    {
+     "oid": "OBJ-DE-A-s5b3",
+     "section_no": 5,
+     "section_name": "Implementing CI/CD",
+     "weight": 10,
+     "domain_key": "cicd",
+     "index": 3,
+     "summary": "Bundle로 Jobs·Declarative Pipelines 등을 패키징·배포·승격",
+     "packs": [
+      "DE-12"
+     ],
+     "source_text_sha256": "5152edcbcda45132ac057876ad3ddbc5ff0e9494a11320687a22b5d7315e0461"
+    },
+    {
+     "oid": "OBJ-DE-A-s5b4",
+     "section_no": 5,
+     "section_name": "Implementing CI/CD",
+     "weight": 10,
+     "domain_key": "cicd",
+     "index": 4,
+     "summary": "CLI로 bundle validate/deploy/관리를 CI/CD에서 자동화",
+     "packs": [
+      "DE-12"
+     ],
+     "source_text_sha256": "5f887789f56e14ea5a58e5ebef7f05d7b83dcde097de12992d15909259aabbcb"
+    },
+    {
+     "oid": "OBJ-DE-A-s6b1",
+     "section_no": 6,
+     "section_name": "Troubleshooting, Monitoring, and Optimization",
+     "weight": 10,
+     "domain_key": "observe",
+     "index": 1,
+     "summary": "Jobs 실행 이력으로 성능 추세·기준선 비교",
+     "packs": [
+      "DE-09"
+     ],
+     "source_text_sha256": "a5efa2b07b1a6380a2ddbe750dcd7033e2d1bb431ac05ab070766170f7e0d31d"
+    },
+    {
+     "oid": "OBJ-DE-A-s6b2",
+     "section_no": 6,
+     "section_name": "Troubleshooting, Monitoring, and Optimization",
+     "weight": 10,
+     "domain_key": "observe",
+     "index": 2,
+     "summary": "Jobs UI로 상태·DAG 상류 병목·실행시간·실패율 모니터링",
+     "packs": [
+      "DE-09",
+      "DE-06"
+     ],
+     "source_text_sha256": "9647c4005c9dee0daf5a630a64ce38c290bd3bfeaf79f3f8ca653dbbdc6b9acd"
+    },
+    {
+     "oid": "OBJ-DE-A-s6b3",
+     "section_no": 6,
+     "section_name": "Troubleshooting, Monitoring, and Optimization",
+     "weight": 10,
+     "domain_key": "observe",
+     "index": 3,
+     "summary": "Spark UI stage 지표로 skew·shuffle·spill 병목 식별",
+     "packs": [
+      "DE-07"
+     ],
+     "source_text_sha256": "f081ecc365631574d99cbf637ca40f58aa6d059ba67b62d8f99220be7dcfdc99"
+    },
+    {
+     "oid": "OBJ-DE-A-s6b4",
+     "section_no": 6,
+     "section_name": "Troubleshooting, Monitoring, and Optimization",
+     "weight": 10,
+     "domain_key": "observe",
+     "index": 4,
+     "summary": "Liquid Clustering·predictive optimization 특성 이해",
+     "packs": [
+      "DE-08"
+     ],
+     "source_text_sha256": "ece42b6aae9c70b329874e04c1c55a3e1442455a5e2750d9ab79c51d793bc796"
+    },
+    {
+     "oid": "OBJ-DE-A-s6b5",
+     "section_no": 6,
+     "section_name": "Troubleshooting, Monitoring, and Optimization",
+     "weight": 10,
+     "domain_key": "observe",
+     "index": 5,
+     "summary": "클러스터 시작 실패·라이브러리 충돌·OOM 진단",
+     "packs": [
+      "DE-07"
+     ],
+     "source_text_sha256": "c0d41f9b89517560976d7dac43895a08ff82a065e880d5c65da65b5c6458e86f"
+    },
+    {
+     "oid": "OBJ-DE-A-s7b1",
+     "section_no": 7,
+     "section_name": "Governance and Security",
+     "weight": 15,
+     "domain_key": "governance",
+     "index": 1,
+     "summary": "UC 관리형 vs 외부 테이블 구분과 기본 작업(생성·수정·삭제·변환)",
+     "packs": [
+      "DE-10"
+     ],
+     "source_text_sha256": "3fb2eb3896e42ba097f9e05707aefa96d9273c7ed7e7cb66cc623db2556ae63c"
+    },
+    {
+     "oid": "OBJ-DE-A-s7b2",
+     "section_no": 7,
+     "section_name": "Governance and Security",
+     "weight": 15,
+     "domain_key": "governance",
+     "index": 2,
+     "summary": "UI·SQL로 GRANT/REVOKE/DENY를 보안 계층의 적절한 수준에 적용 (DENY는 제품 문서와 충돌 가능 — SC-07 확인 필요)",
+     "packs": [
+      "DE-10"
+     ],
+     "source_text_sha256": "a536877607e85720b906548dfdfdf24c110f34e8add8401d8c98c33d18b0d20e"
+    },
+    {
+     "oid": "OBJ-DE-A-s7b3",
+     "section_no": 7,
+     "section_name": "Governance and Security",
+     "weight": 15,
+     "domain_key": "governance",
+     "index": 3,
+     "summary": "열 마스크·행 수준 보안으로 그룹별 가시성 제한",
+     "packs": [
+      "DE-10"
+     ],
+     "source_text_sha256": "a6ab8a2925828f65c47cca23e79d742e89f0699d271b35e2400370cf5b1047b4"
+    },
+    {
+     "oid": "OBJ-DE-A-s7b4",
+     "section_no": 7,
+     "section_name": "Governance and Security",
+     "weight": 15,
+     "domain_key": "governance",
+     "index": 4,
+     "summary": "UC ABAC 정책으로 행 필터·열 마스킹 중앙 통제",
+     "packs": [
+      "DE-10"
+     ],
+     "source_text_sha256": "a837096b7e54fca6274bd9e44b512207ae1933e5853a141a4fcc1cdc77806e3d"
+    }
+   ]
+  },
+  "DE-P": {
+   "guide_sha256": "96d44c981d46e76cd75ebaaeeacbe43cd1ab6d5f7a70b46559f6610a08aa5247",
+   "source_url": "https://www.databricks.com/sites/default/files/2026-10/Databricks-Certified-Data-Engineer-Professional-Exam-Guide-9-Oct-2026.pdf",
+   "objectives": [
+    {
+     "oid": "OBJ-DE-P-s1b1",
+     "section_no": 1,
+     "section_name": "Developing Code for Data Processing using Python and SQL",
+     "weight": 23,
+     "domain_key": "pysql",
+     "index": 1,
+     "summary": "Bundle용 확장 가능한 Python 프로젝트 구조(모듈화·CI/CD 연계)",
+     "packs": [
+      "DE-12"
+     ],
+     "source_text_sha256": "58933f03f2b0869853e51479d9c7f96cb7f3469ae0cab76666b31d3686e23fee"
+    },
+    {
+     "oid": "OBJ-DE-P-s1b2",
+     "section_no": 1,
+     "section_name": "Developing Code for Data Processing using Python and SQL",
+     "weight": 23,
+     "domain_key": "pysql",
+     "index": 2,
+     "summary": "외부 라이브러리 의존성 충돌·설치 실패 해결(serverless·pipeline·bundle 환경)",
+     "packs": [
+      "DE-12"
+     ],
+     "source_text_sha256": "cbf15d3ee3c7250b247857cf542370ad59c5139f58b20bb177834f9225f182f8"
+    },
+    {
+     "oid": "OBJ-DE-P-s1b3",
+     "section_no": 1,
+     "section_name": "Developing Code for Data Processing using Python and SQL",
+     "weight": 23,
+     "domain_key": "pysql",
+     "index": 3,
+     "summary": "Pandas/Python/SQL UDF와 UC 함수 개발",
+     "packs": [
+      "DE-02"
+     ],
+     "source_text_sha256": "a3077e3031098d9eea2959a379386e65129a55481ee5df399339c150b902e9cd"
+    },
+    {
+     "oid": "OBJ-DE-P-s1b4",
+     "section_no": 1,
+     "section_name": "Developing Code for Data Processing using Python and SQL",
+     "weight": 23,
+     "domain_key": "pysql",
+     "index": 4,
+     "summary": "Lakeflow Pipelines와 Auto Loader로 스트리밍 프로덕션 파이프라인 구축",
+     "packs": [
+      "DE-04"
+     ],
+     "source_text_sha256": "ef400c942398593b7e8621d233a5390d3ad9fb3413779a266461fdc957034648"
+    },
+    {
+     "oid": "OBJ-DE-P-s1b5",
+     "section_no": 1,
+     "section_name": "Developing Code for Data Processing using Python and SQL",
+     "weight": 23,
+     "domain_key": "pysql",
+     "index": 5,
+     "summary": "Jobs를 UI·API·CLI로 ETL 자동화",
+     "packs": [
+      "DE-06",
+      "DE-12"
+     ],
+     "source_text_sha256": "8c43fc08bbea2ef5d552731c541421fc65982c36b86b6fa7519719430f2c0a3f"
+    },
+    {
+     "oid": "OBJ-DE-P-s1b6",
+     "section_no": 1,
+     "section_name": "Developing Code for Data Processing using Python and SQL",
+     "weight": 23,
+     "domain_key": "pysql",
+     "index": 6,
+     "summary": "지연·비용·갱신 요구에 따라 streaming table vs materialized view 선택",
+     "packs": [
+      "DE-05"
+     ],
+     "source_text_sha256": "22a3e59b5f9ab57df2105e2d3e776b8ea0944d2d433dbba478da93fb0e5c64d9"
+    },
+    {
+     "oid": "OBJ-DE-P-s1b7",
+     "section_no": 1,
+     "section_name": "Developing Code for Data Processing using Python and SQL",
+     "weight": 23,
+     "domain_key": "pysql",
+     "index": 7,
+     "summary": "AUTO CDC API(구 APPLY CHANGES)로 CDC와 SCD 1/2 구현",
+     "packs": [
+      "DE-05"
+     ],
+     "source_text_sha256": "67b613a5ca588a9074383a682951c784f64dad182283e09d79492789f34e7fd7"
+    },
+    {
+     "oid": "OBJ-DE-P-s1b8",
+     "section_no": 1,
+     "section_name": "Developing Code for Data Processing using Python and SQL",
+     "weight": 23,
+     "domain_key": "pysql",
+     "index": 8,
+     "summary": "Structured Streaming vs Declarative Pipelines 선택",
+     "packs": [
+      "DE-04"
+     ],
+     "source_text_sha256": "b02236b8dd4eaed73f2a9744e31af9ab01b7c7cbcbecb12aa3f7fe33395e33b1"
+    },
+    {
+     "oid": "OBJ-DE-P-s1b9",
+     "section_no": 1,
+     "section_name": "Developing Code for Data Processing using Python and SQL",
+     "weight": 23,
+     "domain_key": "pysql",
+     "index": 9,
+     "summary": "Jobs의 If/Else·For Each 제어 흐름",
+     "packs": [
+      "DE-06"
+     ],
+     "source_text_sha256": "ebf32c51fd1d1090e0414dcb81244e4dc31e656c6c16462989fd28eddc058a89"
+    },
+    {
+     "oid": "OBJ-DE-P-s1b10",
+     "section_no": 1,
+     "section_name": "Developing Code for Data Processing using Python and SQL",
+     "weight": 23,
+     "domain_key": "pysql",
+     "index": 10,
+     "summary": "환경·의존성에 맞는 컴퓨트·구성 선택(serverless 환경 등)",
+     "packs": [
+      "CORE-01",
+      "DE-12"
+     ],
+     "source_text_sha256": "5d32bb792909e4b43b55388c7c83e52909a0e1c7877da6ae9c63413a46104019"
+    },
+    {
+     "oid": "OBJ-DE-P-s1b11",
+     "section_no": 1,
+     "section_name": "Developing Code for Data Processing using Python and SQL",
+     "weight": 23,
+     "domain_key": "pysql",
+     "index": 11,
+     "summary": "assertDataFrameEqual 등으로 단위·통합 테스트",
+     "packs": [
+      "DE-12"
+     ],
+     "source_text_sha256": "009f184b800bf28b78c0027d4ce555e7cb1c3dfe9a8b573ef40268a77a122bc0"
+    },
+    {
+     "oid": "OBJ-DE-P-s1b12",
+     "section_no": 1,
+     "section_name": "Developing Code for Data Processing using Python and SQL",
+     "weight": 23,
+     "domain_key": "pysql",
+     "index": 12,
+     "summary": "Structured Streaming 상태 처리(watermark·output mode·foreachBatch·checkpoint)와 복구",
+     "packs": [
+      "DE-04"
+     ],
+     "source_text_sha256": "f4bd13a4642a790c0a90df910c80e52f1137a4e2a7995ecb6eb326974ff9cd06"
+    },
+    {
+     "oid": "OBJ-DE-P-s2b1",
+     "section_no": 2,
+     "section_name": "Data Ingestion & Acquisition",
+     "weight": 12,
+     "domain_key": "acquire",
+     "index": 1,
+     "summary": "다양한 포맷·소스(메시지 버스, 클라우드 스토리지) 수집 파이프라인 개발",
+     "packs": [
+      "DE-01"
+     ],
+     "source_text_sha256": "63ad4ace86033b0b57ca3201d7de2d2c21265d8165f250a939ecc5343991f0e3"
+    },
+    {
+     "oid": "OBJ-DE-P-s2b2",
+     "section_no": 2,
+     "section_name": "Data Ingestion & Acquisition",
+     "weight": 12,
+     "domain_key": "acquire",
+     "index": 2,
+     "summary": "Lakeflow Pipelines로 Delta/Iceberg 대상 증분 CDC 구성",
+     "packs": [
+      "DE-05"
+     ],
+     "source_text_sha256": "21e4463c55e4be3372b7942da6b86d5b93d2171f23b96a65bb5b3deba3b43b22"
+    },
+    {
+     "oid": "OBJ-DE-P-s2b3",
+     "section_no": 2,
+     "section_name": "Data Ingestion & Acquisition",
+     "weight": 12,
+     "domain_key": "acquire",
+     "index": 3,
+     "summary": "Lakeflow Connect로 SQL Server·MySQL·PostgreSQL CDC 수집",
+     "packs": [
+      "DE-01"
+     ],
+     "source_text_sha256": "6bc21beea1e049f5223ac552f2e60e5030eb3ccf6b80c8b52a45697a17f2972c"
+    },
+    {
+     "oid": "OBJ-DE-P-s2b4",
+     "section_no": 2,
+     "section_name": "Data Ingestion & Acquisition",
+     "weight": 12,
+     "domain_key": "acquire",
+     "index": 4,
+     "summary": "OpenSharing·Clean Rooms로 프라이버시 보존 협업",
+     "packs": [
+      "DE-11"
+     ],
+     "source_text_sha256": "2dee2c9add3d2e3dc19e6532dd2f89842c5438a7dbc5d8bd12eb91819fea0457"
+    },
+    {
+     "oid": "OBJ-DE-P-s2b5",
+     "section_no": 2,
+     "section_name": "Data Ingestion & Acquisition",
+     "weight": 12,
+     "domain_key": "acquire",
+     "index": 5,
+     "summary": "Lakehouse Federation을 UC 권한·connection 자격과 함께 구성",
+     "packs": [
+      "DE-11"
+     ],
+     "source_text_sha256": "4c18b2748dd7928c4bb14e315e4669b813eb4457dea13cd9f5c3aff52fbc3ba3"
+    },
+    {
+     "oid": "OBJ-DE-P-s3b1",
+     "section_no": 3,
+     "section_name": "Data Manipulation",
+     "weight": 12,
+     "domain_key": "manip",
+     "index": 1,
+     "summary": "윈도·조인·집계 등 고급 변환(Spark SQL·PySpark)",
+     "packs": [
+      "DE-02"
+     ],
+     "source_text_sha256": "4878c56441478c58899e364acdf1612029e1ea49704f4505e6ddc7336a8f162e"
+    },
+    {
+     "oid": "OBJ-DE-P-s3b2",
+     "section_no": 3,
+     "section_name": "Data Manipulation",
+     "weight": 12,
+     "domain_key": "manip",
+     "index": 2,
+     "summary": "VARIANT 타입으로 반정형 모델링·질의",
+     "packs": [
+      "DE-02"
+     ],
+     "source_text_sha256": "faa9d9798898ee7293aac67af8ce9b77b05a4c9b1e8fa58052e0b9647db280d3"
+    },
+    {
+     "oid": "OBJ-DE-P-s3b3",
+     "section_no": 3,
+     "section_name": "Data Manipulation",
+     "weight": 12,
+     "domain_key": "manip",
+     "index": 3,
+     "summary": "AI 함수(ai_query)로 파이프라인 내 추론",
+     "packs": [
+      "DE-02"
+     ],
+     "source_text_sha256": "c47b5b97fe7c761f2e9c9021b40a4645d7c59904dcd37b342afec5d417d94d5c"
+    },
+    {
+     "oid": "OBJ-DE-P-s3b4",
+     "section_no": 3,
+     "section_name": "Data Manipulation",
+     "weight": 12,
+     "domain_key": "manip",
+     "index": 4,
+     "summary": "Lakeflow Pipelines expectation으로 불량 레코드 격리·drop·fail",
+     "packs": [
+      "DE-05"
+     ],
+     "source_text_sha256": "97704ebf83fceef74df8ab11c23d7d573785f2c2b5c2580b568a049b1661c584"
+    },
+    {
+     "oid": "OBJ-DE-P-s4b1",
+     "section_no": 4,
+     "section_name": "Monitoring and Alerting",
+     "weight": 10,
+     "domain_key": "observe",
+     "index": 1,
+     "summary": "system tables로 비용·감사·워크로드 분석",
+     "packs": [
+      "DE-09"
+     ],
+     "source_text_sha256": "fc14268799f4024459daf9868d8d5b9e3cc0cf2c1e8647a02c796c9ec334aa0a"
+    },
+    {
+     "oid": "OBJ-DE-P-s4b2",
+     "section_no": 4,
+     "section_name": "Monitoring and Alerting",
+     "weight": 10,
+     "domain_key": "observe",
+     "index": 2,
+     "summary": "REST API/CLI/SDK로 Jobs·pipelines 모니터링",
+     "packs": [
+      "DE-09"
+     ],
+     "source_text_sha256": "336c3db5c4c17cd4e939b15b9492c275dcdbb7a2fcef5d61d524ff33b0b6dd4a"
+    },
+    {
+     "oid": "OBJ-DE-P-s4b3",
+     "section_no": 4,
+     "section_name": "Monitoring and Alerting",
+     "weight": 10,
+     "domain_key": "observe",
+     "index": 3,
+     "summary": "Pipeline event log로 상태·데이터 품질 모니터링",
+     "packs": [
+      "DE-09"
+     ],
+     "source_text_sha256": "e0e1f0bb7a739099e2eeed9160da5b1a4d0236f5bca9c1b0ba950ce2b5fd890c"
+    },
+    {
+     "oid": "OBJ-DE-P-s4b4",
+     "section_no": 4,
+     "section_name": "Monitoring and Alerting",
+     "weight": 10,
+     "domain_key": "observe",
+     "index": 4,
+     "summary": "Lakehouse alerts로 지표·품질·비용·감사 신호 모니터링",
+     "packs": [
+      "DE-09"
+     ],
+     "source_text_sha256": "03f82dbb9c21337714b744852cc0cf410ca47bda14416d40c7598ffaf0345b02"
+    },
+    {
+     "oid": "OBJ-DE-P-s4b5",
+     "section_no": 4,
+     "section_name": "Monitoring and Alerting",
+     "weight": 10,
+     "domain_key": "observe",
+     "index": 5,
+     "summary": "Jobs UI·API로 상태·성능 지표 모니터링",
+     "packs": [
+      "DE-09"
+     ],
+     "source_text_sha256": "6f4259127ba63eecbcb8de56fbe4cc306f379b0ccb9efac27b412506a45ec787"
+    },
+    {
+     "oid": "OBJ-DE-P-s5b1",
+     "section_no": 5,
+     "section_name": "Cost & Performance Optimization",
+     "weight": 15,
+     "domain_key": "costperf",
+     "index": 1,
+     "summary": "관리형 테이블·predictive optimization·Liquid Clustering의 운영 부담 감소",
+     "packs": [
+      "DE-08"
+     ],
+     "source_text_sha256": "8233ef32e9e65693779c0939973bed0ec06224f54bb9cdbb6adc4f61bb91e9d6"
+    },
+    {
+     "oid": "OBJ-DE-P-s5b2",
+     "section_no": 5,
+     "section_name": "Cost & Performance Optimization",
+     "weight": 15,
+     "domain_key": "costperf",
+     "index": 2,
+     "summary": "접근 패턴별 최적화 기법 선택(deletion vectors·Liquid Clustering·CLUSTER BY AUTO)",
+     "packs": [
+      "DE-08"
+     ],
+     "source_text_sha256": "2ec9d5af6ea84df1ee0f1eef3bddf42ae80e48bf18d7fa579d037ade34b4483e"
+    },
+    {
+     "oid": "OBJ-DE-P-s5b3",
+     "section_no": 5,
+     "section_name": "Cost & Performance Optimization",
+     "weight": 15,
+     "domain_key": "costperf",
+     "index": 3,
+     "summary": "Delta cache가 반복 읽기 성능을 높이는 원리",
+     "packs": [
+      "DE-08"
+     ],
+     "source_text_sha256": "30bbd22749acbf568710beb9478bf082b480d109a0f05e32d1aeb185c7b05d40"
+    },
+    {
+     "oid": "OBJ-DE-P-s5b4",
+     "section_no": 5,
+     "section_name": "Cost & Performance Optimization",
+     "weight": 15,
+     "domain_key": "costperf",
+     "index": 4,
+     "summary": "Change Data Feed로 행 단위 변경을 증분 처리에 활용",
+     "packs": [
+      "DE-03"
+     ],
+     "source_text_sha256": "91fd3ffcc51a1fef7e6f664e6e0479a41fd064a4d87e3ab7e184ea8273151954"
+    },
+    {
+     "oid": "OBJ-DE-P-s5b5",
+     "section_no": 5,
+     "section_name": "Cost & Performance Optimization",
+     "weight": 15,
+     "domain_key": "costperf",
+     "index": 5,
+     "summary": "query profile로 data skipping·조인 전략·shuffle 병목 식별",
+     "packs": [
+      "DE-07"
+     ],
+     "source_text_sha256": "b1240c873d0b369993c496f64cf4383167cf2a0738aceeeda14e6394b3570d8d"
+    },
+    {
+     "oid": "OBJ-DE-P-s5b6",
+     "section_no": 5,
+     "section_name": "Cost & Performance Optimization",
+     "weight": 15,
+     "domain_key": "costperf",
+     "index": 6,
+     "summary": "Liquid Clustering vs partitioning/ZORDER 비교 선택",
+     "packs": [
+      "DE-08"
+     ],
+     "source_text_sha256": "8356e9d0a859ab6c9fd2fdfaf8f8eed9e7111ffdfdee76d4c928969017827b0b"
+    },
+    {
+     "oid": "OBJ-DE-P-s6b1",
+     "section_no": 6,
+     "section_name": "Ensuring Data Security and Compliance",
+     "weight": 8,
+     "domain_key": "security",
+     "index": 1,
+     "summary": "최소권한 ACL로 UC 객체·워크스페이스 리소스 보호",
+     "packs": [
+      "DE-10"
+     ],
+     "source_text_sha256": "7c56622a19e34e9ef13693e942d44192e59e6a1b4fdab6094bc49057c0ff30bc"
+    },
+    {
+     "oid": "OBJ-DE-P-s6b2",
+     "section_no": 6,
+     "section_name": "Ensuring Data Security and Compliance",
+     "weight": 8,
+     "domain_key": "security",
+     "index": 2,
+     "summary": "governed tag 기반 ABAC로 행 필터·열 마스크 대규모 적용",
+     "packs": [
+      "DE-10"
+     ],
+     "source_text_sha256": "c0acc529fb5d8c67da7593ef049b806318d2278486680d867ffa64b6f1577cb9"
+    },
+    {
+     "oid": "OBJ-DE-P-s6b3",
+     "section_no": 6,
+     "section_name": "Ensuring Data Security and Compliance",
+     "weight": 8,
+     "domain_key": "security",
+     "index": 3,
+     "summary": "익명화·가명화(해시·토큰화·억제·일반화) 기법 적용",
+     "packs": [
+      "DE-10"
+     ],
+     "source_text_sha256": "8a268c75c3e536f4fee0c0a7e6b348c744b8afec0443e4f667f55eec9e2051d3"
+    },
+    {
+     "oid": "OBJ-DE-P-s6b4",
+     "section_no": 6,
+     "section_name": "Ensuring Data Security and Compliance",
+     "weight": 8,
+     "domain_key": "security",
+     "index": 4,
+     "summary": "배치·스트리밍 전반의 PII 탐지·마스킹 준수 파이프라인",
+     "packs": [
+      "DE-10"
+     ],
+     "source_text_sha256": "b86222b7fa989e7c656dd74528668914216bfdd374b77eb46c6ffb3021181add"
+    },
+    {
+     "oid": "OBJ-DE-P-s6b5",
+     "section_no": 6,
+     "section_name": "Ensuring Data Security and Compliance",
+     "weight": 8,
+     "domain_key": "security",
+     "index": 5,
+     "summary": "보존·삭제 정책(삭제권)을 만족하는 purge 전략",
+     "packs": [
+      "DE-10",
+      "DE-03"
+     ],
+     "source_text_sha256": "5795c0fb168fdc1acb2aeea93a339dd77c684e4cb4514bb0bc99d838b41409fd"
+    },
+    {
+     "oid": "OBJ-DE-P-s7b1",
+     "section_no": 7,
+     "section_name": "Data Governance",
+     "weight": 5,
+     "domain_key": "governance",
+     "index": 1,
+     "summary": "UC tag·comment로 메타데이터를 추가해 검색성 향상",
+     "packs": [
+      "DE-10"
+     ],
+     "source_text_sha256": "9d687f822db1673574110a5dcfbc4b596a350e1b3f048c144b8e27df9c996201"
+    },
+    {
+     "oid": "OBJ-DE-P-s7b2",
+     "section_no": 7,
+     "section_name": "Data Governance",
+     "weight": 5,
+     "domain_key": "governance",
+     "index": 2,
+     "summary": "UC 권한 상속 모델(카탈로그·스키마·객체)",
+     "packs": [
+      "DE-10"
+     ],
+     "source_text_sha256": "078c75ef9d16f943077de96e53deffcdb1bbc545c0532bd96a7915dd6a2ec8e0"
+    },
+    {
+     "oid": "OBJ-DE-P-s8b1",
+     "section_no": 8,
+     "section_name": "Debugging and Deploying",
+     "weight": 10,
+     "domain_key": "deploy",
+     "index": 1,
+     "summary": "Spark UI·클러스터 로그·system tables·query profile로 오류 진단",
+     "packs": [
+      "DE-07"
+     ],
+     "source_text_sha256": "d3d706c2c30996bed473009b2a908ce0f246baec6a767161fc9c5212f98bb8ec"
+    },
+    {
+     "oid": "OBJ-DE-P-s8b2",
+     "section_no": 8,
+     "section_name": "Debugging and Deploying",
+     "weight": 10,
+     "domain_key": "deploy",
+     "index": 2,
+     "summary": "job repair·파라미터 override로 실패 run 복구",
+     "packs": [
+      "DE-06"
+     ],
+     "source_text_sha256": "766160da1bfaaa8b3948f408d735809baaadbb893e0855993ad570fdb32f8abc"
+    },
+    {
+     "oid": "OBJ-DE-P-s8b3",
+     "section_no": 8,
+     "section_name": "Debugging and Deploying",
+     "weight": 10,
+     "domain_key": "deploy",
+     "index": 3,
+     "summary": "Bundle로 Databricks 리소스 배포",
+     "packs": [
+      "DE-12"
+     ],
+     "source_text_sha256": "dfb44c0ef339018d382b1c85f4968da13f644c82b2f59b0551777985883fae02"
+    },
+    {
+     "oid": "OBJ-DE-P-s8b4",
+     "section_no": 8,
+     "section_name": "Debugging and Deploying",
+     "weight": 10,
+     "domain_key": "deploy",
+     "index": 4,
+     "summary": "Git folders 기반 CI/CD로 노트북·코드 배포",
+     "packs": [
+      "DE-12"
+     ],
+     "source_text_sha256": "8eba32606d775e24397ef0590c08da37eb7dd6e8a640a933d281c7b5fe7cb8b4"
+    },
+    {
+     "oid": "OBJ-DE-P-s9b1",
+     "section_no": 9,
+     "section_name": "Data Modeling",
+     "weight": 5,
+     "domain_key": "modeling",
+     "index": 1,
+     "summary": "Delta/Iceberg 테이블 레이아웃 설계(파티셔닝·클러스터링·파일 크기 compaction)",
+     "packs": [
+      "DE-08"
+     ],
+     "source_text_sha256": "a480ab49ef8a1e1e01e329098cf15313f103fc23a15e181a70a117eeb7cd37fc"
+    },
+    {
+     "oid": "OBJ-DE-P-s9b2",
+     "section_no": 9,
+     "section_name": "Data Modeling",
+     "weight": 5,
+     "domain_key": "modeling",
+     "index": 2,
+     "summary": "차원 모델링과 materialized view·UC Metric Views 활용",
+     "packs": [
+      "DE-03"
+     ],
+     "source_text_sha256": "39c98017037d70235123c2c70bc8c56633cda81d6f39ae69bbe1cf5f59416b3f"
+    }
+   ]
+  },
+  "GEN-A": {
+   "guide_sha256": "bb4cbd25e3cb3394d41b8bada42c20dc3c8df73dd4db0051d5d37eb307935e5d",
+   "source_url": "https://www.databricks.com/sites/default/files/2026-10/databricks-certified-gen-ai-associate-exam-guide-august-2026.pdf",
+   "objectives": [
+    {
+     "oid": "OBJ-GEN-A-s1b1",
+     "section_no": 1,
+     "section_name": "Design Applications",
+     "weight": 14,
+     "domain_key": "design",
+     "index": 1,
+     "summary": "특정 형식의 응답을 이끄는 프롬프트 설계",
+     "packs": [
+      "GEN-03"
+     ],
+     "source_text_sha256": "b0bfce43858b46663b6cece6a4c40c79b66b0f1b60d4cc07595d251fb6bee32a"
+    },
+    {
+     "oid": "OBJ-GEN-A-s1b2",
+     "section_no": 1,
+     "section_name": "Design Applications",
+     "weight": 14,
+     "domain_key": "design",
+     "index": 2,
+     "summary": "비즈니스 요구에 맞는 모델 task 선택",
+     "packs": [
+      "GEN-03"
+     ],
+     "source_text_sha256": "dbc7762475d655d017239d80becc404b217e58fe8d66eba4ae8952e954102c4e"
+    },
+    {
+     "oid": "OBJ-GEN-A-s1b3",
+     "section_no": 1,
+     "section_name": "Design Applications",
+     "weight": 14,
+     "domain_key": "design",
+     "index": 3,
+     "summary": "입출력에 맞는 chain 구성요소 선택",
+     "packs": [
+      "GEN-03"
+     ],
+     "source_text_sha256": "7595de52a44e45272041844e5b60de885a997b693636707bad2dc9a2be6b7393"
+    },
+    {
+     "oid": "OBJ-GEN-A-s1b4",
+     "section_no": 1,
+     "section_name": "Design Applications",
+     "weight": 14,
+     "domain_key": "design",
+     "index": 4,
+     "summary": "비즈니스 목표를 AI 파이프라인 입출력으로 번역",
+     "packs": [
+      "GEN-03"
+     ],
+     "source_text_sha256": "975f9ed2bb4057c3fdd507c9e111eb6321735e5919df56104e9a08397565ac3a"
+    },
+    {
+     "oid": "OBJ-GEN-A-s1b5",
+     "section_no": 1,
+     "section_name": "Design Applications",
+     "weight": 14,
+     "domain_key": "design",
+     "index": 5,
+     "summary": "다단계 추론을 위한 도구 정의·순서",
+     "packs": [
+      "GEN-04"
+     ],
+     "source_text_sha256": "393119e3a79ba916acebee71e3c9a681710426223ab6b76817762a0319bab6fb"
+    },
+    {
+     "oid": "OBJ-GEN-A-s1b6",
+     "section_no": 1,
+     "section_name": "Design Applications",
+     "weight": 14,
+     "domain_key": "design",
+     "index": 6,
+     "summary": "Agent Bricks(Knowledge Assistant·Supervisor·Information Extraction) 사용 시점 판단",
+     "packs": [
+      "GEN-04"
+     ],
+     "source_text_sha256": "d404a69f19f16135e417b7628017d08f9c62991eadeab3490df2fe25ef685e28"
+    },
+    {
+     "oid": "OBJ-GEN-A-s2b1",
+     "section_no": 2,
+     "section_name": "Data Preparation",
+     "weight": 14,
+     "domain_key": "prep",
+     "index": 1,
+     "summary": "문서 구조·모델 제약에 맞는 청킹 전략",
+     "packs": [
+      "GEN-01"
+     ],
+     "source_text_sha256": "82cfd2bbd281a3387d49acb83bf57eb659cfe4bb12219de7fc4eb08a9b02fa44"
+    },
+    {
+     "oid": "OBJ-GEN-A-s2b2",
+     "section_no": 2,
+     "section_name": "Data Preparation",
+     "weight": 14,
+     "domain_key": "prep",
+     "index": 2,
+     "summary": "RAG 품질을 떨어뜨리는 불필요 콘텐츠 필터",
+     "packs": [
+      "GEN-01"
+     ],
+     "source_text_sha256": "f1cd2de953aeefc5e8b01449690ba51371ba0ecf0e076694959140df7f14d11f"
+    },
+    {
+     "oid": "OBJ-GEN-A-s2b3",
+     "section_no": 2,
+     "section_name": "Data Preparation",
+     "weight": 14,
+     "domain_key": "prep",
+     "index": 3,
+     "summary": "소스 포맷별 문서 추출 Python 패키지 선택",
+     "packs": [
+      "GEN-01"
+     ],
+     "source_text_sha256": "6d9d898d60487382ae95b2730cce0df4c4c6200b046ca3341aef7ad7294247aa"
+    },
+    {
+     "oid": "OBJ-GEN-A-s2b4",
+     "section_no": 2,
+     "section_name": "Data Preparation",
+     "weight": 14,
+     "domain_key": "prep",
+     "index": 4,
+     "summary": "청크 텍스트를 UC Delta 테이블에 쓰는 작업·순서",
+     "packs": [
+      "GEN-01"
+     ],
+     "source_text_sha256": "c10cc84e8a0d3c99c8b9ace4eb69c5e5968d47b16c9015fa8ca6096641187728"
+    },
+    {
+     "oid": "OBJ-GEN-A-s2b5",
+     "section_no": 2,
+     "section_name": "Data Preparation",
+     "weight": 14,
+     "domain_key": "prep",
+     "index": 5,
+     "summary": "RAG에 필요한 소스 문서 식별(지식·품질)",
+     "packs": [
+      "GEN-01"
+     ],
+     "source_text_sha256": "898a94979a137d31c9ac45154a25f426eaa6063af3db2613156e318c3367b02a"
+    },
+    {
+     "oid": "OBJ-GEN-A-s2b6",
+     "section_no": 2,
+     "section_name": "Data Preparation",
+     "weight": 14,
+     "domain_key": "prep",
+     "index": 6,
+     "summary": "검색 성능 평가 도구·지표",
+     "packs": [
+      "GEN-02"
+     ],
+     "source_text_sha256": "a9d878e49ca9a5ce0d209d33f3ed95401e76730012bc502c5c2888c5ee57d6b8"
+    },
+    {
+     "oid": "OBJ-GEN-A-s2b7",
+     "section_no": 2,
+     "section_name": "Data Preparation",
+     "weight": 14,
+     "domain_key": "prep",
+     "index": 7,
+     "summary": "고급 청킹 전략으로 검색 시스템 설계",
+     "packs": [
+      "GEN-02"
+     ],
+     "source_text_sha256": "ccbe3fe7b86372a5f76c500f5f6f8ae9455bcbcdb2d7e0e8603db384c5a04d9f"
+    },
+    {
+     "oid": "OBJ-GEN-A-s2b8",
+     "section_no": 2,
+     "section_name": "Data Preparation",
+     "weight": 14,
+     "domain_key": "prep",
+     "index": 8,
+     "summary": "re-ranking의 역할",
+     "packs": [
+      "GEN-02"
+     ],
+     "source_text_sha256": "d6aba18987573a65c698c5686b0b0abf087ff2e7fd840ca4b2fd4d12ee5879d4"
+    },
+    {
+     "oid": "OBJ-GEN-A-s3b1",
+     "section_no": 3,
+     "section_name": "Application Development",
+     "weight": 30,
+     "domain_key": "dev",
+     "index": 1,
+     "summary": "LangChain 등 도구 선택",
+     "packs": [
+      "GEN-03"
+     ],
+     "source_text_sha256": "919c6f5af58fe27c41982d5285a749e2559a5cfe114d151a12f6f8a667443d19"
+    },
+    {
+     "oid": "OBJ-GEN-A-s3b2",
+     "section_no": 3,
+     "section_name": "Application Development",
+     "weight": 30,
+     "domain_key": "dev",
+     "index": 2,
+     "summary": "응답의 품질·안전 문제를 정성 평가",
+     "packs": [
+      "GEN-07"
+     ],
+     "source_text_sha256": "132bdb76783644b006d6dabdb4349c24ff702d83b2cecf3b574f4245c5c5bf19"
+    },
+    {
+     "oid": "OBJ-GEN-A-s3b3",
+     "section_no": 3,
+     "section_name": "Application Development",
+     "weight": 30,
+     "domain_key": "dev",
+     "index": 3,
+     "summary": "모델·검색 평가에 근거한 청킹 전략 선택",
+     "packs": [
+      "GEN-02"
+     ],
+     "source_text_sha256": "eb7aa77e9737f08b9d5b2e1a0f8d9418c6d4a677d6103de01cda9a9be4fc6f15"
+    },
+    {
+     "oid": "OBJ-GEN-A-s3b4",
+     "section_no": 3,
+     "section_name": "Application Development",
+     "weight": 30,
+     "domain_key": "dev",
+     "index": 4,
+     "summary": "사용자 입력의 필드·용어·의도로 프롬프트 보강",
+     "packs": [
+      "GEN-03"
+     ],
+     "source_text_sha256": "788855e3657372d5c1b4b981623199415b433d551d984637058d4262a5477550"
+    },
+    {
+     "oid": "OBJ-GEN-A-s3b5",
+     "section_no": 3,
+     "section_name": "Application Development",
+     "weight": 30,
+     "domain_key": "dev",
+     "index": 5,
+     "summary": "기준선 응답을 원하는 출력으로 조정하는 프롬프트",
+     "packs": [
+      "GEN-03"
+     ],
+     "source_text_sha256": "f9226cd1761e93bf4c91ab196f6ef8693d1ece7a99625555b9f09002d1171f96"
+    },
+    {
+     "oid": "OBJ-GEN-A-s3b6",
+     "section_no": 3,
+     "section_name": "Application Development",
+     "weight": 30,
+     "domain_key": "dev",
+     "index": 6,
+     "summary": "부정 결과를 막는 LLM guardrail 구현",
+     "packs": [
+      "GEN-06"
+     ],
+     "source_text_sha256": "6b9c81d6430f78687c615ef5b03fb8b8385fdf6e146eb9554c8aa6b6c7567a2a"
+    },
+    {
+     "oid": "OBJ-GEN-A-s3b7",
+     "section_no": 3,
+     "section_name": "Application Development",
+     "weight": 30,
+     "domain_key": "dev",
+     "index": 7,
+     "summary": "애플리케이션 속성에 맞는 LLM 선택",
+     "packs": [
+      "GEN-03"
+     ],
+     "source_text_sha256": "a4e903193b71f461f48f24d9ebb26e6d0a04ebfd51929699a02c151013942b5c"
+    },
+    {
+     "oid": "OBJ-GEN-A-s3b8",
+     "section_no": 3,
+     "section_name": "Application Development",
+     "weight": 30,
+     "domain_key": "dev",
+     "index": 8,
+     "summary": "문서·예상 질의에 맞는 embedding 모델 컨텍스트 길이 선택",
+     "packs": [
+      "GEN-02"
+     ],
+     "source_text_sha256": "577037fa01f1df9e5f554d9967f24a60b1e80227e711650e37e102fd8d544cfd"
+    },
+    {
+     "oid": "OBJ-GEN-A-s3b9",
+     "section_no": 3,
+     "section_name": "Application Development",
+     "weight": 30,
+     "domain_key": "dev",
+     "index": 9,
+     "summary": "모델 카드로 허브/마켓플레이스 모델 선택",
+     "packs": [
+      "GEN-03"
+     ],
+     "source_text_sha256": "d4affebf4ad8b232970d0c3b137bee64a41ff8bb8963fe6be5cd093edb95e1ff"
+    },
+    {
+     "oid": "OBJ-GEN-A-s3b10",
+     "section_no": 3,
+     "section_name": "Application Development",
+     "weight": 30,
+     "domain_key": "dev",
+     "index": 10,
+     "summary": "실험 지표로 작업에 맞는 모델 선택",
+     "packs": [
+      "GEN-03",
+      "GEN-07"
+     ],
+     "source_text_sha256": "ca9072ce483f1cb40b090b3700d9f91ee3aeee3563d9efe90a83c92c57c2a070"
+    },
+    {
+     "oid": "OBJ-GEN-A-s3b11",
+     "section_no": 3,
+     "section_name": "Application Development",
+     "weight": 30,
+     "domain_key": "dev",
+     "index": 11,
+     "summary": "MLflow·Agent Framework로 agentic 시스템 개발",
+     "packs": [
+      "GEN-03",
+      "GEN-04"
+     ],
+     "source_text_sha256": "913cd4a1fd58deb8200bdbba0d0d4411b7b4e74efdaceb8b9a0d7c6e75c448a8"
+    },
+    {
+     "oid": "OBJ-GEN-A-s3b12",
+     "section_no": 3,
+     "section_name": "Application Development",
+     "weight": 30,
+     "domain_key": "dev",
+     "index": 12,
+     "summary": "Gen AI 수명주기의 평가 vs 모니터링 단계 비교",
+     "packs": [
+      "GEN-07"
+     ],
+     "source_text_sha256": "ef6fcc541e04f4c901c3ace0aedf6ae646f8b203f085d4ec760c2f869c496efa"
+    },
+    {
+     "oid": "OBJ-GEN-A-s3b13",
+     "section_no": 3,
+     "section_name": "Application Development",
+     "weight": 30,
+     "domain_key": "dev",
+     "index": 13,
+     "summary": "멀티 에이전트가 Genie·대화형 API로 데이터 조회",
+     "packs": [
+      "GEN-04"
+     ],
+     "source_text_sha256": "bf50a01a97a96796a55302e7b6e1d8f9514aebd25e9a10d4d67a7496af29702f"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b1",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 1,
+     "summary": "pyfunc 모델로 전·후처리 chain 구현",
+     "packs": [
+      "GEN-05"
+     ],
+     "source_text_sha256": "88cc9f954c4e67ff0f23fa5d35b1e923ac981bb587273a45e785fbef001e60c6"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b2",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 2,
+     "summary": "model serving endpoint의 리소스 접근 제어",
+     "packs": [
+      "GEN-05"
+     ],
+     "source_text_sha256": "6be2f5d552a7f7fed43a1dafd1aa41e3e139179c5baba97db434e904db10413c"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b3",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 3,
+     "summary": "요구사항에 맞는 간단한 chain 코딩",
+     "packs": [
+      "GEN-03"
+     ],
+     "source_text_sha256": "8523680b8c995140816b5779cef3f74b539ed4a34873b6010c18671d2c3d90e1"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b4",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 4,
+     "summary": "RAG 기본 요소(flavor·embedding·retriever·의존성·입력 예시·signature) 선택",
+     "packs": [
+      "GEN-05"
+     ],
+     "source_text_sha256": "db3d5ae881c66b7e6d4b5415f209c81e480d6fb34aed0a08b2e09453e0cec50b"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b5",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 5,
+     "summary": "MLflow로 모델을 UC에 등록",
+     "packs": [
+      "GEN-05"
+     ],
+     "source_text_sha256": "f27264cd8c50bb005051c57127869355bb67b75e3f78371328202f27bcc27be0"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b6",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 6,
+     "summary": "Vector Search(AI Search) 인덱스 생성·질의",
+     "packs": [
+      "GEN-02"
+     ],
+     "source_text_sha256": "d144dac0c733ab72dac17115bd2c2a03e0b0efb3beda131cfd090d8812526bd2"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b7",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 7,
+     "summary": "Foundation Model APIs를 쓰는 LLM 앱 서빙",
+     "packs": [
+      "GEN-05"
+     ],
+     "source_text_sha256": "7c56bc918ff6af8ccc8ddb3dd85dece220123d537bff7c26a8dde2948b6c409e"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b8",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 8,
+     "summary": "Vector Search 핵심 개념·구성요소",
+     "packs": [
+      "GEN-02"
+     ],
+     "source_text_sha256": "eba0feea5d1569dac21482b1cabdd38561d3108429330909ab741d13d61d412b"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b9",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 9,
+     "summary": "배치 추론 워크로드와 ai_query() 적용",
+     "packs": [
+      "GEN-05"
+     ],
+     "source_text_sha256": "2eeab5f0bbc929bb3e00c16567a4471fa79f0d724530cd2eea5ee7d718d6b12a"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b10",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 10,
+     "summary": "임베딩 수·갱신 빈도·지연·비용에 맞는 검색 구성",
+     "packs": [
+      "GEN-02"
+     ],
+     "source_text_sha256": "ac038c6b7629bce7c5c124c9021687add5af010995872cd6fa64a017bc224737"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b11",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 11,
+     "summary": "중간 메모리·구조화 정보를 저장하는 영속 datastore 구성",
+     "packs": [
+      "GEN-04"
+     ],
+     "source_text_sha256": "161e40897fc76cc227b77ac614a65b454f199683dcce03321df933488d2dae1b"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b12",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 12,
+     "summary": "CI/CD: 인덱스 갱신·프롬프트 승격·에이전트 구성요소 테스트",
+     "packs": [
+      "GEN-05"
+     ],
+     "source_text_sha256": "542eb4e4f85faabe9b1a4a2a58bc0aad253cbcbab63d2b6c4c6275929cde0665"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b13",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 13,
+     "summary": "managed·external·custom MCP 서버 통합",
+     "packs": [
+      "GEN-04"
+     ],
+     "source_text_sha256": "ebf4b8fccc0f6d81a94f8204c6fb7809eb51e19eb96911f35eb7e8f1060aa200"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b14",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 14,
+     "summary": "프롬프트 버전 관리·수명주기",
+     "packs": [
+      "GEN-03"
+     ],
+     "source_text_sha256": "0d0de487bffd60ee5cc2ee3c874b675b71da3a8aaa88505aa824dc26ce55097b"
+    },
+    {
+     "oid": "OBJ-GEN-A-s4b15",
+     "section_no": 4,
+     "section_name": "Assembling and Deploying Applications",
+     "weight": 22,
+     "domain_key": "assemble",
+     "index": 15,
+     "summary": "에이전트 사용자 인터페이스(Apps·Slack·Teams 등) 개발",
+     "packs": [
+      "GEN-04"
+     ],
+     "source_text_sha256": "0d8ec39fb1e0d16d359cd6fddbe0c9f028fd9d982540d81bb7ff0202d1534520"
+    },
+    {
+     "oid": "OBJ-GEN-A-s5b1",
+     "section_no": 5,
+     "section_name": "Governance",
+     "weight": 8,
+     "domain_key": "gov",
+     "index": 1,
+     "summary": "성능 목표 달성을 위한 마스킹 기법 guardrail",
+     "packs": [
+      "GEN-06"
+     ],
+     "source_text_sha256": "62c305c2e3c96b6460ce0d504b0422ae02f6b8aaef54b3469059306a86a17824"
+    },
+    {
+     "oid": "OBJ-GEN-A-s5b2",
+     "section_no": 5,
+     "section_name": "Governance",
+     "weight": 8,
+     "domain_key": "gov",
+     "index": 2,
+     "summary": "악성 입력 방어 guardrail 기법 선택",
+     "packs": [
+      "GEN-06"
+     ],
+     "source_text_sha256": "725260873abf10bd347b88eff135dbceb73eb3515181afb4f8484582198866af"
+    },
+    {
+     "oid": "OBJ-GEN-A-s5b3",
+     "section_no": 5,
+     "section_name": "Governance",
+     "weight": 8,
+     "domain_key": "gov",
+     "index": 3,
+     "summary": "데이터 소스의 법적·라이선스 요건 준수",
+     "packs": [
+      "GEN-06"
+     ],
+     "source_text_sha256": "0a1c39bef66569c6497ec6680190dbe6e448ed54aad0c353ebf64adc0c329faf"
+    },
+    {
+     "oid": "OBJ-GEN-A-s5b4",
+     "section_no": 5,
+     "section_name": "Governance",
+     "weight": 8,
+     "domain_key": "gov",
+     "index": 4,
+     "summary": "데이터 소스의 문제 텍스트 완화 대안 권고",
+     "packs": [
+      "GEN-06"
+     ],
+     "source_text_sha256": "501ca4231d0cf3867f76be64966d906f59108f8e91a1a63103401dd7136aed2e"
+    },
+    {
+     "oid": "OBJ-GEN-A-s6b1",
+     "section_no": 6,
+     "section_name": "Evaluation and Monitoring",
+     "weight": 12,
+     "domain_key": "eval",
+     "index": 1,
+     "summary": "정량 평가 지표로 LLM 크기·아키텍처 선택",
+     "packs": [
+      "GEN-07"
+     ],
+     "source_text_sha256": "0de824bce422c731963bd91fe7ce2f4777e382d1c69f75e4416990318012904a"
+    },
+    {
+     "oid": "OBJ-GEN-A-s6b2",
+     "section_no": 6,
+     "section_name": "Evaluation and Monitoring",
+     "weight": 12,
+     "domain_key": "eval",
+     "index": 2,
+     "summary": "LLM 배포 시나리오별 핵심 모니터링 지표 선택",
+     "packs": [
+      "GEN-07"
+     ],
+     "source_text_sha256": "1d895fbdc6cceed53070c7dc6cc8daca7b2147de160a2075433a92b878275355"
+    },
+    {
+     "oid": "OBJ-GEN-A-s6b3",
+     "section_no": 6,
+     "section_name": "Evaluation and Monitoring",
+     "weight": 12,
+     "domain_key": "eval",
+     "index": 3,
+     "summary": "MLflow scoring·tracing으로 에이전트 성능 평가",
+     "packs": [
+      "GEN-07"
+     ],
+     "source_text_sha256": "5aa34022a6b82fdf72dca79a45061e754f9f3fcee62b69c25d94a0d5059ab65f"
+    },
+    {
+     "oid": "OBJ-GEN-A-s6b4",
+     "section_no": 6,
+     "section_name": "Evaluation and Monitoring",
+     "weight": 12,
+     "domain_key": "eval",
+     "index": 4,
+     "summary": "inference logging으로 배포된 RAG 성능 평가",
+     "packs": [
+      "GEN-07"
+     ],
+     "source_text_sha256": "7db14592d2daf377018cbb86172121f41f3a075ab82635e13542b6fa394de796"
+    },
+    {
+     "oid": "OBJ-GEN-A-s6b5",
+     "section_no": 6,
+     "section_name": "Evaluation and Monitoring",
+     "weight": 12,
+     "domain_key": "eval",
+     "index": 5,
+     "summary": "LLM 비용 통제 기능 활용",
+     "packs": [
+      "GEN-07"
+     ],
+     "source_text_sha256": "08c5a2e370e32c611946b24d82f14c657ba024a1e23d1bcc7e70770b784cdc88"
+    },
+    {
+     "oid": "OBJ-GEN-A-s6b6",
+     "section_no": 6,
+     "section_name": "Evaluation and Monitoring",
+     "weight": 12,
+     "domain_key": "eval",
+     "index": 6,
+     "summary": "inference tables·Agent Monitoring으로 라이브 endpoint 추적",
+     "packs": [
+      "GEN-07"
+     ],
+     "source_text_sha256": "ebe1306d973fa55ef80a14a22dbca7df23adc76c1aa5b2b171ab90d2a67bc82c"
+    },
+    {
+     "oid": "OBJ-GEN-A-s6b7",
+     "section_no": 6,
+     "section_name": "Evaluation and Monitoring",
+     "weight": 12,
+     "domain_key": "eval",
+     "index": 7,
+     "summary": "ground truth가 필요한 평가 judge 식별",
+     "packs": [
+      "GEN-07"
+     ],
+     "source_text_sha256": "1f7d9123f40eef6f932d862b875fb5ab08b3a9c4f0a13323deb8299c1c8cf53c"
+    },
+    {
+     "oid": "OBJ-GEN-A-s6b8",
+     "section_no": 6,
+     "section_name": "Evaluation and Monitoring",
+     "weight": 12,
+     "domain_key": "eval",
+     "index": 8,
+     "summary": "AI Gateway로 LLM/에이전트 추적",
+     "packs": [
+      "GEN-07"
+     ],
+     "source_text_sha256": "e45b9a5c88dfb4ddfff48a49f8a91d2b19bcd90b50892842bad8dec05155542d"
+    },
+    {
+     "oid": "OBJ-GEN-A-s6b9",
+     "section_no": 6,
+     "section_name": "Evaluation and Monitoring",
+     "weight": 12,
+     "domain_key": "eval",
+     "index": 9,
+     "summary": "custom Scorer로 에이전트·LLM 평가",
+     "packs": [
+      "GEN-07"
+     ],
+     "source_text_sha256": "f4e457ea897f36a1452a588697caaf76ad2f8eb9eb9102c42c75499bfa804ef5"
+    },
+    {
+     "oid": "OBJ-GEN-A-s6b10",
+     "section_no": 6,
+     "section_name": "Evaluation and Monitoring",
+     "weight": 12,
+     "domain_key": "eval",
+     "index": 10,
+     "summary": "SME 피드백으로 에이전트 개선",
+     "packs": [
+      "GEN-07"
+     ],
+     "source_text_sha256": "0f021bba2003fb4344053844b6c85865dcfcd48284484445ff889698a228b59b"
+    }
+   ]
+  }
+ }
+}

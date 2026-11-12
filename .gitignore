@@ -1,0 +1,23 @@
+# 비밀·개인 데이터 — 절대 커밋하지 않는다
+data/
+.staff_codes.json
+access_codes*.json
+!access_codes.example.json
+tokens.json
+*.key
+*.pem
+.env
+# 빌드 산출물(설치 파일은 운영 서버 /download 로 배포)
+dist_app/
+build_tmp/
+build_sa/
+build_sa.log
+*.exe
+# 파이썬·도구
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+smoke_tmp.py
+sa_dl.tmp

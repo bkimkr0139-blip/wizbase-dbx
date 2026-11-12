@@ -1,0 +1,719 @@
+{
+ "extracted": "2026-11-12",
+ "method": "한국어 공식 PDF 텍스트 추출(pypdf, 격리 폴더) — 원문은 저장하지 않고 bullet별 sha256만 보관(검토자가 PDF와 대조). 영문 최신본과 버전이 달라 1:1 매핑하지 않음.",
+ "exams": {
+  "DE-A": {
+   "url": "https://www.databricks.com/kr/sites/default/files/2026-08/databricks-certified-data-engineer-associate-exam-guide-may-2026-ko.pdf",
+   "version": "2026-05-04",
+   "guide_sha256": "e1b527a720211f8a9b8dd629b411a512a45212e04ee9e2f62676e6b922881bdc",
+   "sections": [
+    {
+     "section_no": 1,
+     "section_name": "Databricks Intelligence Platform",
+     "weight": 6,
+     "bullets": [
+      {
+       "sha256": "b5816864bf17391806765e9c877b32993b78cd66ba91437b49eb4d9f607a13c4",
+       "chars": 98
+      },
+      {
+       "sha256": "5aea65b5799cdcc2c18d833efd71381b47f1ffe0a7ef9f71fa1e0eafb718b186",
+       "chars": 122
+      }
+     ]
+    },
+    {
+     "section_no": 2,
+     "section_name": "데이터 수집 및 로딩",
+     "weight": 21,
+     "bullets": [
+      {
+       "sha256": "3f7d23e654bdaf386d3bb95f12e92b3f2e4b4c096048fca7c59f84f6b15dde8d",
+       "chars": 155
+      },
+      {
+       "sha256": "27a77b12a9e4f66e316adc82b2086b914c0f33814b78b8635a24132547478da7",
+       "chars": 96
+      },
+      {
+       "sha256": "4b730fa772864c442737740c5c12ffd1dd66167adf68baa05705d5f2a637c855",
+       "chars": 134
+      },
+      {
+       "sha256": "acc9d2c4d67da0a60c21bc12cfba33266bfd406cec0ea6a100ce9b65dfd79026",
+       "chars": 84
+      },
+      {
+       "sha256": "fef5854e58abf42f353e85464bff5f4d2caadd3e8f4c440548e87ec61edcdafe",
+       "chars": 132
+      },
+      {
+       "sha256": "9f5ccf6b6ebd9fa59c849cbf946456c67b026d4cae604e3918e38d64edb9ea7f",
+       "chars": 166
+      },
+      {
+       "sha256": "2a9658f2f0e6583860b5be0d91396e0e8ff14a503cbf63e469769cf7b747a69d",
+       "chars": 121
+      }
+     ]
+    },
+    {
+     "section_no": 3,
+     "section_name": "데이터 변환 및 모델링",
+     "weight": 22,
+     "bullets": [
+      {
+       "sha256": "603f6337500a79f3395a6d3948df8a78a2d7c963594541aec176cf2decece0a9",
+       "chars": 97
+      },
+      {
+       "sha256": "10d828dd8c8112e9417559b0f50d01e720101f7535225c5a60d1ae35a97c9f93",
+       "chars": 106
+      },
+      {
+       "sha256": "03aa53629df1a784fca3455982e8f6a49e27167ca4935dcc9477269684ea2648",
+       "chars": 82
+      },
+      {
+       "sha256": "3f13acf4c867c3e329ba029177eb70b725ae4a72079d4c9c3ed7e69361cfeb15",
+       "chars": 98
+      },
+      {
+       "sha256": "ee20a5138f0b2040ea1508efbf57399e97c37a0f2e2c8ce0aee5759742921ed2",
+       "chars": 163
+      },
+      {
+       "sha256": "614afc4d3c99e0ea990941756c585690f85178aae5a655a93eb0476a050be764",
+       "chars": 112
+      },
+      {
+       "sha256": "bb1b254df74e733aea04534b1ba6ebd524839ea45c8cbfe9e8aced91088b4bfc",
+       "chars": 62
+      }
+     ]
+    },
+    {
+     "section_no": 4,
+     "section_name": "Lakeﬂow Jobs 활용",
+     "weight": 16,
+     "bullets": [
+      {
+       "sha256": "2da2b8ba93b8937ca91388eb4e27870a6a71183353e1573ef5d8f727873db459",
+       "chars": 82
+      },
+      {
+       "sha256": "d50d88c257a004efeff0ac673d70e96cc18b53e961f8bb13c4b3ff2dcd8445c4",
+       "chars": 97
+      },
+      {
+       "sha256": "a67088607cffaa19c4414368f1f8af14d69eeb7ae27f24c2398b4c5d7d80bd50",
+       "chars": 81
+      },
+      {
+       "sha256": "f6a6b49d9bcdaecc8a17fe07e3bb3af15244520863c106fc0033b6a71c082551",
+       "chars": 56
+      }
+     ]
+    },
+    {
+     "section_no": 5,
+     "section_name": "CI/CD 구현",
+     "weight": 10,
+     "bullets": [
+      {
+       "sha256": "059365da901aef779d812d304ac150a5318d676816734f5af9721ea29e7ff33b",
+       "chars": 182
+      },
+      {
+       "sha256": "ee7d83464b85243d8b589cdf03550157db6b61d46ba42136f7dfab3eb2c1d4ff",
+       "chars": 120
+      },
+      {
+       "sha256": "06265f95d8d5f46fafbfc273300a96ce6534332918e1372af8d2d16613b7552e",
+       "chars": 181
+      },
+      {
+       "sha256": "b3d6e17abc4b37a591fb5d237fa87ca4322df28feaaed815d5ee9a335aff1516",
+       "chars": 143
+      }
+     ]
+    },
+    {
+     "section_no": 6,
+     "section_name": "문제 해결 , 모니터링 , 최적화",
+     "weight": 10,
+     "bullets": [
+      {
+       "sha256": "830d25bbf8fb321280c2aee97f3f96cb28831d0dbae7e9687e0ddf3b96a04da4",
+       "chars": 71
+      },
+      {
+       "sha256": "35b642adae3b5050b560f94ad4ff8bac75e5e0b599cf6707673e806aafcd1888",
+       "chars": 118
+      },
+      {
+       "sha256": "1c8d9a8ed8de2dcf3f9763dbee3705d9048beb593c4cc16c6fe750252c904820",
+       "chars": 75
+      },
+      {
+       "sha256": "6fc2165e9039b2d5a4cc89f0fa9cf5c1aa68e89e95e1fbe1f48a39bc29aec32b",
+       "chars": 57
+      },
+      {
+       "sha256": "708eb25d4b2b63b1dfc7db8a2286c70bba5d8d170340df1cd6c0005f692967bf",
+       "chars": 59
+      }
+     ]
+    },
+    {
+     "section_no": 7,
+     "section_name": "거버넌스 및 보안",
+     "weight": 15,
+     "bullets": [
+      {
+       "sha256": "85996c6c31cb18d5219ac074e4df08c20b44e0fa78b2331bbc04676d3572bcc6",
+       "chars": 122
+      },
+      {
+       "sha256": "b16079d31ff016548fab4bdbddd0987e1f67bc5ee53523e04546b9edc8a48143",
+       "chars": 111
+      },
+      {
+       "sha256": "41b77a4a21142d00431494677499804aa52c17299b1042861b7f4e3c033e55e3",
+       "chars": 54
+      },
+      {
+       "sha256": "d83e8d99ec00eb80e4cffbb88dd4c2be1c10b655dabefcb0f445f0f095b62954",
+       "chars": 3353
+      }
+     ]
+    }
+   ],
+   "bullet_count": 33
+  },
+  "DE-P": {
+   "url": "https://www.databricks.com/kr/sites/default/files/2025-11/databricks-certified-data-engineer-professional-september-2025-exam-guide3-kr.pdf",
+   "version": "2025-09-30",
+   "guide_sha256": "2b5f201ca03babda378180c6ee79c6aa28ccd87efaaf72caa7534fc4b3ccee2b",
+   "sections": [
+    {
+     "section_no": 1,
+     "section_name": "Python 및 SQL 을 사용하여 데이터 처리를 위한 코드 개발",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "4e049e3326bcb9ad4cb17dc3f29d7b060ca7286d105c4ca08274590aa09ed105",
+       "chars": 21
+      },
+      {
+       "sha256": "c5b4fc459435c3d95530571afc39d996613ffe1f344cafe92cdd87764b6b8ffb",
+       "chars": 110
+      },
+      {
+       "sha256": "aed3e2a3b6b7213b1bf6e9e92cad7ad7fcb43e5f5e57f980972daccc95adedd9",
+       "chars": 84
+      },
+      {
+       "sha256": "f4584d26fb023c07ff70c38a4fe8ccc3005e36b5c8a895a2fa914512ca4a3edd",
+       "chars": 46
+      },
+      {
+       "sha256": "972bda6fc5cb67f70e193ee870cb78d3b115f9f4b9e138c9670f02709502cad9",
+       "chars": 102
+      },
+      {
+       "sha256": "7fd077a82c4a7fb159c68d104fa35712b2db4a182210eb1d61a7a7f9a09bc9cc",
+       "chars": 106
+      },
+      {
+       "sha256": "77bf2b8a174cc9199bcd25f284fdff047ca081176bfe9264002751f81d89c9ad",
+       "chars": 49
+      },
+      {
+       "sha256": "5534e825227ff5fba6cfdab176e1ea723501bc56713e5861c66123fd84d8240d",
+       "chars": 38
+      },
+      {
+       "sha256": "026fba2aa7a21f3321f3e8b3a11d47022080f3359bd5b160d995820962d1fbbf",
+       "chars": 71
+      },
+      {
+       "sha256": "57033368cdd17a5b0123cfb6aa5f7ecbf32e2f6f2d2bb0941da410e4a9c3c522",
+       "chars": 108
+      },
+      {
+       "sha256": "8927bb79485656da03f16e4a4d50fc3aaf82b41bcdc671a15728839a7e479360",
+       "chars": 63
+      },
+      {
+       "sha256": "1333e0eb283f4e3d7845218acc2e6034d2f3cf78e85406a68bb1bb3db28443b2",
+       "chars": 76
+      },
+      {
+       "sha256": "dc2df69dcdf8351b809af8c64f2effa6ec2a87a70e7fd3a28274995fc6f32890",
+       "chars": 128
+      }
+     ]
+    },
+    {
+     "section_no": 2,
+     "section_name": "데이터 수집 및 획득 :",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "953a926231a4d7ed24e401f43f04ebb99925cf6ceb855efae1b4a1ad1c133e8e",
+       "chars": 150
+      },
+      {
+       "sha256": "a083e46df8d070bf4f1ca9228502c67c37f5a21271dbdd060e03e4f4f1024536",
+       "chars": 63
+      }
+     ]
+    },
+    {
+     "section_no": 3,
+     "section_name": "데이터 변환 , 정리 및 품질",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "c886d4ee512b364e25842e3dbb9d87f028aafb8729a7aa7a7faf551ae8c7ac3f",
+       "chars": 94
+      },
+      {
+       "sha256": "7a294d9828c274744b511a4c3656a07e24269bf2a2681c8360d2ffcc2e00f6e2",
+       "chars": 86
+      }
+     ]
+    },
+    {
+     "section_no": 4,
+     "section_name": "데이터 공유 및 페더레이션",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "8b9d0ba42c9a9765707f720967578ba0ccad3c27c88d183fbbcb76ceec7d082b",
+       "chars": 120
+      },
+      {
+       "sha256": "58d90401258c6abcd53c7565f81ae72809689978f84129a0c2af6bfafc72100c",
+       "chars": 59
+      },
+      {
+       "sha256": "52b228b0858ee7547ca22ee08f37e760756052863a2704b8ac26ee76d9ee5930",
+       "chars": 62
+      }
+     ]
+    },
+    {
+     "section_no": 5,
+     "section_name": "모니터링 및 경고",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "88f198cd7aa81d62017d4ba12ffa64eb2fa5d524b977f506f1b2bd1cbbb4a6f6",
+       "chars": 4
+      },
+      {
+       "sha256": "4175fe443f0422909840dda2f3a63b70e41d95b05ac782d28aa83905835bbd06",
+       "chars": 61
+      },
+      {
+       "sha256": "c76cbaee556701b0c82684826b1798685aac67dd65c7d8f629b716cb76ad8a97",
+       "chars": 45
+      },
+      {
+       "sha256": "e8779baebf5b18c4d791f8e6c13fa2d96d314284d5582bcd398a4367d631ab2f",
+       "chars": 67
+      },
+      {
+       "sha256": "3966af3938caed7584395c921383f755cf1eac3cd9b8401388143cd8c42cce6b",
+       "chars": 58
+      },
+      {
+       "sha256": "6c0f751064e5a1ca0e18ed5bd87d83ec200d1443ed3df1bf540916b904aa8d23",
+       "chars": 2
+      },
+      {
+       "sha256": "868bee41d779fa11b7fbffc370d492e7c3aa6d00e2d2192e40ae8dc96ceac694",
+       "chars": 30
+      },
+      {
+       "sha256": "82a6e7a238ee85c23c62547045ea92e18c0a6ce8c0fbc1f94ba6089484f5611b",
+       "chars": 53
+      }
+     ]
+    },
+    {
+     "section_no": 6,
+     "section_name": "비용 및 성능 최적화",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "ff83def9fd24a408a075a7475d2c24cf08c35f7eb81e3ba73d8d5a393ddd938b",
+       "chars": 68
+      },
+      {
+       "sha256": "26997f1967212b61eb6e9f1aa456b6f1be7589e4992e19054b585795212d9347",
+       "chars": 46
+      },
+      {
+       "sha256": "3d089326898783afb36f1e80d7d7a3346971199d043c6d849ebe59623f006287",
+       "chars": 88
+      },
+      {
+       "sha256": "e6fe910e161d0e2c280fd55c699e1cf34e67aabcc772493815fb3a8625b55367",
+       "chars": 74
+      },
+      {
+       "sha256": "d2b8be8629f9896fff593eb34db74b83aae686de29c9844a79d5bd3a2ca302f7",
+       "chars": 83
+      }
+     ]
+    },
+    {
+     "section_no": 7,
+     "section_name": "데이터 보안 보장 및 준수",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "ac99b11836f75594f40719306bcc274c0164b3ede53f2109548b3efcfdaf9785",
+       "chars": 16
+      },
+      {
+       "sha256": "37b66f8ae00eba37ba456364c5f9e74864b2bef21cb69fd39ece4b756b8db42b",
+       "chars": 65
+      },
+      {
+       "sha256": "7d26183f116aa8ba0156eaa3345035585e54d9596751c06f0f6cbd7ef19f8637",
+       "chars": 46
+      },
+      {
+       "sha256": "c981c0ca51dcce9f4a0237f462abc5199dae9b08945351529bfacea313970707",
+       "chars": 53
+      },
+      {
+       "sha256": "7cfed39ca2e01d40feaa70957f1782227cce0ea440ce3caf895d25dbec2bd026",
+       "chars": 5
+      },
+      {
+       "sha256": "9b0f84bc1fc25c6187a9439b00f132f4cd3b11b827a8ca4b3b98520d87dcdfca",
+       "chars": 73
+      },
+      {
+       "sha256": "78edcfe0ea31853cf6bb0ea598cb7ed8c30722a8bcf98dd5649aeb11d83511e8",
+       "chars": 43
+      }
+     ]
+    },
+    {
+     "section_no": 8,
+     "section_name": "데이터 거버넌스",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "2999fa898136649bc42736643ebc75b5cf65f99b797c27f2168c78943a8769ee",
+       "chars": 59
+      },
+      {
+       "sha256": "96fe5f76ba47b6c8eb3bc3edf42a450c27a90a27b12cac1639012708eeb8a5e4",
+       "chars": 38
+      }
+     ]
+    },
+    {
+     "section_no": 9,
+     "section_name": "디버깅 및 배포",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "b7a17e7db4e2621739732ef3ce41e37743ed013557ef03ca5e892a77730adadd",
+       "chars": 11
+      },
+      {
+       "sha256": "90cab6ac3d54cfef874b536d3017bb830bfc70cd337f1d1e7fda4585089600d1",
+       "chars": 74
+      },
+      {
+       "sha256": "1211884da6f9097aa3f0e4646878119af2a1cb1a6d76d606d2a3403ce4fd7293",
+       "chars": 50
+      },
+      {
+       "sha256": "4336f1a28c8d350fc6d64f42522c14bcf7bd23691d20d8cfa0babd9a05d16712",
+       "chars": 72
+      },
+      {
+       "sha256": "234c7c48580b8d41dbab63600bb716c65b28569d1f7c48aa4a449174f1c69c74",
+       "chars": 37
+      },
+      {
+       "sha256": "82fa76346eb29f60579008a77e8e8017c78257199e7ccc4d6cf670193c6adc86",
+       "chars": 8
+      },
+      {
+       "sha256": "0cf44e0336ff3325311d66649f15499e39bef2263ab4c29cf9224d95c3b3607e",
+       "chars": 60
+      },
+      {
+       "sha256": "a371a429de2c3cfff2459b21548bf6424bf80c0bae8d086d74ec47896d8c315f",
+       "chars": 81
+      }
+     ]
+    },
+    {
+     "section_no": 10,
+     "section_name": "데이터 모델링",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "1a259d6221b6e8ab5ab8a189f7f3f7b61f19199ae8679d05c9ac2b14d041cae3",
+       "chars": 62
+      },
+      {
+       "sha256": "89b8392eeaae5399326a0d819d3e39faa2976c3de3156f55cb4e8fa3dbb0ec0e",
+       "chars": 59
+      },
+      {
+       "sha256": "38c926ef0b94ba2091b6c77ce72a1e540d68345e6eabcbcd75ca4d1319d58efb",
+       "chars": 55
+      },
+      {
+       "sha256": "5cdd00ba7cf529c3b1d00f31cd19a5cbf60795accf08d83c3cf6e616cc722124",
+       "chars": 45
+      }
+     ]
+    }
+   ],
+   "bullet_count": 54
+  },
+  "GEN-A": {
+   "url": "https://databricks.com/sites/default/files/2024-08/databricks-exam-guide-generative-ai-engineer-associate-exam-guide_ko-kr.pdf",
+   "version": "2024-06-01",
+   "guide_sha256": "b0702f52e80cb6759cc183408ffe7f28a44581cf696c929006b6e0d223715614",
+   "sections": [
+    {
+     "section_no": 1,
+     "section_name": "애플리케이션 설계",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "f6d40a07bb324ce480bb404505ee1f2abb8d1f526dcc81d846bb094970287569",
+       "chars": 24
+      },
+      {
+       "sha256": "1445ffd5b050554b68dc6634eed6b736d31b9a8c24d40f13dc5e7bc148f54b98",
+       "chars": 27
+      },
+      {
+       "sha256": "9ebf30181fcffa23cc4e5cffb3cf6455b552c466718a369da2c1a004d4c6348b",
+       "chars": 29
+      },
+      {
+       "sha256": "5e767d0cdca15ea7960848b7ee6bf8a7b40c693f435723b795bd29860b6d3649",
+       "chars": 48
+      },
+      {
+       "sha256": "c8e644c0b5f3715950f1c6b457b140aba5fb9e642d0031842d447f98cb11e3f0",
+       "chars": 39
+      }
+     ]
+    },
+    {
+     "section_no": 2,
+     "section_name": "데이터 준비",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "465c94f10a3118a74da29c9777e72e71ad7c6d60069a87f5d9b4da967fc6829a",
+       "chars": 31
+      },
+      {
+       "sha256": "9ad52d0c32bff15867615a3ecfb0fa1a77794b9cfcca817b0d529f5ab5126014",
+       "chars": 41
+      },
+      {
+       "sha256": "7fab9d67cfddd44273b2572e42ad5bfdb728b95e821bc803fdc044cae06aa5a8",
+       "chars": 51
+      },
+      {
+       "sha256": "3baa2a354e77a6f9956e5268f80f77b573e6356ff9ec53369063c8f72e93ed49",
+       "chars": 62
+      },
+      {
+       "sha256": "73c332170e9c5029e573386896b8bc539d0f29102f3e752be0d2d2ef4dc8a1fd",
+       "chars": 46
+      },
+      {
+       "sha256": "a6db9f0035a20011a156d190254d23f0569c1f7444af4a8b5c98e2c571e71d07",
+       "chars": 27
+      },
+      {
+       "sha256": "02f6bf250072fcab2b4c5398a90c1abf50c6e4d8d328eceffad6c4cb632ef8d5",
+       "chars": 23
+      }
+     ]
+    },
+    {
+     "section_no": 3,
+     "section_name": "애플리케이션 개발",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "f58371d2324447b401b9db9768d8f714e2efc0cbc8ab2b49f3d953346f38d7e9",
+       "chars": 30
+      },
+      {
+       "sha256": "0436784f517723c4cadbd41033d2e8000c549a2f2cba6d590dd8a1d98910cfee",
+       "chars": 39
+      },
+      {
+       "sha256": "99671104819643ede09d5e8cfbe2bf41d4c64ac39b0ceb267ee6c31404893345",
+       "chars": 37
+      },
+      {
+       "sha256": "7172a6d3b55c8401e34d7b1f6e6fb10d09f9f1ba45e79061d08f4aee432c7137",
+       "chars": 37
+      },
+      {
+       "sha256": "c7dcc5060b7067fc49509afcab6188b789b5812964b7c0d4ad7808cddf860e21",
+       "chars": 25
+      },
+      {
+       "sha256": "769101c662d958c21d4b4a80f17922edccdf7c81e6cc7b910a5aaccdadf135c7",
+       "chars": 54
+      },
+      {
+       "sha256": "219874d2bd1e5353b294a48ae1e828951e6a98dec47d1717d0d7330160d49065",
+       "chars": 37
+      },
+      {
+       "sha256": "7916af76a8665a8b1aa8b90362a03346d9a11b47105179d85da6f82e41aac1f4",
+       "chars": 28
+      },
+      {
+       "sha256": "38837382ce6f97a069f03313a850e4dd564b264c9fb6e2b257c0f929cc84f28c",
+       "chars": 31
+      },
+      {
+       "sha256": "84f874764d1daa9d6707a410855c6922d843a14b09198a30044b621fdc595662",
+       "chars": 32
+      },
+      {
+       "sha256": "a7fcb2f25e8bc2cf918e82a3e5886b706677c64533378a6e7622091813c9f451",
+       "chars": 33
+      },
+      {
+       "sha256": "dd5c65d01229423534088c3a33a9ec3d616b890306682f219d65d026e18a5641",
+       "chars": 46
+      },
+      {
+       "sha256": "8cc5885d19f180eb2ba7513675fe0a7e7e715c04543f7ebc720143816c6b29bf",
+       "chars": 57
+      },
+      {
+       "sha256": "015597f12a120798be1bc8f0ff970de1e1e484ef6ed6a7942b38fdac150c7809",
+       "chars": 42
+      }
+     ]
+    },
+    {
+     "section_no": 4,
+     "section_name": "애플리케이션 어셈블링 및 배포",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "b5b9e12f7c151ed50fb5795eb1b62ade3da9fd56c3855a60a7fbf709058ea7fd",
+       "chars": 38
+      },
+      {
+       "sha256": "a5b143a4f2b19dbd4cd86fc641e405b41785dbd1928d8a625f8156f2a58ca8c7",
+       "chars": 26
+      },
+      {
+       "sha256": "5de013513342a4e38b5b02894de9672676ed71cc08b3115959110e739594e08e",
+       "chars": 19
+      },
+      {
+       "sha256": "d6b39aa9039177e6685e4cfeca35ff0ea94be6a84fcb411054d5003952e90159",
+       "chars": 22
+      },
+      {
+       "sha256": "3438cc08d7f92fc0f987b3e2c3dba6c0f0dfcda41dc5dd75822f93236810a93d",
+       "chars": 84
+      },
+      {
+       "sha256": "3599e073b339f26b94953f077c31833f89e73e06b391ea2a0d7d283d9ebc05ee",
+       "chars": 35
+      },
+      {
+       "sha256": "cd60a0652e7748b9e98ec880d23fd1dd9d7c654133299064daf3f7200ded51ce",
+       "chars": 45
+      },
+      {
+       "sha256": "1bf22943cc2fb9fd48514669cd847f55649999d0b34526319c5f0d8be3b5c6ad",
+       "chars": 17
+      },
+      {
+       "sha256": "36d6cf7c048e9f3698d4a344f056f45427f6981ed6995fc322ee5fe24d064756",
+       "chars": 56
+      },
+      {
+       "sha256": "9c70dc7d9889d8f6a386dcd74d0a8b355dd12c0e5ab3b3c1c92eb8c8ea2cab41",
+       "chars": 33
+      }
+     ]
+    },
+    {
+     "section_no": 5,
+     "section_name": "거버넌스",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "c37e256be958235b2fcfd942c979e35e031e459724d84cb5c7a1a7b853edfd67",
+       "chars": 31
+      },
+      {
+       "sha256": "22904716680b62d556efe44ea8c06b27e00e3d3229c5129527565fabe8eeab20",
+       "chars": 49
+      },
+      {
+       "sha256": "7180176c4d6145d94daa377bdd31914bb36db8e586cb15c1741cc614fce621f0",
+       "chars": 50
+      },
+      {
+       "sha256": "649c21fb91d6dd78b58a87e82ad18f6bbaaec3ecbaf43510de739c563adffdbc",
+       "chars": 41
+      }
+     ]
+    },
+    {
+     "section_no": 6,
+     "section_name": "평가 및 모니터링",
+     "weight": null,
+     "bullets": [
+      {
+       "sha256": "8566ac2cf25b9ebb954bf21ebb925333977fe30e3ab6d6b2aa3e04a0ce9aa121",
+       "chars": 40
+      },
+      {
+       "sha256": "2bc028dbfc30ed1b15bb1a8f5e84903b96202f0f75aa8f5a0d87a54623f99426",
+       "chars": 31
+      },
+      {
+       "sha256": "62cce95ef98662f7a5ea42eeb10905ee3376d8955b63ed14427b7da2afd17e41",
+       "chars": 34
+      },
+      {
+       "sha256": "19955502f2750f31dec2b326d2035dde14393803bfc45354427ad09f37745aa0",
+       "chars": 32
+      },
+      {
+       "sha256": "9dbb8decc3f8682fcfe73711ab3ff3f298ea1bba89c69641fdb19583e6f8db7b",
+       "chars": 41
+      }
+     ]
+    }
+   ],
+   "bullet_count": 45
+  }
+ }
+}

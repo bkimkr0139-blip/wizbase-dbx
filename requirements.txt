@@ -1,0 +1,9 @@
+# 서버 실행(필수)
+fastapi==0.115.0
+uvicorn==0.30.6
+pydantic==2.9.2
+duckdb==2.0.0
+sqlglot>=30
+PyYAML>=6
+# 공식 가이드 PDF 목록 재생성 도구(tools/)를 쓸 때만
+pypdf>=5
