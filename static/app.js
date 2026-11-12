@@ -129,7 +129,7 @@ async function render(soft) {
 
 /* ------------------------------------------------------------ 메뉴 바 (Windows 표준 앱 스타일: 드롭다운 목록 + 단축키) */
 const UA_APP = /DBXDesktop\/([\d.]+)/.exec(navigator.userAgent || "");
-const IS_APP = !!UA_APP, APP_VER = UA_APP ? UA_APP[1] : "", IS_SA = /DBXDesktop\/[\d.]+ Standalone/.test(navigator.userAgent || "");
+const IS_APP = !!UA_APP, APP_VER = UA_APP ? UA_APP[1] : "", IS_MACOS = /Mac/.test(navigator.platform || "") && !/iPhone|iPad/.test(navigator.userAgent || ""), IS_SA = /DBXDesktop\/[\d.]+ Standalone/.test(navigator.userAgent || "");
 let MENUOPEN = -1, UPD_SHOWN = "", POLL = null;
 function menuModel() {
   const stf = staff(), adm = ME?.role === "admin";
@@ -145,7 +145,7 @@ function menuModel() {
       { label: "시스템 정보", key: "Alt+Shift+I", a: "sysinfo" },
       ...(IS_APP || ME?.role !== "admin" ? [] : [{ label: "시스템문서.md 다운로드", key: "Alt+Shift+D", a: "sysdoc" }]),
       { sep: 1 },
-      ...(IS_APP ? [{ label: "이 앱 정보", a: "appinfo" }] : [{ label: "Windows 설치형 앱 다운로드", a: "appdl" }])
+      ...(IS_APP ? [{ label: "이 앱 정보", a: "appinfo" }] : [{ label: IS_MACOS ? "Mac 설치형 앱 다운로드" : "Windows 설치형 앱 다운로드", a: "appdl" }])
     ]
   });
   ms.forEach(m => { let n = 0; m.items.forEach(i => { if (!i.sep) i.no = ++n }) });
@@ -208,7 +208,7 @@ async function pollUpdate(manual) {
 function updateCardHtml(u, shell) {
   const parts = [];
   if (u.update_available) parts.push(`<div class="updbox"><b>사이트가 업데이트되었습니다</b> (서버 v${esc(u.server_version)} · 빌드 <code>${esc(u.server_build)}</code>)<div class="sub">지금 적용하면 화면을 새로 불러와 최신 기능을 사용합니다. 진행 중 입력은 저장 후 적용하세요.</div><p><button class="primary" data-a="sysreload">지금 적용</button> <button data-a="syspopclose">나중에</button></p></div>`);
-  if (shell && IS_SA) parts.push(`<div class="updbox"><b>새 버전 ${esc(u.app.latest_version || "")}이(가) 있습니다</b> (현재 ${esc(APP_VER)})<div class="sub">운영자 서버에서 새 설치 파일을 내려받아 교체합니다. <b>내 학습 데이터는 유지</b>되며 완료되면 앱이 다시 시작됩니다.</div><p><button class="primary" data-a="appupdate">지금 업데이트</button> <button data-a="syspopclose">나중에</button></p></div>`);
+  if (shell && IS_SA) parts.push(`<div class="updbox"><b>${u.app.kind === "pack" ? "기능 업데이트" : "새 버전"} ${esc(u.app.latest_version || "")}이(가) 있습니다</b> (현재 ${esc(APP_VER)})<div class="sub">${u.app.kind === "pack" ? `필요한 부분만 내려받아(약 ${Math.max(1, Math.round((u.app.size || 0) / 1024))}KB) 적용하고 앱을 자동으로 다시 시작합니다.` : "운영자 서버에서 새 설치 파일을 내려받아 교체합니다."} <b>내 학습 데이터는 유지</b>됩니다.</div><p><button class="primary" data-a="appupdate">지금 업데이트</button> <button data-a="syspopclose">나중에</button></p></div>`);
   else if (shell) parts.push(`<div class="updbox"><b>PC 앱 새 버전 ${esc(u.app.shell_version)}</b> (현재 ${esc(APP_VER)})<div class="sub">앱 자체(실행 파일)가 갱신되었습니다. 내려받아 실행하면 기존 앱을 교체 설치합니다.</div><p><button class="primary" data-a="appdl">새 버전 내려받기</button> <button data-a="syspopclose">나중에</button></p></div>`);
   return `<h3 style="margin-top:0">업데이트 알림</h3>${parts.join("")}`;
 }
@@ -326,8 +326,10 @@ function renderLogin(app) {
   app.innerHTML = `<div class="loginwrap"><div class="hero"><div class="brand big"><img class="logobig" src="/static/logo.png" alt="wizbase"><div><span>DBX Project Rehearsal</span></div></div><h1>Databricks 현장 PoC,<br>실전 전에 리허설하다.</h1><p>권한·데이터·파이프라인·승인·배포까지 실제 작업 순서대로 훈련하고, 모든 결과를 증거로 남기는 글로벌 AX 프로젝트용 시뮬레이터.</p>
     <ul><li>단계별 AI 지원과 바로가기</li><li>입력에 따라 달라지는 실행 결과 (고정 성공 없음)</li><li>모의·로컬 실행·실제 검증을 구분하는 증거 보고서</li></ul></div>
     <div class="lcard"><h2>로그인</h2><div class="sub">교육 역할과 DBX 권한은 별도 모델입니다.</div><label>이름 <small>(필수 · 실명)</small></label><input id="ln" maxlength="40" placeholder="실명을 입력하세요 (예: 홍길동)" autocomplete="name" onkeydown="if(event.key==='Enter')H.login()"><label>역할</label><select id="lr"><option value="learner">학습자 — 코드 불필요</option><option value="admin">admin — 수퍼유저 (UC 관리자·시스템 문서·피드백 관리)</option><option value="reviewer">리뷰어 / 승인자</option><option value="instructor">강사</option></select><label>접근 코드 <small>(admin·검토자·강사 — 역할별 별도 코드)</small></label><input id="lc" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')H.login()"><button class="primary wide" data-a="login">시작하기</button><div id="lerr" class="bad"></div>
-    ${IS_APP ? "" : `<div class="dlbox" id="dlbox"><b>Windows 설치형 앱 (권장)</b><div class="mute">내 PC에서 단독으로 실행됩니다. 서버가 앱 안에 들어 있어 접속자가 많아도 느려지지 않고, 운영자 PC가 꺼져 있어도 학습할 수 있습니다. 학습 데이터는 내 PC에만 저장됩니다.</div><button class="primary" data-a="appdl" data-k="standalone">단독 설치형 다운로드 (.exe)</button><div class="mute" id="dlinfo"></div><div class="mute" style="margin-top:8px">설치가 어렵다면 위 로그인으로 웹에서 체험할 수도 있습니다(운영자 PC 상태에 따라 느리거나 접속이 안 될 수 있음).</div></div>`}<div class="fine">WIZBASE 교육 환경 · Databricks 공식 제품·인증·교육과정이 아님 · 합성 데이터 전용</div></div></div>`;
-  if (!IS_APP) fetch("/api/app/manifest").then(r => r.json()).then(m => { const e = $("#dlinfo"), b = $("#dlbox"), sa = m.standalone || {}; if (!sa.available && b) { b.querySelector("button").disabled = true; if (e) e.textContent = "설치 파일을 준비 중입니다." } else if (e) e.textContent = `버전 ${sa.version} · ${(sa.size / 1048576).toFixed(0)} MB · Windows 10/11 64비트 · 코드 서명이 없어 처음 실행 시 SmartScreen 경고가 표시될 수 있습니다.` }).catch(() => { });
+    ${IS_APP ? "" : `<div class="dlbox" id="dlbox"><b>${IS_MACOS ? "Mac" : "Windows"} 설치형 앱 (권장)</b><div class="mute">내 PC에서 단독으로 실행됩니다. 서버가 앱 안에 들어 있어 접속자가 많아도 느려지지 않고, 운영자 PC가 꺼져 있어도 학습할 수 있습니다. 학습 데이터는 내 PC에만 저장됩니다.</div>${IS_MACOS ? `<button class="primary" data-a="appdl" data-k="mac-arm64">Apple Silicon 용 다운로드 (M1 이상)</button> <button data-a="appdl" data-k="mac-x64">Intel Mac 용</button>` : `<button class="primary" data-a="appdl" data-k="standalone">단독 설치형 다운로드 (.exe)</button>`}<div class="mute" id="dlinfo"></div><div class="mute" style="margin-top:8px">${IS_MACOS ? "Windows용은 Windows PC에서 같은 주소로 받으세요. " : "Mac용은 Mac에서 같은 주소로 받으세요. "}설치가 어렵다면 위 로그인으로 웹에서 체험할 수도 있습니다(운영자 PC 상태에 따라 느리거나 접속이 안 될 수 있음).</div></div>`}<div class="fine">WIZBASE 교육 환경 · Databricks 공식 제품·인증·교육과정이 아님 · 합성 데이터 전용</div></div></div>`;
+  if (!IS_APP) fetch("/api/app/manifest").then(r => r.json()).then(m => { const e = $("#dlinfo"), b = $("#dlbox"); const L = IS_MACOS ? [["Apple Silicon", m.mac_arm64], ["Intel", m.mac_x64]] : [["Windows", m.standalone]];
+    const ok = L.filter(([, x]) => x && x.available); if (!ok.length && b) { b.querySelectorAll("button").forEach(x => x.disabled = true); if (e) e.textContent = "설치 파일을 준비 중입니다." }
+    else if (e) e.textContent = ok.map(([n, x]) => `${n}: 버전 ${x.version} · ${(x.size / 1048576).toFixed(0)} MB`).join(" / ") + (IS_MACOS ? " · 코드 서명이 없어 처음 실행 시 우클릭 > 열기가 필요합니다." : " · Windows 10/11 64비트 · 코드 서명이 없어 처음 실행 시 SmartScreen 경고가 표시될 수 있습니다.") }).catch(() => { });
 }
 document.addEventListener("click", async ev => {
   if (MENUOPEN >= 0 && !ev.target.closest(".menubar")) menuSet(-1);
@@ -384,10 +386,14 @@ window.H = {
     SYSPOP = `<h3 style="margin-top:0">단축키 안내</h3>${table(["키", "동작"], [["F10", "메뉴 바 활성화(첫 메뉴 열기)"], ["Alt + 1 ~ 7", "해당 번호의 메뉴 열기/닫기 (7 = 도움말)"], ["↑ ↓ ← →", "열린 메뉴 안에서 항목·메뉴 이동"], ["숫자 1 ~ 9", "열린 메뉴의 해당 번호 항목 실행"], ["Enter / Esc", "항목 실행 / 메뉴 닫기"], ["F1", "사용 안내(HELP) 열기·닫기"], ["Alt + Shift + A", "AI 지원"], ["Alt + Shift + F", "피드백 보내기(AXOS 탭)"], ["Alt + Shift + U", "업데이트 확인"], ["Alt + Shift + I", "시스템 정보"], ["Alt + Shift + K", "단축키 안내"], ...(IS_APP || ME?.role !== "admin" ? [] : [["Alt + Shift + D", "시스템문서.md 다운로드(admin)"]])])}`; render(true)
   },
   appdl(d) {
-    const sa = !d || d.k !== "shell"; const url = sa ? "/download/standalone" : "/download/app", fn = sa ? "WIZBASE-DBX-Standalone.exe" : "WIZBASE-DBX-Rehearsal.exe";
+    const MAP = { standalone: ["/download/standalone", "WIZBASE-DBX-Standalone.exe"], shell: ["/download/app", "WIZBASE-DBX-Rehearsal.exe"], "mac-arm64": ["/download/standalone-mac-arm64", "WIZBASE-DBX-Standalone-mac-arm64.zip"], "mac-x64": ["/download/standalone-mac-x64", "WIZBASE-DBX-Standalone-mac-x64.zip"] };
     if (IS_SA) { H.appupdate(); return }
-    if (IS_APP && window.pywebview?.api?.open_external) { window.pywebview.api.open_external(location.origin + url); return }
-    const a = document.createElement("a"); a.href = url; a.download = fn; document.body.appendChild(a); a.click(); a.remove(); log("Windows 앱 내려받기를 시작했습니다.");
+    if (IS_MACOS && (!d || !d.k)) {   // 메뉴에서 눌렀을 때: Mac은 CPU 종류를 고르게 한다
+      SYSPOP = `<h3 style="margin-top:0">Mac 설치형 앱 다운로드</h3><p>사용 중인 Mac의 CPU를 선택하세요. (  메뉴 > 이 Mac에 관하여 에서 확인: "칩 Apple M…"이면 Apple Silicon, "프로세서 Intel…"이면 Intel)</p><p><button class="primary" data-a="appdl" data-k="mac-arm64">Apple Silicon (M1 이상)</button> <button data-a="appdl" data-k="mac-x64">Intel Mac</button></p><div class="sub">내려받은 zip을 풀고 "WIZBASE DBX Rehearsal"을 응용 프로그램 폴더로 옮긴 뒤, 처음에는 우클릭 > 열기로 실행하세요(서명되지 않은 앱이라 보안 경고가 표시됩니다).</div>`; render(true); return
+    }
+    const [url, fn] = MAP[(d && d.k) || "standalone"] || MAP.standalone;
+    SYSPOP = ""; if (IS_APP && window.pywebview?.api?.open_external) { window.pywebview.api.open_external(location.origin + url); return }
+    const a = document.createElement("a"); a.href = url; a.download = fn; document.body.appendChild(a); a.click(); a.remove(); log("설치 파일 내려받기를 시작했습니다.");
   },
   async appupdate() {
     const api_ = window.pywebview?.api; if (!api_) { toast("앱 안에서만 업데이트할 수 있습니다."); return }

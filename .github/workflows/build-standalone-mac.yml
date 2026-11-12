@@ -1,0 +1,26 @@
+# macOS 단독 설치형 빌드 — Actions 탭에서 "Run workflow" 로 수동 실행 → Artifacts 의 zip 을 받아 운영 서버 dist_app/release/ 에 복사
+name: build-standalone-mac
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14        # Apple Silicon (arm64)
+            arch: arm64
+          - os: macos-15-intel  # Intel (x64) — 러너 라벨이 없으면 이 항목만 실패하며 arm64 결과에는 영향 없음
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements.txt pywebview pyinstaller
+      - run: python tools/build_standalone_mac.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WIZBASE-DBX-Standalone-mac-${{ matrix.arch }}
+          path: dist_app/release/WIZBASE-DBX-Standalone-mac-*.zip

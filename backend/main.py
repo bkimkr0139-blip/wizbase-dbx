@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import core, v11, v11_ext, guide, labs, transfer, ko_guide, sysinfo, feedback
+from . import pack as pack_mod
 from . import content as C
 from .core import ApiError
 
@@ -1030,6 +1031,30 @@ async def fb_intake(request: Request):
 @app.get("/api/feedback/intake/{fid}")
 def fb_intake_status(fid: str, receipt: str = ""):
     return feedback.intake_status(fid, receipt)
+
+
+@app.get("/download/pack")
+def download_pack():
+    from fastapi.responses import Response
+    data, mf = pack_mod.build(sysinfo.VERSION, sysinfo.STANDALONE_COMPAT, sysinfo.ROOT)
+    return Response(data, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="dbx-pack-{mf["content_id"]}.zip"', "Cache-Control": "no-store"})
+
+
+@app.get("/download/standalone-mac-arm64")
+def download_mac_arm64():
+    return _mac_file("mac_arm64")
+
+
+@app.get("/download/standalone-mac-x64")
+def download_mac_x64():
+    return _mac_file("mac_x64")
+
+
+def _mac_file(k):
+    f = sysinfo.MAC_FILES[k]
+    if not f.is_file():
+        raise ApiError(404, "APP_NOT_BUILT", "Mac용 설치 파일이 아직 준비되지 않았습니다.")
+    return FileResponse(str(f), media_type="application/zip", filename=f.name)
 
 
 @app.get("/download/standalone")

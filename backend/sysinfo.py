@@ -3,17 +3,19 @@ from __future__ import annotations
 import hashlib, os, platform, time
 from pathlib import Path
 
-from . import core, labs, transfer, v11
+from . import core, labs, pack, transfer, v11
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.4.3"
+VERSION = "0.4.4"
 RELEASED = "2026-11-12"
 SHELL_VERSION = "0.1.1"  # PC 앱(desktop/dbx_app.py APP_VERSION)의 최신 버전 — 새 exe를 배포할 때 함께 올린다
 APP_FILE = ROOT / "dist_app" / "release" / "WIZBASE-DBX-Rehearsal.exe"
 VERSION_POLICY = ("버전 규칙(MAJOR.MINOR.PATCH): 정식 서비스 전에는 MAJOR=0. 버그 수정은 어떤 자리도 올리지 않는다. 소규모 기능 추가는 PATCH(마지막 숫자), "
                   "주요 개선은 MINOR(가운데 숫자)를 올린다. 정식 서비스 전환은 운영자(WIZBASE)가 판단해 MAJOR를 1로 올린다(자동으로 올리지 않음). 현재 0.4.2이며 다음 기능 추가는 0.4.3. "
                   "PC 앱(exe)은 앱 자체가 바뀔 때만 별도 버전(SHELL_VERSION)을 올린다.")
+STANDALONE_COMPAT = 1  # 팩으로 갱신 가능한 범위의 호환 번호 — 새 라이브러리 추가·앱 껍데기 변경 등 팩으로 불가능한 변경 시 올리고 exe를 다시 빌드한다
 STANDALONE_FILE = ROOT / "dist_app" / "release" / "WIZBASE-DBX-Standalone.exe"
+MAC_FILES = {"mac_arm64": ROOT / "dist_app" / "release" / "WIZBASE-DBX-Standalone-mac-arm64.zip", "mac_x64": ROOT / "dist_app" / "release" / "WIZBASE-DBX-Standalone-mac-x64.zip"}
 STARTED = time.time()
 _SHA: dict = {}
 _CENTRAL: dict = {"t": 0.0, "v": None}
@@ -45,6 +47,8 @@ def central_manifest():
 PURPOSE = ("WIZBASE(Databricks 파트너)의 실제 PoC 준비와 파트너 레벨 상향을 위한 인증 시험 준비를 지원하는 교육·훈련 환경. "
            "Databricks 공식 제품·교육·시험이 아니며 합격·자격·투입을 보증하지 않음.")
 CHANGELOG = [
+    {"version": "0.4.4", "date": "2026-11-12", "notes": ["단독 설치형 '콘텐츠 팩' 업데이트 — 화면·서버 코드 변경은 exe 재빌드 없이 작은 파일(수백 KB)로 내려받아 적용(SHA-256·파일별 해시 검증, 문제 시 자동 복구)",
+                                                      "macOS 단독 설치형 앱 추가(Apple Silicon·Intel, .app) — 빌드는 Mac 또는 GitHub Actions에서 수행", "UI-01 기준 프로필을 읽기 쉬운 표로 표시"]},
     {"version": "0.4.3", "date": "2026-11-12", "notes": ["Windows 단독 설치형 앱 추가 — 서버·데이터베이스가 앱 안에 포함되어 내 PC에서 단독 실행(인터넷·운영자 PC 없이 학습 가능, 학습 데이터는 내 PC에만 저장)",
                                                       "단독형 업데이트: 운영자 서버에 새 설치 파일이 있으면 알림 → 선택 시 내려받아(SHA-256 검증) 교체, 학습 데이터 유지", "단독형 AXOS 피드백: 인터넷 연결 시 운영자 개발큐로 전달·처리 상태 반영(오프라인이면 보류 후 자동 전송)",
                                                       "AI 지원 채팅창을 열면 처음부터 보이도록 스크롤 개선"]},
@@ -103,17 +107,35 @@ def app_manifest():
     return {"shell_version": SHELL_VERSION, "available": ok, "size": APP_FILE.stat().st_size if ok else 0, "filename": APP_FILE.name,
             "sha256": _sha(APP_FILE) if ok else "", "download": "/download/app", "server_version": VERSION, "server_build": build_id(),
             "standalone": {"available": sa, "version": VERSION, "size": STANDALONE_FILE.stat().st_size if sa else 0, "filename": STANDALONE_FILE.name,
-                           "sha256": _sha(STANDALONE_FILE) if sa else "", "download": "/download/standalone"}}
+                           "sha256": _sha(STANDALONE_FILE) if sa else "", "download": "/download/standalone", "compat": STANDALONE_COMPAT},
+            "pack": pack_info(), **{k: {"available": f.is_file(), "version": VERSION, "size": f.stat().st_size if f.is_file() else 0, "filename": f.name, "sha256": _sha(f) if f.is_file() else "",
+                                        "download": "/download/standalone-" + k.replace("_", "-"), "compat": STANDALONE_COMPAT} for k, f in MAC_FILES.items()}}
+
+
+def pack_info():
+    """콘텐츠 팩(화면+서버 코드 업데이트 파일) 정보 — 저장소 파일에서 즉석 생성되므로 재빌드 없이 최신 상태가 반영된다."""
+    if standalone():
+        return {"available": False}
+    data, mf = pack.build(VERSION, STANDALONE_COMPAT, ROOT)
+    return {"available": True, "content_id": mf["content_id"], "version": VERSION, "size": mf["size"], "sha256": mf["sha256"], "compat": STANDALONE_COMPAT, "download": "/download/pack"}
 
 
 def update_check(client_build):
     cur = build_id()
     if standalone():  # 단독형: 화면 자산은 앱에 포함 — 갱신은 운영자 서버의 새 설치 파일 유무로 판단
         rm = central_manifest()
-        sa = (rm or {}).get("standalone") or {}
-        mine = os.environ.get("DBX_EXE_SHA", "")
-        app = {"shell_version": VERSION, "standalone": True, "offline": rm is None, "latest_version": sa.get("version", ""), "update_available": bool(sa.get("available") and mine and sa.get("sha256") != mine),
-               "size": sa.get("size", 0)}
+        sa = (rm or {}).get("standalone" if os.environ.get("DBX_PLATFORM", "win") == "win" else os.environ["DBX_PLATFORM"]) or {}   # 내 플랫폼의 설치 파일 항목
+        pk = (rm or {}).get("pack") or {}
+        mine_compat = int(os.environ.get("DBX_EXE_COMPAT", "0") or 0)
+        cur = os.environ.get("DBX_CONTENT_ID", "")
+        kind, size, latest = "", 0, ""
+        if rm and sa.get("available") and mine_compat and int(sa.get("compat", 0)) != mine_compat:
+            kind, size, latest = "exe", sa.get("size", 0), sa.get("version", "")      # 앱 자체(exe) 교체가 필요한 변경
+        elif rm and pk.get("available") and pk.get("content_id") != cur and int(pk.get("compat", 0)) == mine_compat:
+            kind, size, latest = "pack", pk.get("size", 0), pk.get("version", "")     # 화면·서버 코드만 교체(작은 파일)
+        elif rm and not mine_compat and sa.get("available") and sa.get("sha256") != os.environ.get("DBX_EXE_SHA", "~"):
+            kind, size, latest = "exe", sa.get("size", 0), sa.get("version", "")      # 구형 앱(호환 정보 없음)은 전체 교체
+        app = {"shell_version": VERSION, "standalone": True, "offline": rm is None, "latest_version": latest, "update_available": bool(kind), "kind": kind, "size": size}
         return {"server_version": VERSION, "server_build": cur, "client_build": client_build, "update_available": False, "changelog": CHANGELOG[:3], "app": app,
                 "how": "단독 설치형은 운영자 서버에 새 설치 파일이 올라오면 알림을 표시하고, 선택하면 내려받아 교체합니다(내 학습 데이터는 유지)."}
     return {"server_version": VERSION, "server_build": cur, "client_build": client_build, "update_available": bool(client_build) and client_build != cur, "changelog": CHANGELOG[:3], "app": app_manifest(),
@@ -146,7 +168,7 @@ def system_document():
           "6. **세션 관리(UI-01)**: 세션 목록에 사용자명·사용자 ID(admin)·생성 일시·최종 작업 일시(KST)를 표시. 본인 세션은 선택 삭제 가능, admin은 전체 세션 선택 삭제(삭제 전 확인, 되돌릴 수 없음, 감사 로그 기록). 로그인 시 **이름(실명) 입력 필수**(2자 이상, '학습자' 등 기본값 불가). **세션 소유자는 이름이 아니라 로그인마다 새로 발급되는 사용자 ID**이므로 이름이 같아도 세션은 공유·연결되지 않으며(웹↔단독형, 웹 재로그인 포함), 로그아웃·재로그인하거나 브라우저·PC를 바꾸면 이전 세션은 '내 세션'에 보이지 않는다(비밀번호가 없어 이름만으로 연결하면 타인이 기록을 볼 수 있기 때문). 이어 쓰려면 로그아웃하지 않고 같은 브라우저를 사용한다.",
           "6-1. **AXOS 피드백 폐루프**: 사용자는 우측 AXOS 탭에서 기능 추가·화면 버그·기능 개선·DBX 불일치 오류·문항/자료 오류·기타를 제출(텍스트 + PNG/JPEG/GIF/WEBP 최대 5장·장당 3MB, 붙여넣기·끌어놓기 지원). 화면·버전·빌드·클라이언트(웹/PC 앱)가 자동 첨부됨. 상태: 접수 → 검토·승인 → 개발큐 → 개발중 → 반영완료(반려·보류는 사유 필수, 제출자에게 표시). 개발큐로 옮기면 **개발 지시서**(대상 화면·후보 파일·완료 기준)가 자동 생성되고 `개발큐.md`로 내려받아 개발 입력으로 사용. 반영완료 시 반영 버전을 기록하고 제출자에게 알림. **관리(전이·이미지 열람·큐)는 admin만**, 제출자는 본인 건의 상태만 조회. 개발 자체는 자동 실행이 아니라 개발큐를 입력으로 운영자가 수행.",
           "7. **전이 도메인 신청**: 원하는 산업 도메인(목적·필요 데이터·심어 둘 문제·희망 시기)을 AXOS 탭에서 신청하면 다른 피드백과 같은 폐루프(접수 → 검토·승인 → 개발큐 → 개발중 → 반영완료)로 관리되며 이메일은 보내지 않음. 합성 데이터 요청만 받음.",
-          f"8. **Windows 앱 2종**: ① **단독 설치형(권장)** — 서버(FastAPI)와 DuckDB가 앱 안에 포함되어 내 PC(127.0.0.1)에서만 실행. 학습 데이터는 `%LOCALAPPDATA%\\WIZBASE\\DBXRehearsal-Standalone\\data`에 저장되며 인터넷·운영자 PC가 없어도 학습 가능. 인터넷이 연결되면 새 설치 파일 확인(알림 → 선택 시 내려받아 SHA-256 검증 후 교체, 데이터 유지)과 AXOS 피드백 전달(운영자 개발큐 접수·처리 상태 반영, 오프라인이면 보류 후 자동 전송)이 이루어짐. admin 기능·시스템 문서는 포함되지 않고 접근 코드는 PC마다 무작위 생성. ② **접속형** — 운영자 서버 사이트를 PC 창으로 여는 앱(서버 부하·오프라인 제약은 웹과 동일).\n          8-1. **Windows PC 앱(접속형)**(현재 {SHELL_VERSION}): 시작 화면에서 내려받는 설치용 exe(WebView2, Windows 10/11 64비트, 코드 서명 없음 — SmartScreen 경고 가능). 사이트가 갱신되면 적용 여부 알림, 앱 신버전도 알림. 시스템 문서는 포함되지 않으며 서버도 앱 요청에는 문서를 내주지 않음.",
+          f"8. **설치형 앱(Windows·macOS)**: ① **단독 설치형(권장, Windows .exe / macOS .app)** — 서버(FastAPI)와 DuckDB가 앱 안에 포함되어 내 PC(127.0.0.1)에서만 실행. 학습 데이터는 `%LOCALAPPDATA%\\WIZBASE\\DBXRehearsal-Standalone\\data`에 저장되며 인터넷·운영자 PC가 없어도 학습 가능. 인터넷이 연결되면 업데이트 확인(알림 → 선택 시 적용, 데이터 유지)과 AXOS 피드백 전달(운영자 개발큐 접수·처리 상태 반영, 오프라인이면 보류 후 자동 전송)이 이루어짐. **업데이트는 두 종류**: (가) **콘텐츠 팩**(화면·서버 코드 변경, 수백 KB, 재빌드 불필요 — 운영 서버가 저장소 파일에서 즉석 생성, 앱이 내려받아 SHA-256과 파일별 해시를 검증해 `overlay/current`에 두고 자동 재시작, 새 팩이 서버를 못 띄우면 자동으로 폐기하고 내장 버전으로 복구), (나) **앱 전체 교체**(새 라이브러리·앱 껍데기 변경 시 `STANDALONE_COMPAT`가 바뀐 경우: Windows는 내려받아 SHA-256 검증 후 교체, macOS는 새 .app 다운로드 후 사용자가 교체). macOS 앱은 Apple Silicon·Intel 별도 빌드, 코드 서명·공증이 없어 처음에는 우클릭 > 열기가 필요. admin 기능·시스템 문서는 포함되지 않고 접근 코드는 PC마다 무작위 생성. ② **접속형** — 운영자 서버 사이트를 PC 창으로 여는 앱(서버 부하·오프라인 제약은 웹과 동일).\n          8-1. **Windows PC 앱(접속형)**(현재 {SHELL_VERSION}): 시작 화면에서 내려받는 설치용 exe(WebView2, Windows 10/11 64비트, 코드 서명 없음 — SmartScreen 경고 가능). 사이트가 갱신되면 적용 여부 알림, 앱 신버전도 알림. 시스템 문서는 포함되지 않으며 서버도 앱 요청에는 문서를 내주지 않음.",
           "9. **거버넌스**: 투입 승인(본인 승인 금지·만료), Academy 이력 확인대기, 개인정보 열람/삭제, 감사 로그.", "",
           "## 4. 역할", "", "| 역할 | 권한 |", "|---|---|", "| learner | 본인 세션(선택 삭제 가능)·실습·시험 |", "| instructor | 강사: 정답표·수료·검토 (admin 고유 기능 접근 불가) |",
           "| reviewer | 검토자(위즈베이스 DB 컨설턴트): 검수·재확인·대조표 |", "| admin | **수퍼유저**: 시스템 문서, 피드백 관리·개발큐, 도메인 신청 포함 모든 요구사항·피드백 관리 (별도 admin 접근 코드 필요 — staff·instructor 코드로는 로그인 불가) |", "",
@@ -154,12 +176,13 @@ def system_document():
           "- 외부 공개: `https://dbx.wizbase.ai.kr`(nginx + Let's Encrypt, frp 터널). 로컬 포트 8830. 단독 설치형은 사용자 PC의 127.0.0.1:18830에서 자체 서버 실행.",
           "- 소스 저장소: `https://github.com/bkimkr0139-blip/wizbase-dbx`(공개 저장소 — 접근 코드·세션 데이터·설치 파일은 제외). 다른 PC에서 `git clone` → `start_server.bat`로 로컬 서버를 띄우고, 운영자가 별도 전달한 접근 코드 파일을 `data\\.staff_codes.json`으로 두거나 환경변수 `DBX_CODES_FILE`로 지정하면 admin 기능을 사용할 수 있다(그 PC에만 데이터가 생기며 운영 서버와 별개). 운영 서버의 admin 기능은 어느 PC에서든 사이트에 admin 코드로 로그인해 사용.",
           "- 접근 코드: admin·staff·instructor 3종(서로 달라야 함). 우선순위: 환경변수(`DBX_ADMIN_CODE`/`DBX_STAFF_CODE`/`DBX_INSTRUCTOR_CODE`) > 코드 파일(`DBX_CODES_FILE` 또는 `data/.staff_codes.json`) > 최초 실행 시 무작위 생성. 전달받은 파일은 서버가 수정하지 않음.",
-          "- 중앙 서버 연계 API: `/api/app/manifest`(배포 정보), `/download/standalone`·`/download/app`, `/api/feedback/intake`(단독형 피드백 접수, 비로그인·한도 있음), `/api/feedback/intake/{id}?receipt=`(처리 상태 조회).",
+          "- 중앙 서버 연계 API: `/api/app/manifest`(배포 정보), `/download/standalone`·`/download/standalone-mac-arm64`·`/download/standalone-mac-x64`·`/download/pack`·`/download/app`, `/api/feedback/intake`(단독형 피드백 접수, 비로그인·한도 있음), `/api/feedback/intake/{id}?receipt=`(처리 상태 조회).",
           "- 주요 API: `/api/feedback/*`(제출·내역은 로그인 사용자, 관리·큐·이미지는 admin), `/api/app/manifest`, `/download/app`, `/api/system/*`, `/api/ko-guide`, `/api/transfer-seeds`, `/api/collab/*`, `/api/verification-matrix`, `/api/objectives`, `/api/items`.", "",
           "## 6. 한계와 미완료(숨기지 않음)", "",
           "- 실제 Databricks 워크스페이스 대조는 컨설턴트의 직접 수행이 필요(WORKSPACE_CHECKED·DBX_VERIFIED는 기록 전까지 0).",
           "- 문항·목표의 인간 검수, 파일럿(12명 이상) 미수행. 한국어 DE-P·GEN-A 가이드는 영문 최신본과 다른 이전 버전(참고용).",
           "- 로그인에 비밀번호·개인 PIN이 없어 사용자 식별은 로그인 단위이며, 개인 계정·세션 이어쓰기(PIN, 내보내기/가져오기)는 미구현.",
+          "- macOS 앱은 이 개발 환경(Windows)에서 빌드·시험하지 못해 Mac 또는 GitHub Actions(`build-standalone-mac`)에서 빌드해야 하며, 실제 Mac 실행은 미검증. 콘텐츠 팩은 새 라이브러리 추가·앱 껍데기 변경을 담을 수 없음(앱 전체 교체 필요).",
           "- 단독 설치형: 업데이트·피드백 전달은 운영자 서버가 켜져 있고 인터넷이 연결될 때만 가능. 설치 파일은 약 46MB, 코드 서명 없음(SmartScreen 경고 가능). 단독형은 PC별 데이터가 분리되어 사용자 간 협업 기능(팀)·중앙 검토는 이용할 수 없음.",
           "- 피드백 → 개발은 자동 개발이 아님(개발큐 지시서를 운영자가 처리). PC 앱 exe는 코드 서명 없음.",
           "- Python 격리 실행기 미구성(AT-16은 차단 방식). 파트너 tier·Portal 연결은 회사가 직접 확인.", "", "## 7. 변경 이력", ""]

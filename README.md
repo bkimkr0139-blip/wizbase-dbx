@@ -31,13 +31,24 @@ admin(수퍼유저)은 피드백·개발큐 관리, 시스템 문서, 전체 세
 
 접근 코드 파일은 절대 커밋하지 마세요(`.gitignore`가 `data/`, `.staff_codes.json`, `access_codes*.json`을 제외합니다).
 
+## 단독 설치형 앱 (Windows · macOS)
+
+서버(FastAPI+DuckDB)가 앱 안에 들어 있어 내 PC에서만 실행됩니다(데이터는 PC마다 별도).
+
+- **업데이트 = 콘텐츠 팩(재빌드 불필요)**: 화면(`static/`)·서버 코드(`backend/`)를 바꾸면 운영 서버가 작은 팩을 자동 제공하고 앱이 알림 후 내려받아 적용합니다(SHA-256·파일별 해시 검증, 실패 시 자동 복구).
+  새 라이브러리 추가·앱 껍데기(`desktop/`) 변경처럼 팩으로 담을 수 없는 변경은 `backend/sysinfo.py`의 `STANDALONE_COMPAT`와 `desktop/dbx_standalone.py`의 `EXE_COMPAT`를 함께 올리고 앱을 다시 빌드합니다.
+- **Windows 빌드**: `python tools/build_standalone.py` → `dist_app/release/WIZBASE-DBX-Standalone.exe` (대형 패키지 제외 설정이 스크립트에 들어 있음)
+- **macOS 빌드**(Mac에서만 가능): `python3 tools/build_standalone_mac.py` → `dist_app/release/WIZBASE-DBX-Standalone-mac-<arm64|x64>.zip`.
+  Mac이 없으면 GitHub → Actions → `build-standalone-mac` → Run workflow → Artifacts 의 zip 을 받아 운영 서버의 `dist_app/release/`에 넣습니다(서버가 자동으로 `/download/standalone-mac-*`로 제공).
+  코드 서명·공증이 없어 내려받은 앱은 처음에 우클릭 > 열기(또는 `xattr -dr com.apple.quarantine "WIZBASE DBX Rehearsal.app"`)가 필요합니다.
+
 ## 테스트·빌드
 
 ```bat
 pip install -r requirements-dev.txt
 python -m pytest tests -q
 ```
-Windows 앱 빌드는 `desktop/` 참고. 단독형은 PyInstaller 빌드 시 `tensorflow`, `torch`, `cv2` 등을 `--exclude-module`로 제외하고 `--copy-metadata duckdb`를 지정해야 합니다(`REMAINING.md` 참고).
+접속형 Windows 앱 빌드는 `desktop/dbx_app.py`(PyInstaller)를 참고하세요.
 
 ## 보안 메모
 - 접근 코드·토큰·세션 데이터(`data/`)는 저장소에 포함되지 않습니다.

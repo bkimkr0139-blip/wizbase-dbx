@@ -61,3 +61,9 @@
 - 데이터: `%LOCALAPPDATA%\WIZBASE\DBXRehearsal-Standalone\data`. 서버: 127.0.0.1:18830. 업데이트: 중앙 `/api/app/manifest`의 standalone.sha256 ≠ 내 exe SHA-256 이면 알림.
 - 중앙 서버에서 새 단독형을 배포하려면 exe를 다시 빌드해 `dist_app/release`에 덮어쓴 뒤 서버 재시작(없어도 manifest는 즉시 갱신).
 - 미검증: 실제 다른 PC 설치, 인터넷 단절 상태의 업데이트 다운로드 UI(코드 경로만 단위 테스트).
+
+## 콘텐츠 팩 업데이트·macOS (v0.4.4)
+- 단독형 업데이트는 `backend/pack.py` 콘텐츠 팩(static + backend 코드, 수백 KB). 서버가 즉석 생성(`/download/pack`), 앱은 `overlay/current`에 적용, 실패 시 `overlay/rejected`로 폐기 후 내장 버전 복구. 시험: Windows exe 실기 시험 완료(적용·복구).
+- 빌드: `tools/build_standalone.py`(Windows), `tools/build_standalone_mac.py`(Mac) / `.github/workflows/build-standalone-mac.yml`.
+- **미검증**: macOS 실행(이 환경에서 빌드·시험 불가). Intel Mac 러너 라벨(`macos-15-intel`)은 GitHub 정책에 따라 바뀔 수 있음.
+- 팩에 못 담는 변경: 새 라이브러리·앱 껍데기 → STANDALONE_COMPAT/EXE_COMPAT 둘 다 올리고 재빌드.
