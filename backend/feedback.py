@@ -76,6 +76,10 @@ def _brief(f, full=False):
         d["edited_at"] = f["edited_at"]
     if f.get("install") and full:
         d["install"] = f["install"]
+    if f.get("source") == "standalone":
+        d["delivery"] = {"polled_at": f.get("polled_at"), "polled_status": f.get("polled_status"), "delivered": bool(f.get("polled_status") == f["status"])}
+    if f.get("checked_at"):
+        d["checked_at"] = f["checked_at"]
     if standalone():
         d["remote_state"] = "SENT" if f.get("remote") else "PENDING"
     if full:
@@ -384,12 +388,33 @@ def intake(ip, b):
     return {"id": r["id"], "receipt": receipt}
 
 
-def intake_status(fid, receipt):
+def intake_status(fid, receipt, polled=True):
     f = _F().get(fid)
     if not f or not f.get("receipt_hash") or not secrets.compare_digest(f["receipt_hash"], hashlib.sha256(str(receipt).encode()).hexdigest()):
         raise ApiError(404, "NO_FEEDBACK", fid)
+    if polled:   # 앱이 처리 상태를 조회했다 = 사용자에게 전달된 시점 기록
+        changed = f.get("polled_status") != f["status"]
+        f["polled_at"], f["polled_status"] = v11._iso(), f["status"]
+        if changed:
+            v11.save()
     show = f["status"] in ("DONE", "REJECTED", "ON_HOLD")
     return {"status": f["status"], "released_version": f.get("released_version"), "resolution": f.get("resolution", "") if show else "", "priority": f.get("priority")}
+
+
+def intake_status_batch(ip, items):
+    """설치형 앱이 여러 건의 처리 상태를 한 번에 조회한다(영수증 확인, 시간당 한도)."""
+    now = time.time()
+    hits = [t for t in _INTAKE_HITS.get("poll:" + ip, []) if now - t < 3600]
+    if len(hits) >= 120:
+        raise ApiError(429, "TOO_MANY", "잠시 후 다시 조회하세요.")
+    _INTAKE_HITS["poll:" + ip] = hits + [now]
+    out = {}
+    for it in list(items or [])[:50]:
+        try:
+            out[str(it.get("id"))] = intake_status(str(it.get("id")), str(it.get("receipt")))
+        except ApiError:
+            out[str(it.get("id"))] = {"error": "NOT_FOUND"}
+    return out
 
 
 def _payload(f):
@@ -426,24 +451,43 @@ def _forward(fid):
     v11.save()
 
 
-def sync(actor):
-    """내 피드백 조회 시: 미전송분 재전송 + 중앙 처리 상태 반영(오프라인이면 건너뜀)."""
-    if not standalone() or not _online():
-        return
-    for f in [x for x in _F().values() if x["submitted_by"] == actor["user_id"]][:30]:
+def _apply_status(f, st):
+    """중앙 처리 결과를 내 피드백에 반영하고, 바뀌었으면 사용자 알림 표시를 켠다."""
+    changed = st["status"] != f["status"]
+    if changed:
+        f["status"], f["status_label"] = st["status"], STATUS.get(st["status"], st["status"])
+        f["history"].append({"at": v11._iso(), "by": "central", "to": st["status"], "note": st.get("resolution", "")})
+        f["unseen_done"] = True                     # 새 처리 결과 알림(AXOS 탭 표시)
+    f["priority"], f["released_version"] = st.get("priority"), st.get("released_version")
+    if st.get("resolution"):
+        f["resolution"] = st["resolution"]
+    if st["status"] in TERMINAL:
+        f["delivered_terminal"] = True                # 종결 결과까지 전달받았으므로 더 조회하지 않는다
+    f["checked_at"] = v11._iso()
+    return changed
+
+
+def sync(actor=None, force=False):
+    """미전송 피드백 재전송 + 중앙 처리 상태 조회(배치). actor 가 없으면 이 PC의 모든 피드백.
+    트리거: 앱 시작·로그인·내 피드백 열기·[지금 확인]·10분 주기. 오프라인이면 건너뛴다. 바뀐 건수를 돌려준다."""
+    if not standalone() or not (force or _online()):
+        return {"forwarded": 0, "updated": 0, "online": False}
+    mine_ = [x for x in _F().values() if actor is None or x["submitted_by"] == actor["user_id"]]
+    fwd = 0
+    for f in mine_[:60]:
         if not f.get("remote"):
             forward(f["id"])
-        elif f["status"] not in TERMINAL:
-            try:
-                s = _http("GET", f"/api/feedback/intake/{f['remote']['id']}?receipt={f['remote']['receipt']}", timeout=5)
-            except Exception:
-                continue
-            if s["status"] != f["status"]:
-                f["status"], f["status_label"] = s["status"], STATUS.get(s["status"], s["status"])
-                f["history"].append({"at": v11._iso(), "by": "central", "to": s["status"], "note": s.get("resolution", "")})
-                if s["status"] == "DONE":
-                    f["unseen_done"] = True
-            f["priority"], f["released_version"] = s.get("priority"), s.get("released_version")
-            if s.get("resolution"):
-                f["resolution"] = s["resolution"]
+            fwd += 1 if f.get("remote") else 0
+    pend = [f for f in mine_ if f.get("remote") and not f.get("delivered_terminal")][:50]
+    updated = 0
+    if pend:
+        try:
+            res = _http("POST", "/api/feedback/intake/status-batch", {"items": [{"id": f["remote"]["id"], "receipt": f["remote"]["receipt"]} for f in pend]}, timeout=10)
+        except Exception:
+            return {"forwarded": fwd, "updated": 0, "online": False}
+        for f in pend:
+            st = res.get(f["remote"]["id"])
+            if st and "status" in st:
+                updated += 1 if _apply_status(f, st) else 0
     v11.save()
+    return {"forwarded": fwd, "updated": updated, "online": True}

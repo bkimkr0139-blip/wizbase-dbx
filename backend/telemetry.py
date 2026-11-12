@@ -50,9 +50,24 @@ def set_enabled(on: bool):
         f.write_text("off", encoding="utf-8")
 
 
+def set_user(name: str):
+    """이 설치에서 마지막으로 로그인한 사용자(자기 입력 실명). 서버가 설치 ID ↔ 사용자를 연결하는 데 쓴다."""
+    try:
+        (_dir() / "last_user.txt").write_text(str(name).strip()[:40], encoding="utf-8")
+    except OSError:
+        pass
+
+
+def get_user() -> str:
+    try:
+        return (_dir() / "last_user.txt").read_text(encoding="utf-8").strip()[:40]
+    except OSError:
+        return ""
+
+
 def meta() -> dict:
     from . import sysinfo
-    return {"install": install_id(), "app_version": sysinfo.VERSION, "platform": os.environ.get("DBX_PLATFORM", "win"), "os": platform.platform()[:60], "content_id": os.environ.get("DBX_CONTENT_ID", "")[:16]}
+    return {"install": install_id(), "app_version": sysinfo.VERSION, "platform": os.environ.get("DBX_PLATFORM", "win"), "os": platform.platform()[:60], "content_id": os.environ.get("DBX_CONTENT_ID", "")[:16], "user": get_user()}
 
 
 def headers() -> dict:

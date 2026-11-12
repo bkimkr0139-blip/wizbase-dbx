@@ -56,12 +56,25 @@ def _save_tokens():
     TOK_FILE.write_text(json.dumps(TOKENS))
 
 
+def _standalone_loop():
+    """설치형: 시작 직후 한 번, 이후 10분마다 — 신호 큐 전송 + AXOS 처리 상태 조회(오프라인이면 건너뜀)."""
+    time.sleep(8)
+    while True:
+        try:
+            telemetry.flush()
+            feedback.sync(None, force=False)
+        except Exception:
+            pass
+        time.sleep(600)
+
+
 @app.on_event("startup")
 def _startup():
     core.load_all()
     v11.init()
     if telemetry.standalone():
         threading.Thread(target=telemetry.startup_report, daemon=True).start()
+        threading.Thread(target=_standalone_loop, daemon=True).start()
 
 
 @app.exception_handler(ApiError)
@@ -136,6 +149,10 @@ def login(b: Login, request: Request):
     TOKENS[tok] = {"user_id": f"{b.role[:1]}_{secrets.token_hex(4)}", "role": b.role, "name": name}
     _save_tokens()
     usage.log("login_ok", TOKENS[tok], request)
+    if telemetry.standalone():            # 설치형: 로그인한 사용자를 설치 ID와 연결해 서버에 알리고, 내 피드백 처리 상태를 바로 확인한다
+        telemetry.set_user(name)
+        telemetry.report("login")
+        threading.Thread(target=lambda: feedback.sync(None, force=False), daemon=True).start()
     return {"token": tok, **TOKENS[tok]}
 
 
@@ -1081,6 +1098,23 @@ async def fb_intake(request: Request):
     return r
 
 
+@app.post("/api/feedback/intake/status-batch")
+async def fb_intake_status_batch(request: Request):
+    ip = (request.headers.get("x-forwarded-for") or request.headers.get("x-real-ip") or (request.client.host if request.client else "?")).split(",")[0].strip()
+    body = await request.json()
+    return feedback.intake_status_batch(ip, (body or {}).get("items") or [])
+
+
+@app.post("/api/feedback/sync")
+def fb_sync(authorization: Optional[str] = Header(None)):
+    """설치형 앱: 내 피드백의 운영 서버 처리 상태를 지금 확인한다([지금 확인] 버튼)."""
+    a = A(authorization)
+    if not feedback.standalone():
+        return {"standalone": False}
+    r = feedback.sync(a, force=True)
+    return {"standalone": True, **r}
+
+
 @app.get("/api/feedback/intake/{fid}")
 def fb_intake_status(fid: str, receipt: str = ""):
     return feedback.intake_status(fid, receipt)
@@ -1122,7 +1156,7 @@ def download_standalone(request: Request):
 
 
 _TEL_HITS: dict = {}
-_TEL_EVENTS = {"start": "app_start", "update_offered": "app_update", "update_applied": "app_update", "update_failed": "app_update"}
+_TEL_EVENTS = {"login": "app_login", "start": "app_start", "update_offered": "app_update", "update_applied": "app_update", "update_failed": "app_update"}
 
 
 @app.post("/api/app/telemetry")
@@ -1142,10 +1176,18 @@ def app_telemetry(b: Free, request: Request):
         _TEL_HITS[key] = hits + [now]
     plat = str(d.get("platform", ""))[:20]
     detail = {"inst": inst[:12], "ver": str(d.get("app_version", ""))[:20], "plat": plat if re.fullmatch(r"[a-z0-9_]{1,20}", plat) else "?", "os": str(d.get("os", ""))[:60], "cid": str(d.get("content_id", ""))[:16]}
-    if ev != "start":
+    if ev not in ("start", "login"):
         detail.update(result={"update_offered": "offered", "update_applied": "applied", "update_failed": "failed"}[ev], kind=str(d.get("kind", ""))[:8], frm=str(d.get("from_version", ""))[:20],
                       to=str(d.get("to_version", ""))[:20], err=str(d.get("error", ""))[:80] or None)
-    usage.log(_TEL_EVENTS[ev], None, request, **detail)
+    user = str(d.get("user", "")).strip()[:40]
+    if user:
+        detail["usr"] = user
+    if ev == "login":
+        if len(user) < 2:
+            raise ApiError(400, "BAD_TELEMETRY", "사용자 이름이 필요합니다.")
+        usage.log("app_login", {"name": user, "role": "standalone"}, request, **detail)
+    else:
+        usage.log(_TEL_EVENTS[ev], None, request, **detail)
     return {"ok": True}
 
 

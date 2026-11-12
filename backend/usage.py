@@ -16,7 +16,7 @@ LOCK = threading.Lock()
 RETENTION_DAYS = 180
 _LAST_PURGE = [0.0]
 KINDS = {"login_ok": "로그인 성공", "login_fail": "로그인 실패", "view": "화면 열기", "cmd": "명령 실행", "session_new": "세션 생성", "session_del": "세션 삭제", "chat": "AI 지원 질문",
-         "feedback": "피드백 제출", "download": "앱 다운로드", "api_error": "API 오류", "real_conn": "실제 연결 설정", "real_sql": "실제 연결 SQL", "feedback_admin": "피드백 관리(수정·삭제 등)", "app_start": "설치형 앱 실행", "app_update": "설치형 앱 업데이트"}
+         "feedback": "피드백 제출", "download": "앱 다운로드", "api_error": "API 오류", "real_conn": "실제 연결 설정", "real_sql": "실제 연결 SQL", "feedback_admin": "피드백 관리(수정·삭제 등)", "app_start": "설치형 앱 실행", "app_update": "설치형 앱 업데이트", "app_login": "설치형 앱 로그인"}
 
 
 def _path():
@@ -126,7 +126,8 @@ def _kpi(evs):
     return {"logins": sum(1 for e in evs if e["e"] == "login_ok"), "users": len(users), "login_fail": sum(1 for e in evs if e["e"] == "login_fail"), "sessions": sum(1 for e in evs if e["e"] == "session_new"),
             "cmds": len(cmds), "cmd_fail": sum(1 for e in cmds if e["d"].get("status") != "ok"), "views": sum(1 for e in evs if e["e"] == "view"), "chats": sum(1 for e in evs if e["e"] == "chat"),
             "feedback": sum(1 for e in evs if e["e"] == "feedback"), "downloads": sum(1 for e in evs if e["e"] == "download"), "errors": sum(1 for e in evs if e["e"] == "api_error"),
-            "app_pcs": len({e["d"].get("inst") for e in evs if e["e"] == "app_start" and e["d"].get("inst")}), "update_ok": sum(1 for e in evs if e["e"] == "app_update" and e["d"].get("result") == "applied"),
+            "app_pcs": len({e["d"].get("inst") for e in evs if e["e"] == "app_start" and e["d"].get("inst")}),
+            "app_users": len({(e["n"] or e["d"].get("usr") or "").strip().lower() for e in evs if e["e"] in ("app_login", "app_start") and (e["n"] or e["d"].get("usr"))}), "update_ok": sum(1 for e in evs if e["e"] == "app_update" and e["d"].get("result") == "applied"),
             "update_fail": sum(1 for e in evs if e["e"] == "app_update" and e["d"].get("result") == "failed")}
 
 
@@ -149,9 +150,12 @@ def _installs(evs):
         inst = e["d"].get("inst")
         if not inst:
             continue
-        a = agg.setdefault(inst, {"inst": inst, "platform": "", "os": "", "version": "", "first_t": e["t"], "last_t": e["t"], "events": 0, "starts": 0, "downloads": 0, "feedback": 0, "update_ok": 0, "update_fail": 0, "ip": ""})
+        a = agg.setdefault(inst, {"users": [], "inst": inst, "platform": "", "os": "", "version": "", "first_t": e["t"], "last_t": e["t"], "events": 0, "starts": 0, "downloads": 0, "feedback": 0, "update_ok": 0, "update_fail": 0, "ip": ""})
         a["events"] += 1
         a["first_t"], a["last_t"] = min(a["first_t"], e["t"]), max(a["last_t"], e["t"])
+        nm = (e["n"] or e["d"].get("usr") or "").strip()
+        if nm and nm not in a["users"]:
+            a["users"].append(nm)
         k = e["e"]
         if k == "app_start":
             a["starts"] += 1
@@ -175,7 +179,7 @@ def installs(days: int = 30, q: str = "", offset: int = 0, limit: int = 15):
     L = sorted(agg.values(), key=lambda a: -a["last_t"])
     q = (q or "").strip().lower()
     if q:
-        L = [a for a in L if q in a["inst"] or q in (a["platform"] or "").lower() or q in (a["os"] or "").lower() or q in (a["version"] or "").lower() or q in (a["ip"] or "")]
+        L = [a for a in L if q in a["inst"] or any(q in u.lower() for u in a["users"]) or q in (a["platform"] or "").lower() or q in (a["os"] or "").lower() or q in (a["version"] or "").lower() or q in (a["ip"] or "")]
     total = len(L)
     limit = max(5, min(int(limit or 15), 100))
     off = max(0, int(offset))
