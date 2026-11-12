@@ -4,7 +4,7 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "
 const J = o => esc(JSON.stringify(o, null, 1));
 const ls = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch { } }, del(k) { try { localStorage.removeItem(k) } catch { } } };
 let TOKEN = ls.get("tok"), ME = null, SID = ls.get("sid"), ST = null, VIEW = ls.get("view") || "env", META = null, LASTLOG = "", PRINCIPAL = "", SIDE = true;
-let AI_SCROLL = "top", AI_KEEP = 0, REAL = null, LASTVIEW = "", PENDING_DEL = [], SYS = null, CLIENT_BUILD = null, RTAB = ls.get("rtab") || "", SYSPOP = "";
+let AI_SCROLL = "top", AI_KEEP = 0, SESSQ = { q: "", page: 0, size: 25, checked: new Set(), ids: [] }, REAL = null, LASTVIEW = "", PENDING_DEL = [], SYS = null, CLIENT_BUILD = null, RTAB = ls.get("rtab") || "", SYSPOP = "";
 const NAV = [
   ["학습 환경", [["env", "UI-01 환경 점검"], ["req", "UI-02 착수·요구·계약"], ["ws", "UI-03 Workspace"], ["cat", "UI-04 Catalog Explorer"], ["sql", "UI-05 SQL Editor"], ["nb", "UI-06 Notebook"], ["comp", "UI-07 Compute/Warehouses"], ["track", "프로젝트 트랙(8주)"], ["demo", "고객 시연 20분"]]],
   ["데이터 구축", [["conn", "UI-08 Connections/수집"], ["pipe", "UI-09 Pipelines"], ["cdc", "UI-09b CDC 재생"], ["jobs", "UI-10 Jobs"], ["genie", "UI-11 의미모델·Genie"], ["agent", "UI-12 Agent·승인"], ["trace", "UI-13 Tracing/평가"], ["bundle", "UI-14 Git/Bundle/CLI"], ["perm", "UI-15 권한·관리"]]],
@@ -356,7 +356,7 @@ function renderLogin(app) {
     const ok = L.filter(([, x]) => x && x.available); if (!ok.length && b) { b.querySelectorAll("button").forEach(x => x.disabled = true); if (e) e.textContent = "설치 파일을 준비 중입니다." }
     else if (e) e.textContent = ok.map(([n, x]) => `${n}: 버전 ${x.version} · ${(x.size / 1048576).toFixed(0)} MB`).join(" / ") + (IS_MACOS ? " · 코드 서명이 없어 처음 실행 시 우클릭 > 열기가 필요합니다." : " · Windows 10/11 64비트 · 코드 서명이 없어 처음 실행 시 SmartScreen 경고가 표시될 수 있습니다.") }).catch(() => { });
 }
-document.addEventListener("change", ev => { const t = ev.target; if (t && t.classList && t.classList.contains("fbchk")) { t.checked ? FBQ.checked.add(t.dataset.id) : FBQ.checked.delete(t.dataset.id) } });
+document.addEventListener("change", ev => { const t = ev.target; if (t && t.classList && t.classList.contains("fbchk")) { t.checked ? FBQ.checked.add(t.dataset.id) : FBQ.checked.delete(t.dataset.id) } if (t && t.classList && t.classList.contains("sesschk")) { t.checked ? SESSQ.checked.add(t.dataset.id) : SESSQ.checked.delete(t.dataset.id) } });
 document.addEventListener("click", async ev => {
   if (MENUOPEN >= 0 && !ev.target.closest(".menubar")) menuSet(-1);
   if (ev.target.classList && ev.target.classList.contains("syspop")) { SYSPOP = ""; REMEDY_POP = null; render(true); return }
@@ -392,15 +392,20 @@ window.H = {
   usersearchclear() { USG.uq = ""; USG.upage = 0; render(true) },
   userpage(d) { USG.upage = Math.max(0, +d.p); render(true) },
   userpagesize(v) { USG.usize = +v; USG.upage = 0; render(true) },
-  sesssel() { const l = [...document.querySelectorAll(".sesschk")]; const all = l.every(x => x.checked); l.forEach(x => x.checked = !all) },
+  sesssel() { const l = [...document.querySelectorAll(".sesschk")]; const all = l.length && l.every(x => x.checked); l.forEach(x => { x.checked = !all; all ? SESSQ.checked.delete(x.dataset.id) : SESSQ.checked.add(x.dataset.id) }); render(true) },
+  sessselall() { SESSQ.checked = new Set([...SESSQ.checked, ...SESSQ.ids]); render(true) },
+  sesssearch() { SESSQ.q = (val("sessq") || "").trim(); SESSQ.page = 0; render(true) },
+  sesssearchclear() { SESSQ.q = ""; SESSQ.page = 0; render(true) },
+  sesspage(d) { SESSQ.page = Math.max(0, +d.p); render(true) },
+  sesspagesize(v) { SESSQ.size = +v; SESSQ.page = 0; render(true) },
   sessdel() {
-    const ids = [...document.querySelectorAll(".sesschk")].filter(x => x.checked).map(x => x.dataset.id);
+    const ids = [...SESSQ.checked];
     if (!ids.length) { toast("삭제할 세션을 선택하세요."); return }
     PENDING_DEL = ids;
     SYSPOP = `<h3 style="margin-top:0">세션 삭제</h3><p><b>${ids.length}개</b> 세션을 삭제합니다. 세션의 데이터와 진행 기록이 사라지며 <b>되돌릴 수 없습니다</b>.</p><div class="sub">${ids.map(esc).join(", ")}</div><p><button class="primary" data-a="sessdelok">삭제</button> <button data-a="syspopclose">취소</button></p>`; render(true)
   },
   async sessdelok() {
-    const r = await api("/api/sessions/delete", { body: { ids: PENDING_DEL } }); PENDING_DEL = []; SYSPOP = "";
+    const r = await api("/api/sessions/delete", { body: { ids: PENDING_DEL } }); PENDING_DEL = []; SYSPOP = ""; SESSQ.checked = new Set();
     if (r.deleted.includes(SID)) { SID = null; ls.del("sid"); ST = null; GUIDE = null }
     log(`세션 ${r.deleted.length}개 삭제` + (r.denied.length ? ` · 권한 없음/없는 세션 ${r.denied.length}개 제외` : "")); await refresh()
   },
@@ -920,12 +925,12 @@ const V = {
     <div class="card"><b>그 밖의 검토</b> <div class="sub">실습 증거 승인 대기 ${q.lab_evidence_pending}건 · 현장 대조표 ${q.matrix_rows}행. <a href="#" data-a="nav" data-v="lab">실습 증거함</a> · <a href="#" data-a="nav" data-v="vmx">현장 대조표</a> · <a href="#" data-a="nav" data-v="map">공식 목표</a></div></div>`;
   },
   async env() {
-    const sess = await api("/api/sessions"); const feats = await api("/api/features");
+    const sp = await api(`/api/sessions/page?q=${encodeURIComponent(SESSQ.q)}&page=${SESSQ.page}&size=${SESSQ.size}`); SESSQ.page = sp.page; SESSQ.ids = sp.ids; const sess = sp.items; const feats = await api("/api/features");
     return `<h2>UI-01 환경 점검</h2><div class="sub">클라우드·리전·프로필·권한·미지원 항목 확인. 프로필은 선택 예시이며 모든 기능이 가능하다는 보증이 아닙니다.</div>
     <div class="card"><b>새 세션</b><div class="row"><select id="mode"><option value="B">B 로컬 코드 실습 (LOCAL_EXECUTED)</option><option value="A">A 완전 모의 (SIMULATED)</option><option value="C">C 실제 교육용 DBX (이 배포 미지원)</option></select>
     <select id="seedsel"><option value="food-order-v1">시드 v1</option><option value="food-order-v2">시드 v2 (다른 숫자)</option><option value="food-order-v3">시드 v3 (다른 숫자)</option></select><select id="lmode"><option value="guided">안내형</option><option value="practice">실습형</option><option value="real">실전형</option><option value="demo">고객 시연형</option></select><button data-a="newsess">세션 시작</button></div>
     <div class="sub">실습 범위: 식자재 주문 변경 합성 데이터(거래처 30·상품 100·주문 300·주문행 900, 시드 food-order-v1, 기준시각 2026-11-11 15:20 KST). 실행 경계: Python/PySpark 미실행, 외부 접속 차단. 모드는 실행 중 전환 불가.</div></div>
-    <div class="card"><b>${ME.role === "admin" ? "전체 세션 (admin)" : "내 세션"}</b>${(() => { const L = ME.role === "admin" ? sess : sess.filter(s => s.owner === ME.user_id); return L.length ? `<div style="margin:6px 0;display:flex;gap:6px"><button data-a="sesssel">전체 선택/해제</button><button data-a="sessdel">선택 삭제</button></div>` + table(["", "세션", "사용자", ...(ME.role === "admin" ? ["사용자 ID"] : []), "레슨", "모드", "진행", "revision", "생성 일시", "최종 작업 일시", ""], L.map(s => [`<input type="checkbox" class="sesschk" data-id="${esc(s.session_id)}">`, s.session_id, s.owner_name || "(이름 미기록)", ...(ME.role === "admin" ? [s.owner] : []), s.lesson_id, s.mode + "/" + s.learning_mode, `${s.completed}/${s.lessons}`, s.revision, fmtKst(s.created_at), fmtKst(s.last_activity_at), `<a href="#" data-a="opensess" data-id="${esc(s.session_id)}">열기</a>`])) : '<div class="mute">(없음)</div>' })()}</div>
+    <div class="card"><b>${ME.role === "admin" ? "전체 세션 (admin)" : "내 세션"}</b>${(() => { const L = sess; const bar = `<div class="vfilters"><input id="sessq" value="${esc(SESSQ.q)}" placeholder="세션 ID·사용자·레슨·모드 검색" style="width:260px" onkeydown="if(event.key==='Enter')H.sesssearch()"><button data-a="sesssearch">검색</button>${SESSQ.q ? `<button class="ghost" data-a="sesssearchclear">검색 지우기</button>` : ""}<span class="mute">${SESSQ.q ? "조건에 맞는 " : "전체 "}${nf(sp.total)}개</span></div>`; return (L.length || SESSQ.q) ? bar + `<div style="margin:6px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button data-a="sesssel">이 쪽 전체 선택/해제</button><button data-a="sessselall">조건에 맞는 ${nf(Math.min(sp.total, 500))}개 모두 선택</button><button data-a="sessdel">선택 삭제</button><span class="mute">선택 <b>${SESSQ.checked.size}</b>개(다른 쪽 포함)</span></div>` + table(["", "세션", "사용자", ...(ME.role === "admin" ? ["사용자 ID"] : []), "레슨", "모드", "진행", "revision", "생성 일시", "최종 작업 일시", ""], L.map(s => [`<input type="checkbox" class="sesschk" data-id="${esc(s.session_id)}" ${SESSQ.checked.has(s.session_id) ? "checked" : ""} aria-label="${esc(s.session_id)} 선택">`, s.session_id, s.owner_name || "(이름 미기록)", ...(ME.role === "admin" ? [s.owner] : []), s.lesson_id, s.mode + "/" + s.learning_mode, `${s.completed}/${s.lessons}`, s.revision, fmtKst(s.created_at), fmtKst(s.last_activity_at), `<a href="#" data-a="opensess" data-id="${esc(s.session_id)}">열기</a>`])) + pagerHtml(sp.total, sp.page, sp.size, "sesspage") : '<div class="mute">(없음)</div>' })()}</div>
     ${ST ? `<div class="card"><button data-a="c" data-t="env.check">환경 점검 실행</button> <button data-a="whstart">Warehouse 시작</button><div class="sub">환경 점검·미확인 항목이 로그와 증거에 기록됩니다.</div></div>` : ""}
     <div class="card"><b>기능 매니페스트</b> <span class="mute">(${esc(feats.profile)})</span><div class="sub">각 기능을 <b>지금 쓸 수 있는지</b>와 <b>얼마나 확인됐는지</b>를 보여 줍니다. <b>[사용해 보기]</b>를 누르면 그 기능을 쓰는 상황을 모의로 실행해 결과(가능/확인 필요)를 실행 로그에 남깁니다.${ST ? "" : " <b>세션을 먼저 시작해야 누를 수 있습니다.</b>"}</div>${table(["기능", "확인 상태", "워크스페이스", "화면 위치", "사용 가능", ""], feats.features.map(f => [`<span><b>${esc(f.feature_id.replace(/_/g, " "))}</b></span>`, badge(({ DOC_CHECKED: "문서 확인", WORKSPACE_CHECKED: "워크스페이스 확인", DRAFT: "초안", STALE: "재확인 필요(오래됨)", DBX_VERIFIED: "DBX 실측" })[f.status] || f.status, f.status === "WORKSPACE_CHECKED" || f.status === "DBX_VERIFIED" ? "ok" : "w"), badge(({ unknown: "미확인", true: "켜짐", false: "꺼짐" })[String(f.workspace_enabled)] || String(f.workspace_enabled), f.workspace_enabled === true ? "ok" : "w"), String(f.ui_path || "-"), badge(f.usable ? "모의 가능" : "확인 필요", f.usable ? "ok" : "bad"), ST ? `<button data-a="c" data-t="feature.use" data-p='${JSON.stringify({ feature_id: f.feature_id })}'>사용해 보기</button>` : `<span class="mute">세션 필요</span>`]))}</div>
     <div class="card"><b>기준 프로필</b> <span class="mute">— 이 학습 환경이 가정하는 Databricks 환경 설정입니다</span>${profileHtml(META.profile)}</div>`;

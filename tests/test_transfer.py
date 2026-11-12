@@ -216,3 +216,22 @@ def test_every_sql_error_code_has_a_remedy_in_ui():
     codes = set(re.findall(r'sql_error\(\s*"([A-Z_]+)"', core)) | {"WAREHOUSE_START_FAILED"}
     have = set(re.findall(r"^\s{2}([A-Z_]+): e =>", js, re.M))
     assert codes - have == set(), f"해결 안내 없는 오류 코드: {sorted(codes - have)}"
+
+
+def test_sessions_page_search_pagination_and_scope(env):
+    c = env["c"]
+    Adm = env["A"]
+    mine = [c.post("/api/sessions", headers=Adm, json={}).json()["session_id"] for _ in range(7)]
+    r = c.get("/api/sessions/page?size=5&page=0", headers=Adm).json()
+    assert r["scope"] == "all" and r["total"] >= 7 and len(r["items"]) == 5 and r["pages"] >= 2 and len(r["ids"]) == min(r["total"], 500)
+    r2 = c.get("/api/sessions/page?size=5&page=1", headers=Adm).json()
+    assert {i["session_id"] for i in r["items"]}.isdisjoint({i["session_id"] for i in r2["items"]})
+    assert c.get("/api/sessions/page?size=5&page=999", headers=Adm).json()["page"] == r["pages"] - 1                       # 범위 초과 → 마지막 쪽
+    sid = mine[3]
+    q = c.get(f"/api/sessions/page?q={sid}", headers=Adm).json(); assert q["total"] == 1 and q["items"][0]["session_id"] == sid   # 세션 ID 검색
+    assert all("adm" in i["owner_name"].lower() for i in c.get("/api/sessions/page?q=adm&size=100", headers=Adm).json()["items"])  # 사용자 이름 검색
+    # 학습자는 admin이 만든 세션이 보이지 않고 본인 것만(검색해도)
+    L = env["L"]
+    lr = c.get("/api/sessions/page?size=100", headers=L).json()
+    assert lr["scope"] == "own" and all(i["owner_name"] != "adm" for i in lr["items"]) and sid not in lr["ids"]
+    assert c.get(f"/api/sessions/page?q={sid}", headers=L).json()["total"] == 0

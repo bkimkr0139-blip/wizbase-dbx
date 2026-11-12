@@ -190,6 +190,29 @@ def list_sessions(authorization: Optional[str] = Header(None)):
     return sorted(out, key=lambda x: -x["created_at"])
 
 
+@app.get("/api/sessions/page")
+def sessions_page(q: str = "", page: int = 0, size: int = 25, authorization: Optional[str] = Header(None)):
+    """UI-01 세션 목록(검색·쪽 나누기): admin은 전체, 그 외는 본인 세션만."""
+    a = actor_of(authorization)
+    size = max(5, min(int(size or 25), 100))
+    q = (q or "").strip().lower()
+    rows = []
+    for S in core.SESSIONS.values():
+        if S["owner"] != a["user_id"] and a["role"] != "admin":
+            continue
+        name = S.get("owner_name") or next((t["name"] for t in TOKENS.values() if t["user_id"] == S["owner"]), "")
+        if q and not any(q in str(x).lower() for x in (S["id"], name, S["owner"], S["lesson_id"], S["mode"], S["learning_mode"])):
+            continue
+        rows.append({"session_id": S["id"], "owner": S["owner"], "owner_name": name, "lesson_id": S["lesson_id"], "mode": S["mode"], "learning_mode": S["learning_mode"], "revision": S["revision"],
+                     "completed": sum(1 for p in core.progress(S) if p["completed"]), "lessons": len(core.LESSONS), "paused": S["paused"], "created_at": S["created_at"],
+                     "last_activity_at": S.get("last_activity_at") or S["created_at"]})
+    rows.sort(key=lambda x: -x["created_at"])
+    total = len(rows)
+    pages = max(1, -(-total // size))
+    page = max(0, min(int(page or 0), pages - 1))
+    return {"items": rows[page * size:(page + 1) * size], "total": total, "page": page, "pages": pages, "size": size, "ids": [r["session_id"] for r in rows[:500]], "scope": "all" if a["role"] == "admin" else "own"}
+
+
 class DelSessions(BaseModel):
     ids: list[str]
 
