@@ -1,6 +1,6 @@
 """FastAPI app: WIZBASE DBX Project Rehearsal. Server-side auth, ownership and role checks on every route."""
 from __future__ import annotations
-import json, os, secrets, time, threading
+import json, os, re, secrets, time, threading
 from pathlib import Path
 from typing import Any, Optional
 
@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from . import core, v11, v11_ext, guide, labs, transfer, ko_guide, sysinfo, feedback
 from . import pack as pack_mod
+from . import usage
 from . import content as C
 from .core import ApiError
 
@@ -60,7 +61,10 @@ def _startup():
 
 
 @app.exception_handler(ApiError)
-async def api_err(_, e: ApiError):
+async def api_err(request, e: ApiError):
+    if e.status != 401 and e.code not in ("NO_FEEDBACK",):
+        tk = (request.headers.get("authorization") or "")[7:]
+        usage.log("api_error", TOKENS.get(tk) if tk else None, request, code=e.code, status=e.status, path=request.url.path[:60])
     return JSONResponse(status_code=e.status, content={"error": {"code": e.code, "message": e.message, **e.extra}})
 
 
@@ -106,6 +110,7 @@ def login(b: Login, request: Request):
     def bad_code():
         with _G:
             _attempts.setdefault(ip, []).append(time.time())
+        usage.log("login_fail", {"name": (b.name or "")[:40], "role": b.role}, request, reason="BAD_CODE")
         raise ApiError(403, "BAD_CODE", "접근 코드가 올바르지 않습니다.")
     name = (b.name or "").strip()[:40]
     if not name or name in ("학습자", "관리자", "검토자", "강사"):
@@ -126,6 +131,7 @@ def login(b: Login, request: Request):
     tok = secrets.token_urlsafe(24)
     TOKENS[tok] = {"user_id": f"{b.role[:1]}_{secrets.token_hex(4)}", "role": b.role, "name": name}
     _save_tokens()
+    usage.log("login_ok", TOKENS[tok], request)
     return {"token": tok, **TOKENS[tok]}
 
 
@@ -157,7 +163,7 @@ class NewSession(BaseModel):
 
 
 @app.post("/api/sessions")
-def new_session(b: NewSession, authorization: Optional[str] = Header(None)):
+def new_session(b: NewSession, request: Request, authorization: Optional[str] = Header(None)):
     a = actor_of(authorization)
     if b.profile_id != core.PROFILE["profile_id"]:
         raise ApiError(400, "UNKNOWN_PROFILE", "지원 프로필: " + core.PROFILE["profile_id"])
@@ -168,6 +174,7 @@ def new_session(b: NewSession, authorization: Optional[str] = Header(None)):
     S = core.create_session(a["user_id"], b.lesson_id, b.mode, b.learning_mode, b.seed)
     S["owner_name"] = a["name"]
     core.save(S)
+    usage.log("session_new", a, request, mode=S["mode"], learning=S["learning_mode"])
     return {"session_id": S["id"], "seed": S["seed"], "effective_actor": core.TRAINEE, "mode": S["mode"], "profile_id": S["profile_id"], "seed": S["seed"], "evidence_level": "A=SIMULATED / B=LOCAL_EXECUTED"}
 
 
@@ -187,7 +194,7 @@ class DelSessions(BaseModel):
 
 
 @app.post("/api/sessions/delete")
-def delete_sessions(b: DelSessions, authorization: Optional[str] = Header(None)):
+def delete_sessions(b: DelSessions, request: Request, authorization: Optional[str] = Header(None)):
     """본인 세션만(admin은 전체) 선택 삭제. 권한 없는 id는 삭제하지 않고 denied로 돌려준다."""
     a = actor_of(authorization)
     done, denied = [], []
@@ -199,6 +206,7 @@ def delete_sessions(b: DelSessions, authorization: Optional[str] = Header(None))
         core.delete_session(sid)
         done.append(sid)
     if done:
+        usage.log("session_del", a, request, count=len(done), by_admin=bool(a["role"] == "admin"))
         v11.audit(a, "SESSION_DELETE", ",".join(done), detail={"count": len(done)})
         v11.save()
     return {"deleted": done, "denied": denied}
@@ -212,13 +220,15 @@ class Cmd(BaseModel):
 
 
 @app.post("/api/sessions/{sid}/commands")
-def command(sid: str, b: Cmd, authorization: Optional[str] = Header(None)):
+def command(sid: str, b: Cmd, request: Request, authorization: Optional[str] = Header(None)):
     a = actor_of(authorization)
     S = sess(sid, a)
     with core.lock_for(sid):
         if b.command_type in ("genie.config",) and a["role"] == "reviewer":
             raise ApiError(403, "FORBIDDEN", "")
-        return core.commands(S, a, b.command_type, b.payload, b.idempotency_key, b.expected_revision)
+        ex = core.commands(S, a, b.command_type, b.payload, b.idempotency_key, b.expected_revision)
+    usage.log("cmd", a, request, type=b.command_type, status=ex.get("status") if isinstance(ex, dict) else None)
+    return ex
 
 
 @app.get("/api/executions/{eid}")
@@ -424,15 +434,18 @@ class GuideMsg(BaseModel):
 
 
 @app.post("/api/guide/chat")
-def guide_chat(b: GuideMsg, authorization: Optional[str] = Header(None)):
+def guide_chat(b: GuideMsg, request: Request, authorization: Optional[str] = Header(None)):
     a = actor_of(authorization)
     S = sess(b.session_id, a) if b.session_id else None
     if len(b.message) > 500:
         raise ApiError(400, "TOO_LONG", "500자 이내")
     if S:
         with core.lock_for(S["id"]):
-            return guide.chat(S, a, b.message, S["learning_mode"] in ("real", "demo"), b.view)
-    return guide.chat(None, a, b.message, False, b.view)
+            r = guide.chat(S, a, b.message, S["learning_mode"] in ("real", "demo"), b.view)
+    else:
+        r = guide.chat(None, a, b.message, False, b.view)
+    usage.log("chat", a, request, intent=r.get("intent"), view=b.view, qlen=len(b.message))   # 질문 본문은 저장하지 않는다
+    return r
 
 
 @app.get("/api/sessions/{sid}/audit")
@@ -1035,19 +1048,22 @@ def fb_intake_status(fid: str, receipt: str = ""):
 
 
 @app.get("/download/pack")
-def download_pack():
+def download_pack(request: Request):
+    usage.log("download", None, request, what="pack")
     from fastapi.responses import Response
     data, mf = pack_mod.build(sysinfo.VERSION, sysinfo.STANDALONE_COMPAT, sysinfo.ROOT)
     return Response(data, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="dbx-pack-{mf["content_id"]}.zip"', "Cache-Control": "no-store"})
 
 
 @app.get("/download/standalone-mac-arm64")
-def download_mac_arm64():
+def download_mac_arm64(request: Request):
+    usage.log("download", None, request, what="mac_arm64")
     return _mac_file("mac_arm64")
 
 
 @app.get("/download/standalone-mac-x64")
-def download_mac_x64():
+def download_mac_x64(request: Request):
+    usage.log("download", None, request, what="mac_x64")
     return _mac_file("mac_x64")
 
 
@@ -1059,14 +1075,16 @@ def _mac_file(k):
 
 
 @app.get("/download/standalone")
-def download_standalone():
+def download_standalone(request: Request):
+    usage.log("download", None, request, what="windows_standalone")
     if not sysinfo.STANDALONE_FILE.is_file():
         raise ApiError(404, "APP_NOT_BUILT", "단독 설치형 파일이 아직 준비되지 않았습니다.")
     return FileResponse(str(sysinfo.STANDALONE_FILE), media_type="application/octet-stream", filename=sysinfo.STANDALONE_FILE.name)
 
 
 @app.get("/download/app")
-def download_app():
+def download_app(request: Request):
+    usage.log("download", None, request, what="windows_shell")
     if not sysinfo.APP_FILE.is_file():
         raise ApiError(404, "APP_NOT_BUILT", "설치 파일이 아직 준비되지 않았습니다.")
     return FileResponse(str(sysinfo.APP_FILE), media_type="application/octet-stream", filename=sysinfo.APP_FILE.name)
@@ -1128,8 +1146,11 @@ def fb_meta(authorization: Optional[str] = Header(None)):
 
 
 @app.post("/api/feedback")
-def fb_submit(b: Free, authorization: Optional[str] = Header(None)):
-    return feedback.submit(A(authorization), b.model_dump())
+def fb_submit(b: Free, request: Request, authorization: Optional[str] = Header(None)):
+    a = A(authorization)
+    r = feedback.submit(a, b.model_dump())
+    usage.log("feedback", a, request, kind=b.model_dump().get("kind"))
+    return r
 
 
 @app.get("/api/feedback/mine")
@@ -1169,6 +1190,30 @@ def fb_transition(fid: str, b: Free, authorization: Optional[str] = Header(None)
     d = b.model_dump()
     return feedback.transition(A(authorization), fid, str(d.get("to", "")), d.get("note", ""), d.get("priority"), d.get("released_version"))
 
+
+
+class ViewBeat(BaseModel):
+    view: str
+
+
+@app.post("/api/usage/view")
+def usage_view(b: ViewBeat, request: Request, authorization: Optional[str] = Header(None)):
+    a = actor_of(authorization)
+    if re.fullmatch(r"[a-z0-9]{2,12}", b.view or ""):
+        usage.log("view", a, request, view=b.view)
+    return {"ok": True}
+
+
+@app.get("/api/usage/summary")
+def usage_summary(days: int = 30, authorization: Optional[str] = Header(None)):
+    staff_only(A(authorization), "admin")
+    return usage.summary(days)
+
+
+@app.get("/api/usage/events")
+def usage_events(limit: int = 100, offset: int = 0, kind: str = "", q: str = "", authorization: Optional[str] = Header(None)):
+    staff_only(A(authorization), "admin")
+    return usage.events(limit, offset, kind, q)
 
 
 @app.get("/")

@@ -4,11 +4,11 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "
 const J = o => esc(JSON.stringify(o, null, 1));
 const ls = { get(k) { try { return localStorage.getItem(k) } catch { return null } }, set(k, v) { try { localStorage.setItem(k, v) } catch { } }, del(k) { try { localStorage.removeItem(k) } catch { } } };
 let TOKEN = ls.get("tok"), ME = null, SID = ls.get("sid"), ST = null, VIEW = ls.get("view") || "env", META = null, LASTLOG = "", PRINCIPAL = "", SIDE = true;
-let AI_SCROLL = "top", AI_KEEP = 0, PENDING_DEL = [], SYS = null, CLIENT_BUILD = null, RTAB = ls.get("rtab") || "", SYSPOP = "";
+let AI_SCROLL = "top", AI_KEEP = 0, LASTVIEW = "", PENDING_DEL = [], SYS = null, CLIENT_BUILD = null, RTAB = ls.get("rtab") || "", SYSPOP = "";
 const NAV = [
   ["학습 환경", [["env", "UI-01 환경 점검"], ["req", "UI-02 착수·요구·계약"], ["ws", "UI-03 Workspace"], ["cat", "UI-04 Catalog Explorer"], ["sql", "UI-05 SQL Editor"], ["nb", "UI-06 Notebook"], ["comp", "UI-07 Compute/Warehouses"], ["track", "프로젝트 트랙(8주)"], ["demo", "고객 시연 20분"]]],
   ["데이터 구축", [["conn", "UI-08 Connections/수집"], ["pipe", "UI-09 Pipelines"], ["cdc", "UI-09b CDC 재생"], ["jobs", "UI-10 Jobs"], ["genie", "UI-11 의미모델·Genie"], ["agent", "UI-12 Agent·승인"], ["trace", "UI-13 Tracing/평가"], ["bundle", "UI-14 Git/Bundle/CLI"], ["perm", "UI-15 권한·관리"]]],
-  ["운영", [["rvw", "검토 센터"], ["fbq", "피드백·개발큐"], ["ko", "한국어 가이드"], ["xfer", "전이 시드·협업"], ["inst", "UI-16 강사·수료"], ["evid", "증거 보고서"]]],
+  ["운영", [["rvw", "검토 센터"], ["fbq", "피드백·개발큐"], ["usage", "접속·사용 기록"], ["ko", "한국어 가이드"], ["xfer", "전이 시드·협업"], ["inst", "UI-16 강사·수료"], ["evid", "증거 보고서"]]],
   ["전문과정 v1.1", [["prof", "UI-17 역량·등급"], ["plan", "UI-18 목표·학습계획"], ["map", "UI-19 공식 목표 지도"], ["tutor", "UI-20 AI 튜터"], ["exam", "UI-21 시험센터"], ["lab", "UI-22 실제 실습 증거함"], ["qual", "UI-23 콘텐츠 품질"], ["partner", "UI-24 파트너 인력"], ["conf", "UI-25 자료 충돌"], ["vmx", "UI-26 현장 대조표"]]]
 ];
 
@@ -117,7 +117,8 @@ async function render(soft) {
     <button class="aitab axostab ${AI_OPEN && PANEL === "axos" ? "on" : ""}" data-a="axostoggle" aria-label="AXOS 피드백 열기">${ICON.axos}<span>AXOS</span>${FB_UNSEEN ? '<i class="pulse"></i>' : ""}</button>
     <aside id="ai" class="${AI_OPEN ? "open" : ""}">${aiHtml()}</aside>
     <div class="log" id="log">${fixBtn()}<span>${esc(LASTLOG) || "실행 로그 · 오류 · 증거 수준이 여기에 표시됩니다."}</span></div>`;
-  const needSess = !["env", "exam", "prof", "plan", "map", "tutor", "lab", "qual", "partner", "conf", "vmx", "inst", "rvw", "ko", "xfer", "fbq"].includes(VIEW);
+  if (VIEW !== LASTVIEW) { LASTVIEW = VIEW; api("/api/usage/view", { body: { view: VIEW } }).catch(() => { }) }
+  const needSess = !["env", "exam", "prof", "plan", "map", "tutor", "lab", "qual", "partner", "conf", "vmx", "inst", "rvw", "ko", "xfer", "fbq", "usage"].includes(VIEW);
   const main = $("#main");
   if (needSess && !SID) { main.innerHTML = `<div class="empty"><h2>세션이 필요합니다</h2><p>먼저 <a href="#" data-a="nav" data-v="env">환경 점검</a>에서 세션을 시작하세요.</p></div>`; }
   else { try { main.innerHTML = (await (V[VIEW] || V.env)()) + viewFooter(VIEW) } catch (e) { main.innerHTML = err(e) } }
@@ -134,7 +135,7 @@ const IS_APP = !!UA_APP, APP_VER = UA_APP ? UA_APP[1] : "", IS_MACOS = /Mac/.tes
 let MENUOPEN = -1, UPD_SHOWN = "", POLL = null;
 function menuModel() {
   const stf = staff(), adm = ME?.role === "admin";
-  const ms = SYS.menu.map(t => ({ title: t.tab, items: t.items.filter(i => (stf || adm || i.view !== "rvw") && (adm || i.view !== "fbq")).map(i => ({ label: i.label, tip: i.desc, a: "nav", v: i.view })) }));
+  const ms = SYS.menu.map(t => ({ title: t.tab, items: t.items.filter(i => (stf || adm || i.view !== "rvw") && (adm || (i.view !== "fbq" && i.view !== "usage"))).map(i => ({ label: i.label, tip: i.desc, a: "nav", v: i.view })) }));
   ms.push({
     title: "도움말", items: [
       { label: "사용 안내", key: "F1", a: "helptoggle" },
@@ -356,6 +357,9 @@ document.addEventListener("click", async ev => {
 /* ------------------------------------------------------------ handlers */
 window.addEventListener("resize", () => { try { const mb = document.querySelector(".menubar"); if (mb) document.documentElement.style.setProperty("--aitop", Math.round(mb.getBoundingClientRect().bottom) + "px") } catch { } });
 window.H = {
+  usagedays(d) { USG.days = +d.n; USG.page = 0; render(true) },
+  usagefilter() { USG.kind = val("uskind") || ""; USG.q = val("usq") || ""; USG.page = 0; render(true) },
+  usagepage(d) { USG.page = Math.max(0, USG.page + +d.d); render(true) },
   sesssel() { const l = [...document.querySelectorAll(".sesschk")]; const all = l.every(x => x.checked); l.forEach(x => x.checked = !all) },
   sessdel() {
     const ids = [...document.querySelectorAll(".sesschk")].filter(x => x.checked).map(x => x.dataset.id);
@@ -625,7 +629,7 @@ const prettyBox = (v, rawToo) => `<div class="pbox">${pretty(v)}</div>${rawToo ?
 const EV_NAV = [[/^(SQL|QUERY)/, "sql"], [/^WAREHOUSE/, "comp"], [/^PIPELINE/, "pipe"], [/^(JOB|RUN_|REPAIR)/, "jobs"], [/^(NOTEBOOK|CELL)/, "nb"], [/^(CONN|FOREIGN)/, "conn"], [/^(GRANT|REVOKE|PERMISSION|TICKET|UC_|PRIVILEGE)/, "perm"], [/^(ORDER|AX_|APPROVAL|PROPOSAL|POLICY|PAYLOAD)/, "agent"], [/^GENIE/, "genie"], [/^(BUNDLE|GIT|CLI|DEPLOY)/, "bundle"], [/^CDC/, "cdc"], [/^(TRACE|EVAL)/, "trace"], [/^(EXAM|ATTEMPT)/, "exam"], [/^LAB/, "lab"], [/^(SESSION|ENV|PROFILE)/, "env"], [/^(OBJECTIVE|COVERAGE)/, "map"], [/^(ITEM|QUESTION)/, "qual"]];
 const KIND_NAV = { "Notebook cell": "nb", File: "bundle", Pipeline: "pipe", Job: "jobs", Warehouse: "comp", Connection: "conn", Genie: "genie", Agent: "agent" };
 const STAFF_VIEWS = new Set(["rvw", "vmx", "inst", "partner", "conf"]);
-const canGo = v => v === "fbq" ? ME?.role === "admin" : STAFF_VIEWS.has(v) ? staff() : true;
+const canGo = v => (v === "fbq" || v === "usage") ? ME?.role === "admin" : STAFF_VIEWS.has(v) ? staff() : true;
 const goLink = (v, label, tip) => `<a href="#" class="golink" data-a="nav" data-v="${v}" title="${esc(tip || (viewLabel(v) + " 화면으로 이동"))}">${esc(label)} ›</a>`;
 function autoLink(c) {
   if (typeof c !== "string" || !c || c.length > 64) return null;
@@ -636,13 +640,74 @@ function autoLink(c) {
   if (!v && /^s_[0-9a-f]{8,}$/.test(c)) return `<a href="#" class="golink" data-a="opensess" data-id="${esc(c)}" title="이 세션 열기">${esc(c)} ›</a>`;
   return v && v !== VIEW && canGo(v) ? goLink(v, c) : null;
 }
-const NEXTV = { env: "req", req: "comp", ws: "cat", cat: "sql", sql: "perm", nb: "pipe", comp: "cat", conn: "pipe", pipe: "jobs", cdc: "jobs", jobs: "nb", genie: "agent", agent: "trace", trace: "bundle", bundle: "perm", perm: "sql", track: "demo", demo: "evid", xfer: "prof", prof: "plan", plan: "map", map: "tutor", ko: "tutor", tutor: "exam", exam: "lab", lab: "qual", qual: "partner", partner: "conf", conf: "vmx", vmx: "rvw", rvw: "vmx", fbq: "evid", inst: "evid", evid: "prof" };
+const NEXTV = { env: "req", req: "comp", ws: "cat", cat: "sql", sql: "perm", nb: "pipe", comp: "cat", conn: "pipe", pipe: "jobs", cdc: "jobs", jobs: "nb", genie: "agent", agent: "trace", trace: "bundle", bundle: "perm", perm: "sql", track: "demo", demo: "evid", xfer: "prof", prof: "plan", plan: "map", map: "tutor", ko: "tutor", tutor: "exam", exam: "lab", lab: "qual", qual: "partner", partner: "conf", conf: "vmx", vmx: "rvw", rvw: "vmx", fbq: "usage", usage: "evid", inst: "evid", evid: "prof" };
 function viewFooter(v) {
   let n = NEXTV[v]; if (n && !canGo(n)) n = ["evid", "prof", "env"].find(x => x !== v && canGo(x));
   const b = [];
   if (n) b.push(scBtn(SCN(`다음 화면: ${viewLabel(n)}`, n), true));
   b.push(scBtn(SCA("이 화면은 뭐야? (AI 지원)", "이 화면은 뭐야?")), scBtn({ type: "help", label: "이 화면 도움말(F1)" }));
   return `<div class="vfoot"><span class="mute">이어서</span> ${b.join(" ")}</div>`;
+}
+/* ------------------------------------------------------------ 차트(SVG, 외부 라이브러리 없음) — 접속·사용 기록 화면 */
+const nf = n => Number(n || 0).toLocaleString("ko-KR");
+const niceMax = v => { if (v <= 4) return 4; const p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p };
+const SER = ["var(--vs1)", "var(--vs2)", "var(--vs3)", "var(--vs4)"];
+const tipAttr = h => `data-tip="${esc(h)}"`;
+function legend(items) { return `<div class="vlegend">${items.map(([n, c, ic]) => `<span><i style="background:${c}"></i>${ic ? ic + " " : ""}${esc(n)}</span>`).join("")}</div>` }
+function tableView(cols, rows) { return `<details class="vtab"><summary>표로 보기</summary>${table(cols, rows, true)}</details>` }
+/* 꺾은선: 시리즈 2~3개(같은 척도), 일별. 교차선+툴팁은 칸마다 투명 히트 영역으로 구현 */
+function lineChart(labels, series, o = {}) {
+  const W = 720, H = 220, L = 38, R = 12, T = 12, B = 26, pw = W - L - R, ph = H - T - B, n = labels.length;
+  const max = niceMax(Math.max(1, ...series.flatMap(s => s.values))), x = i => L + (n <= 1 ? pw / 2 : i * pw / (n - 1)), y = v => T + ph - v / max * ph;
+  const grid = [0, 1, 2, 3, 4].map(k => { const v = max * k / 4, yy = y(v); return `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" class="vgrid"/><text x="${L - 6}" y="${yy + 4}" class="vax" text-anchor="end">${nf(Math.round(v))}</text>` }).join("");
+  const step = Math.max(1, Math.ceil(n / 8)), xl = labels.map((d, i) => i % step === 0 || (i === n - 1 && (n - 1) % step >= Math.ceil(step / 2)) ? `<text x="${x(i)}" y="${H - 8}" class="vax" text-anchor="middle">${esc(d.slice(5))}</text>` : "").join("");
+  const paths = series.map(s => `<path d="${s.values.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("")}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`).join("");
+  const hits = labels.map((d, i) => { const w = n <= 1 ? pw : pw / (n - 1), tip = `<b>${d}</b><br>` + series.map(s => `${s.name}: <b>${nf(s.values[i])}</b>`).join("<br>");
+    return `<g class="hx"><rect x="${(x(i) - w / 2).toFixed(1)}" y="${T}" width="${w.toFixed(1)}" height="${ph}" fill="transparent" ${tipAttr(tip)}/><line x1="${x(i).toFixed(1)}" x2="${x(i).toFixed(1)}" y1="${T}" y2="${T + ph}" class="vcross"/>${series.map(s => `<circle cx="${x(i).toFixed(1)}" cy="${y(s.values[i]).toFixed(1)}" r="4" fill="${s.color}" class="vdot"/>`).join("")}</g>` }).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" class="vsvg" role="img" aria-label="${esc(o.label || "꺾은선 차트")}">${grid}${paths}${hits}${xl}</svg>${series.length > 1 ? legend(series.map(s => [s.name, s.color])) : ""}`;
+}
+/* 막대(단일 시리즈 또는 성공/실패 누적): 데이터 끝 모서리 둥글게, 막대 사이 2px */
+function barChart(labels, series, o = {}) {
+  const W = 720, H = 200, L = 38, R = 8, T = 10, B = 26, pw = W - L - R, ph = H - T - B, n = labels.length, bw = Math.max(2, pw / n - 2);
+  const tot = labels.map((_, i) => series.reduce((a, s) => a + s.values[i], 0)), max = niceMax(Math.max(1, ...tot)), y = v => T + ph - v / max * ph, x = i => L + i * pw / n + 1;
+  const grid = [0, 1, 2, 3, 4].map(k => { const v = max * k / 4, yy = y(v); return `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" class="vgrid"/><text x="${L - 6}" y="${yy + 4}" class="vax" text-anchor="end">${nf(Math.round(v))}</text>` }).join("");
+  const step = Math.max(1, Math.ceil(n / (o.maxLabels || 12))), xl = labels.map((d, i) => i % step === 0 ? `<text x="${(x(i) + bw / 2).toFixed(1)}" y="${H - 8}" class="vax" text-anchor="middle">${esc(o.fmt ? o.fmt(d) : d)}</text>` : "").join("");
+  const bars = labels.map((d, i) => { let acc = 0; const tip = `<b>${esc(o.fmt ? o.fmt(d) : d)}</b><br>` + series.map(s => `${s.name}: <b>${nf(s.values[i])}</b>`).join("<br>");
+    const segs = series.map((s, k) => { const v = s.values[i]; if (!v) return ""; const y1 = y(acc + v), h = Math.max(1, y(acc) - y1 - (k < series.length - 1 && series[k + 1].values[i] ? 2 : 0)); acc += v;
+      const r = Math.min(4, bw / 2, h); const top = acc >= tot[i] - 1e-9; return `<path d="M${x(i).toFixed(1)},${(y1 + h).toFixed(1)}V${(y1 + (top ? r : 0)).toFixed(1)}${top ? `Q${x(i).toFixed(1)},${y1.toFixed(1)} ${(x(i) + r).toFixed(1)},${y1.toFixed(1)}H${(x(i) + bw - r).toFixed(1)}Q${(x(i) + bw).toFixed(1)},${y1.toFixed(1)} ${(x(i) + bw).toFixed(1)},${(y1 + r).toFixed(1)}` : `H${(x(i) + bw).toFixed(1)}`}V${(y1 + h).toFixed(1)}Z" fill="${s.color}"/>` }).join("");
+    return `<g class="vbar">${segs}<rect x="${x(i).toFixed(1)}" y="${T}" width="${bw.toFixed(1)}" height="${ph}" fill="transparent" ${tipAttr(tip)}/></g>` }).join("");
+  return `<svg viewBox="0 0 ${W} ${H}" class="vsvg" role="img" aria-label="${esc(o.label || "막대 차트")}">${grid}${bars}${xl}</svg>${series.length > 1 ? legend(series.map(s => [s.name, s.color, s.icon])) : ""}`;
+}
+/* 가로 막대(순위): 값은 막대 끝에 직접 표시, 정렬된 단일 색 */
+function hbars(entries, o = {}) {
+  if (!entries.length) return `<div class="mute">(기록 없음)</div>`; const max = Math.max(1, ...entries.map(e => e[1]));
+  return `<div class="hbars">${entries.map(([k, v, extra]) => `<div class="hb" ${tipAttr(`<b>${esc(o.label ? o.label(k) : k)}</b><br>${nf(v)}${extra ? " · " + esc(extra) : ""}`)}><span class="hbl">${esc(o.label ? o.label(k) : k)}</span><span class="hbt"><span class="hbf" style="width:${(v / max * 100).toFixed(1)}%;background:${o.color || SER[0]}"></span></span><span class="hbv">${nf(v)}</span></div>`).join("")}</div>`;
+}
+/* 구성비: 한 줄 100% 막대(조각 사이 2px) + 범례(수·%) — 도넛 대신 */
+function segBar(entries, colors) {
+  const tot = entries.reduce((a, e) => a + e[1], 0); if (!tot) return `<div class="mute">(기록 없음)</div>`;
+  return `<div class="seg">${entries.map(([k, v], i) => `<span style="flex:${v};background:${(colors || SER)[i % 4]}" ${tipAttr(`<b>${esc(k)}</b><br>${nf(v)} (${Math.round(v / tot * 100)}%)`)}></span>`).join("")}</div>
+    <div class="vlegend">${entries.map(([k, v], i) => `<span><i style="background:${(colors || SER)[i % 4]}"></i>${esc(k)} <b>${nf(v)}</b> <em>${Math.round(v / tot * 100)}%</em></span>`).join("")}</div>`;
+}
+/* 히트맵: 요일 × 시간, 단일 색 순차(연한→진한) */
+function heatmap(m) {
+  const max = Math.max(1, ...m.flat()), days = ["월", "화", "수", "목", "금", "토", "일"], cw = 26, ch = 22, L = 26, T = 4;
+  const cells = m.map((row, d) => row.map((v, h) => `<rect x="${L + h * cw}" y="${T + d * ch}" width="${cw - 2}" height="${ch - 2}" rx="3" style="fill:var(--vq${v ? Math.min(6, 1 + Math.floor(v / max * 5.999)) : 0})" ${tipAttr(`<b>${days[d]}요일 ${h}시</b><br>${nf(v)}건`)}/>`).join("")).join("");
+  const dl = days.map((d, i) => `<text x="${L - 6}" y="${T + i * ch + 15}" class="vax" text-anchor="end">${d}</text>`).join(""), hl = [0, 3, 6, 9, 12, 15, 18, 21].map(h => `<text x="${L + h * cw + 11}" y="${T + 7 * ch + 14}" class="vax" text-anchor="middle">${h}</text>`).join("");
+  return `<svg viewBox="0 0 ${L + 24 * cw} ${T + 7 * ch + 20}" class="vsvg" role="img" aria-label="요일·시간대별 사용량 히트맵">${cells}${dl}${hl}</svg><div class="vlegend"><span>적음</span><span class="vramp">${[1, 2, 3, 4, 5, 6].map(k => `<i style="background:var(--vq${k})"></i>`).join("")}</span><span>많음 (최대 ${nf(max)}건)</span></div>`;
+}
+/* 툴팁(이벤트 위임) */
+(function () {
+  let tip = null; const get = () => tip || (tip = (() => { const d = document.createElement("div"); d.className = "vtip"; d.style.display = "none"; document.body.appendChild(d); return d })());
+  document.addEventListener("mouseover", e => { const t = e.target.closest && e.target.closest("[data-tip]"); if (!t) { if (tip) tip.style.display = "none"; return } const d = get(); d.innerHTML = t.getAttribute("data-tip"); d.style.display = "block" });
+  document.addEventListener("mousemove", e => { if (tip && tip.style.display === "block") { tip.style.left = Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 14) + "px"; tip.style.top = (e.clientY + 16 + tip.offsetHeight > innerHeight ? e.clientY - tip.offsetHeight - 10 : e.clientY + 16) + "px" } });
+})();
+let USG = { days: 30, kind: "", q: "", page: 0 };
+const ROLEL = { learner: "학습자", instructor: "강사", reviewer: "검토자", admin: "admin" }, CLIL = { web: "웹(PC)", mobile: "웹(모바일)", pc_app: "PC 앱", bot: "봇/도구", unknown: "알 수 없음" };
+const DLL = { windows_standalone: "Windows 단독형", windows_shell: "Windows 접속형", pack: "기능 업데이트 팩", mac_arm64: "Mac(Apple Silicon)", mac_x64: "Mac(Intel)" };
+function kpiTile(label, v, prev, o = {}) {
+  const d = prev ? Math.round((v - prev) / prev * 100) : null;
+  return `<div class="kpi"><div class="kl">${esc(label)}</div><div class="kv">${nf(v)}${o.unit ? `<small>${o.unit}</small>` : ""}</div><div class="kd">${d === null ? "이전 기간 기록 없음" : `${d > 0 ? "▲" : d < 0 ? "▼" : "–"} ${Math.abs(d)}% (이전 ${USG.days}일 ${nf(prev)})`}</div></div>`;
 }
 function resBox(ex) {
   if (!ex) return ""; const r = ex.result || ex; const e = r.error;
@@ -653,6 +718,37 @@ function resBox(ex) {
 
 /* ------------------------------------------------------------ views */
 const V = {
+  async usage() {
+    if (ME.role !== "admin") return `<div class="empty"><h2>admin(수퍼유저) 전용 화면입니다</h2><p>접속·사용 기록은 admin 계정으로 로그인한 경우에만 볼 수 있습니다.</p></div>`;
+    const [d, ev] = await Promise.all([api(`/api/usage/summary?days=${USG.days}`), api(`/api/usage/events?limit=25&offset=${USG.page * 25}&kind=${encodeURIComponent(USG.kind)}&q=${encodeURIComponent(USG.q)}`)]);
+    const k = d.kpi, p = d.prev, dates = d.daily.map(r => r.date);
+    const okc = d.daily.map(r => r.cmds - r.cmd_fail), failc = d.daily.map(r => r.cmd_fail);
+    const hourEntries = d.hourly.map((v, h) => [h, v]);
+    const cmdOk = d.cmds.reduce((a, r) => a + r[1], 0), cmdBad = d.cmds.reduce((a, r) => a + r[2], 0);
+    const vlabel = v => (NAV.flatMap(g => g[1]).find(n => n[0] === v) || [v, v])[1].replace(/^UI-\d+b?\s*/, "");
+    const kindOpts = [["", "전체"], ...Object.entries(d.kinds)].map(([v, l]) => `<option value="${v}" ${USG.kind === v ? "selected" : ""}>${esc(l)}</option>`).join("");
+    const pages = Math.max(1, Math.ceil(ev.total / 25));
+    return `<h2>접속·사용 기록 <span class="mute" style="font-size:12px">admin 전용</span></h2>
+    <div class="sub">웹 서버에 접속한 사용자의 로그인·화면 이동·명령 실행·오류·세션·피드백·다운로드 기록입니다. 이름·역할·화면/명령 종류·결과만 기록하고 <b>접근 코드, SQL·입력 본문, 피드백 내용은 저장하지 않으며</b> IP는 일부만 저장합니다. 최대 ${d.retention_days}일 보관 후 자동 삭제됩니다. 단독 설치형 앱 안의 사용은 사용자 PC에만 있어 포함되지 않습니다(다운로드·업데이트 요청만 기록).</div>
+    <div class="vfilters"><span class="mute">기간</span>${[7, 30, 90].map(n => `<button class="${USG.days === n ? "primary" : ""}" data-a="usagedays" data-n="${n}">최근 ${n}일</button>`).join("")}<span class="mute" style="margin-left:auto">집계 ${esc(d.generated)} (KST) · 이벤트 ${nf(d.total_events)}건</span></div>
+    <div class="kpis">${kpiTile("로그인", k.logins, p.logins)}${kpiTile("고유 사용자(이름 기준)", k.users, p.users, { unit: "명" })}${kpiTile("명령 실행", k.cmds, p.cmds)}${kpiTile("명령 실패", k.cmd_fail, p.cmd_fail)}${kpiTile("세션 생성", k.sessions, p.sessions)}${kpiTile("화면 열기", k.views, p.views)}${kpiTile("AI 지원 질문", k.chats, p.chats)}${kpiTile("피드백", k.feedback, p.feedback)}${kpiTile("앱 다운로드", k.downloads, p.downloads)}${kpiTile("로그인 실패", k.login_fail, p.login_fail)}</div>
+    <div class="vgrid2"><div class="card vc"><b>일별 접속</b><div class="sub">로그인 수와 고유 사용자 수</div>${lineChart(dates, [{ name: "로그인", color: SER[0], values: d.daily.map(r => r.logins) }, { name: "고유 사용자", color: SER[1], values: d.daily.map(r => r.users) }], { label: "일별 로그인과 고유 사용자" })}${tableView(["날짜", "로그인", "고유 사용자"], d.daily.map(r => [r.date, r.logins, r.users]))}</div>
+    <div class="card vc"><b>일별 명령 실행</b><div class="sub">성공 / 실패</div>${barChart(dates, [{ name: "성공", icon: "✓", color: "var(--vgood)", values: okc }, { name: "실패", icon: "✕", color: "var(--vbad)", values: failc }], { fmt: x => x.slice(5), label: "일별 명령 실행 성공·실패" })}${tableView(["날짜", "성공", "실패"], d.daily.map((r, i) => [r.date, okc[i], failc[i]]))}</div></div>
+    <div class="vgrid2"><div class="card vc"><b>시간대별 사용량</b><div class="sub">모든 이벤트, 한국 시간</div>${barChart(hourEntries.map(e => String(e[0])), [{ name: "이벤트", color: SER[0], values: d.hourly }], { fmt: h => h + "시", maxLabels: 12, label: "시간대별 사용량" })}</div>
+    <div class="card vc"><b>요일 × 시간대 히트맵</b><div class="sub">언제 가장 많이 쓰는지</div>${heatmap(d.heat)}</div></div>
+    <div class="vgrid2"><div class="card vc"><b>많이 연 화면</b>${hbars(d.views.map(([v, n]) => [v, n]), { label: vlabel })}</div>
+    <div class="card vc"><b>많이 쓴 명령</b><div class="sub">실패가 있으면 오른쪽에 표시</div>${hbars(d.cmds.map(([t, ok, bad]) => [t, ok + bad, bad ? `실패 ${bad}` : ""]))}${cmdOk + cmdBad ? `<div class="sub" style="margin-top:6px">성공률 <b>${Math.round(cmdOk / (cmdOk + cmdBad) * 100)}%</b> (${nf(cmdOk)} / ${nf(cmdOk + cmdBad)})</div>` : ""}</div></div>
+    <div class="vgrid3"><div class="card vc"><b>역할별 로그인</b>${segBar(Object.entries(d.roles).map(([r, n]) => [ROLEL[r] || r, n]))}</div>
+    <div class="card vc"><b>접속 단말</b>${segBar(Object.entries(d.clients).map(([r, n]) => [CLIL[r] || r, n]))}</div>
+    <div class="card vc"><b>앱 다운로드</b>${segBar(Object.entries(d.downloads).map(([r, n]) => [DLL[r] || r, n]))}</div></div>
+    <div class="vgrid2"><div class="card vc"><b>AI 지원 질문 종류</b><div class="sub">질문 내용은 저장하지 않고 분류만 기록</div>${hbars(d.chat)}</div>
+    <div class="card vc"><b>API 오류 코드</b><div class="sub">서버가 거절·실패로 응답한 요청(인증 만료 제외)</div>${hbars(d.errors, { color: "var(--vbad)" })}${d.login_fail_ips.length ? `<div class="sub" style="margin-top:8px">로그인 실패 많은 IP(일부 마스킹): ${d.login_fail_ips.map(([ip, n]) => `${esc(ip)} ${n}회`).join(" · ")}</div>` : ""}</div></div>
+    <div class="card"><b>활동이 많은 사용자</b> <span class="mute">이름 기준 상위 15명</span>${table(["이름", "역할", "이벤트", "로그인", "명령", "최근", "단말"], d.top_users.map(u => [u.name, ROLEL[u.role] || u.role, u.events, u.logins, u.cmds, u.last, CLIL[u.client] || u.client || "-"]), true)}</div>
+    <div class="card"><b>최근 기록</b>
+      <div class="vfilters"><select id="uskind" data-a="usagefilter">${kindOpts}</select><input id="usq" value="${esc(USG.q)}" placeholder="이름·내용·IP 검색" style="width:200px" onkeydown="if(event.key==='Enter')H.usagefilter()"><button data-a="usagefilter">검색</button><span class="mute" style="margin-left:auto">${nf(ev.total)}건 · ${USG.page + 1}/${pages}쪽</span></div>
+      ${table(["시각(KST)", "종류", "이름", "역할", "내용", "단말", "IP"], ev.items.map(e => [e.time, e.kind_label, e.name || "-", ROLEL[e.role] || e.role || "-", Object.entries(e.detail).map(([a, b]) => `${a}=${b}`).join(" · "), CLIL[e.client] || "-", e.ip || "-"]), true)}
+      <div style="margin-top:8px;display:flex;gap:6px"><button class="ghost" data-a="usagepage" data-d="-1" ${USG.page <= 0 ? "disabled" : ""}>이전</button><button class="ghost" data-a="usagepage" data-d="1" ${USG.page + 1 >= pages ? "disabled" : ""}>다음</button></div></div>`;
+  },
   async fbq() {
     if (ME.role !== "admin") return `<div class="empty"><h2>admin(수퍼유저) 전용 화면입니다</h2><p>피드백 관리와 개발큐는 admin 계정으로 로그인한 경우에만 사용할 수 있습니다.</p></div>`;
     const d = await api("/api/feedback/admin" + (FBQ.status ? "?status=" + FBQ.status : ""));

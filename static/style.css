@@ -211,3 +211,18 @@ button.hfail{cursor:pointer;border:none}
 /* ---- 연결(내비게이션) */
 a.golink{color:var(--acc);font-weight:600;text-decoration:none;border-bottom:1px dotted var(--acc)}a.golink:hover{background:var(--acc-soft)}
 .vfoot{margin:22px 0 8px;padding:10px 12px;border-top:2px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* ---- 접속·사용 기록 차트 (참조 팔레트: 파랑·주황·청록 / 상태 good·critical / 순차 파랑) */
+:root{--vs1:#2a78d6;--vs2:#eb6834;--vs3:#1baf7a;--vs4:#eda100;--vgood:#0ca30c;--vbad:#d03b3b;--vgridc:#e1e0d9;--vaxc:#898781;--vq0:#efeee9;--vq1:#cde2fb;--vq2:#9ec5f4;--vq3:#6da7ec;--vq4:#2a78d6;--vq5:#1c5cab;--vq6:#104281}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--vs1:#3987e5;--vs2:#d95926;--vs3:#199e70;--vs4:#c98500;--vgridc:#2c2c2a;--vq0:#262624;--vq1:#184f95;--vq2:#1c5cab;--vq3:#2a78d6;--vq4:#5598e7;--vq5:#86b6ef;--vq6:#cde2fb}}
+:root[data-theme="dark"]{--vs1:#3987e5;--vs2:#d95926;--vs3:#199e70;--vs4:#c98500;--vgridc:#2c2c2a;--vq0:#262624;--vq1:#184f95;--vq2:#1c5cab;--vq3:#2a78d6;--vq4:#5598e7;--vq5:#86b6ef;--vq6:#cde2fb}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px;margin:10px 0}
+.kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel)}.kl{font-size:12px;color:var(--ink2)}.kv{font-size:26px;font-weight:700;margin-top:2px}.kv small{font-size:12px;font-weight:500;margin-left:3px;color:var(--mute)}.kd{font-size:11px;color:var(--mute);margin-top:2px}
+.vgrid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:10px;margin:10px 0}.vgrid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin:10px 0}
+.vc .sub{margin:0 0 6px}.vsvg{width:100%;height:auto;display:block}.vgrid{stroke:var(--vgridc);stroke-width:1}.vax{fill:var(--vaxc);font-size:11px}
+.vcross{stroke:var(--vaxc);stroke-width:1;stroke-dasharray:3 3;display:none}.vdot{display:none;stroke:var(--panel);stroke-width:2}.hx:hover .vcross,.hx:hover .vdot{display:block}
+.vbar:hover path{opacity:.82}.vlegend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:6px;font-size:12px;color:var(--ink2)}.vlegend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}.vlegend em{font-style:normal;color:var(--mute)}.vramp i{width:16px;margin:0 1px 0 0}
+.hbars{display:flex;flex-direction:column;gap:5px}.hb{display:grid;grid-template-columns:minmax(80px,32%) 1fr 48px;align-items:center;gap:8px;font-size:12.5px}.hbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink2)}.hbt{height:10px;background:var(--panel2);border-radius:5px;overflow:hidden}.hbf{display:block;height:10px;border-radius:0 5px 5px 0}.hbv{text-align:right;font-variant-numeric:tabular-nums}
+.seg{display:flex;gap:2px;height:16px;border-radius:5px;overflow:hidden}.seg span{display:block;min-width:3px}
+.vfilters{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:8px 0}.vtab{margin-top:6px;font-size:12px}.vtab summary{cursor:pointer;color:var(--mute)}
+.vtip{position:fixed;z-index:200;pointer-events:none;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;box-shadow:var(--sh2);padding:6px 10px;font-size:12px;line-height:1.5}
