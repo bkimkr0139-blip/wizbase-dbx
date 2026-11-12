@@ -6,7 +6,7 @@ from pathlib import Path
 from . import core, labs, pack, transfer, v11
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.4.12"
+VERSION = "0.4.13"
 RELEASED = "2026-11-12"
 SHELL_VERSION = "0.1.1"  # PC 앱(desktop/dbx_app.py APP_VERSION)의 최신 버전 — 새 exe를 배포할 때 함께 올린다
 APP_FILE = ROOT / "dist_app" / "release" / "WIZBASE-DBX-Rehearsal.exe"
@@ -47,6 +47,7 @@ def central_manifest():
 PURPOSE = ("WIZBASE(Databricks 파트너)의 실제 PoC 준비와 파트너 레벨 상향을 위한 인증 시험 준비를 지원하는 교육·훈련 환경. "
            "Databricks 공식 제품·교육·시험이 아니며 합격·자격·투입을 보증하지 않음.")
 CHANGELOG = [
+    {"version": "0.4.13", "date": "2026-11-12", "notes": ["UI-01 환경 점검의 전체 세션(admin) 목록에 검색(세션 ID·사용자·레슨·모드)과 쪽 나누기(쪽당 10~100개), 조건에 맞는 세션 모두 선택, 다른 쪽에서 고른 세션 선택 유지"]},
     {"version": "0.4.12", "date": "2026-11-12", "notes": ["모바일 최적화(≤820px): 상단 바 + ☰ 전체 메뉴(아코디언), 도움말·AI 지원·피드백 아이콘, 한 열 레이아웃·터치 크기 컨트롤, 패널 전체 화면, 모바일 첫 접속 시 패널 닫힘, 차트·표·목록 모바일 표시, 휴대폰에서는 PC 앱 다운로드 대신 모바일 이용 안내"]},
     {"version": "0.4.11", "date": "2026-11-12", "notes": ["피드백 관리·개발큐와 접속·사용 기록에 검색·쪽 나누기(처음/이전/쪽 번호/다음/마지막, 쪽당 10·25·50·100건) 추가, 조건에 맞는 건 모두 선택, 사용자별 활동 전체 목록 검색", "상단 바 로고를 어두운 바탕에 흰 글자로 통일"]},
     {"version": "0.4.10", "date": "2026-11-12", "notes": ["피드백 관리·개발큐: 선택 삭제(첨부 이미지 포함, 확인 후 영구 삭제), 피드백 수정(제목·내용·유형·우선순위, 수정 이력·개발 지시서 재생성), 선택 일괄 상태 변경(흐름에 맞지 않는 건은 건너뛰고 이유 표시)", "피드백 접수 일자를 날짜와 시간(한국 시간)으로 표시"]},
