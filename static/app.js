@@ -35,6 +35,18 @@ const badge = (t, c) => `<span class="b ${c || ""}">${esc(t)}</span>`;
 const lv = l => badge(l, l === "LOCAL_EXECUTED" ? "ok" : "w");
 function table(cols, rows, untrusted) { if (!rows || !rows.length) return `<div class="mute">(없음)</div>`; return `<div class="tw"><table><tr>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr>${rows.map(r => `<tr>${r.map(c => `<td>${typeof c === "object" && c !== null ? `<pre>${J(c)}</pre>` : (!untrusted && typeof c === "string" && /^<(a|button|input|span)\b/.test(c) ? c : esc(c))}</td>`).join("")}</tr>`).join("")}</table></div>` }
 const val = id => $("#" + id)?.value;
+const PV = v => ({ unknown: "미확인", to_be_pinned: "미지정(확정 전)", to_be_recorded: "미기록", not_applicable: "해당 없음", serverless: "서버리스", training: "교육용", aws: "AWS", en: "영어(en)", DOC_CHECKED: "문서 확인만 완료" })[v] ?? (v === null || v === undefined ? "기록 없음" : v === true ? "예" : v === false ? "아니오" : String(v));
+function profileHtml(p) {
+  const c = p.compute || {}, row = (k, v, hint) => [k, `${esc(PV(v))}${hint ? ` <span class="mute">${esc(hint)}</span>` : ""}`];
+  const rows = [row("프로필 ID", p.profile_id), row("클라우드 / 리전", `${PV(p.cloud)} / ${p.region}`, "서울"), row("워크스페이스 종류", p.workspace_kind), row("Unity Catalog", p.unity_catalog_enabled, "데이터 거버넌스 기능"),
+    row("컴퓨트 방식", c.mode), row("DBR 버전", c.dbr_version, c.dbr_version === "not_applicable" ? "서버리스는 런타임 버전을 직접 고르지 않음" : ""), row("서버리스 환경", c.serverless_environment, "실제 워크스페이스에서 확인 전"), row("SQL Warehouse 채널", c.sql_warehouse_channel, "실제 워크스페이스에서 확인 전"),
+    row("CLI 버전", p.cli_version, p.cli_min_documented), row("화면 언어", p.ui_locale), row("화면 확인 일시", p.ui_observed_at, "실제 화면을 본 기록이 아직 없음"), row("화면 릴리스", p.ui_release_id), row("SA 검토 일시", p.sa_reviewed_at, "검토 전"), row("확인 상태", p.evidence_status, "문서 기준이며 실제 워크스페이스 검증 전")];
+  const names = Object.entries(p.official_names_checked || {});
+  return `<div class="tw"><table>${rows.map(([k, v]) => `<tr><th style="width:170px;text-align:left">${esc(k)}</th><td>${v}</td></tr>`).join("")}</table></div>
+    ${names.length ? `<div class="sub" style="margin-top:8px"><b>공식 명칭 변경 확인</b> (옛 이름 → 현재 공식 이름)</div>${table(["옛 이름", "현재 공식 이름"], names.map(([a, b]) => [a, b]))}` : ""}
+    <div class="sub">${esc(p.note || "")}</div>
+    <details><summary class="mute">원본 데이터(JSON) 보기</summary><pre>${J(p)}</pre></details>`;
+}
 const staff = () => ["instructor", "admin", "reviewer"].includes(ME?.role);
 const err = e => `<div class="bad">${esc(e.message || e)}</div>`;
 
@@ -574,7 +586,7 @@ const V = {
     <div class="card"><b>${ME.role === "admin" ? "전체 세션 (admin)" : "내 세션"}</b>${(() => { const L = ME.role === "admin" ? sess : sess.filter(s => s.owner === ME.user_id); return L.length ? `<div style="margin:6px 0;display:flex;gap:6px"><button data-a="sesssel">전체 선택/해제</button><button data-a="sessdel">선택 삭제</button></div>` + table(["", "세션", "사용자", ...(ME.role === "admin" ? ["사용자 ID"] : []), "레슨", "모드", "진행", "revision", "생성 일시", "최종 작업 일시", ""], L.map(s => [`<input type="checkbox" class="sesschk" data-id="${esc(s.session_id)}">`, s.session_id, s.owner_name || "(이름 미기록)", ...(ME.role === "admin" ? [s.owner] : []), s.lesson_id, s.mode + "/" + s.learning_mode, `${s.completed}/${s.lessons}`, s.revision, fmtKst(s.created_at), fmtKst(s.last_activity_at), `<a href="#" data-a="opensess" data-id="${esc(s.session_id)}">열기</a>`])) : '<div class="mute">(없음)</div>' })()}</div>
     ${ST ? `<div class="card"><button data-a="c" data-t="env.check">환경 점검 실행</button> <button data-a="whstart">Warehouse 시작</button><div class="sub">환경 점검·미확인 항목이 로그와 증거에 기록됩니다.</div></div>` : ""}
     <div class="card"><b>기능 매니페스트</b> <span class="mute">(${esc(feats.profile)})</span><div class="sub">각 기능을 <b>지금 쓸 수 있는지</b>와 <b>얼마나 확인됐는지</b>를 보여 줍니다. <b>[사용해 보기]</b>를 누르면 그 기능을 쓰는 상황을 모의로 실행해 결과(가능/확인 필요)를 실행 로그에 남깁니다.${ST ? "" : " <b>세션을 먼저 시작해야 누를 수 있습니다.</b>"}</div>${table(["기능", "확인 상태", "워크스페이스", "화면 위치", "사용 가능", ""], feats.features.map(f => [`<span><b>${esc(f.feature_id.replace(/_/g, " "))}</b></span>`, badge(({ DOC_CHECKED: "문서 확인", WORKSPACE_CHECKED: "워크스페이스 확인", DRAFT: "초안", STALE: "재확인 필요(오래됨)", DBX_VERIFIED: "DBX 실측" })[f.status] || f.status, f.status === "WORKSPACE_CHECKED" || f.status === "DBX_VERIFIED" ? "ok" : "w"), badge(({ unknown: "미확인", true: "켜짐", false: "꺼짐" })[String(f.workspace_enabled)] || String(f.workspace_enabled), f.workspace_enabled === true ? "ok" : "w"), String(f.ui_path || "-"), badge(f.usable ? "모의 가능" : "확인 필요", f.usable ? "ok" : "bad"), ST ? `<button data-a="c" data-t="feature.use" data-p='${JSON.stringify({ feature_id: f.feature_id })}'>사용해 보기</button>` : `<span class="mute">세션 필요</span>`]))}</div>
-    <div class="card"><b>기준 프로필</b><pre>${J(META.profile)}</pre></div>`;
+    <div class="card"><b>기준 프로필</b> <span class="mute">— 이 학습 환경이 가정하는 Databricks 환경 설정입니다</span>${profileHtml(META.profile)}</div>`;
   },
   async req() {
     return `<h2>UI-02 착수·요구·데이터 계약</h2><div class="sub">고객 인터뷰 카드로 누락 요구를 발견하고 계약을 검토합니다.</div>
