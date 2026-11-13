@@ -67,7 +67,19 @@ SQL_FN_ALLOW = {"ifnull", "nvl", "coalesce", "date_format", "datediff", "current
                 "nullif", "try_cast", "date_add", "to_date", "regexp_replace", "split"}
 
 _locks: dict[str, threading.RLock] = {}
-_conns: dict[str, duckdb.DuckDBPyConnection] = {}
+class _LazyConns(dict):
+    """세션 DuckDB 연결을 처음 쓸 때 연다(서버 시작 시 세션 수천 개를 한꺼번에 열어 시간·메모리를 쓰지 않도록)."""
+
+    def __missing__(self, sid):
+        if not (DATA / f"{sid}.duckdb").exists():
+            raise KeyError(sid)
+        c = _open_conn(sid)
+        _lockdown(c)
+        self[sid] = c
+        return c
+
+
+_conns: dict[str, duckdb.DuckDBPyConnection] = _LazyConns()
 SESSIONS: dict[str, dict] = {}
 _glock = threading.RLock()
 
@@ -281,10 +293,7 @@ def load_all():
             dbp = DATA / f"{S['id']}.duckdb"
             if not dbp.exists():
                 continue
-            c = _open_conn(S["id"])
-            _lockdown(c)
-            _conns[S["id"]] = c
-            _thist_invalidate(S)
+            _thist_invalidate(S)                    # 연결은 처음 쓸 때 연다(_LazyConns)
             SESSIONS[S["id"]] = S
         except Exception as e:  # pragma: no cover
             print("load fail", p, e)
@@ -2068,7 +2077,9 @@ def checkpoint(S, name):
 def restore(S, name):
     if name not in S["checkpoints"]:
         raise ApiError(404, "NO_CHECKPOINT", name)
-    c = _conns.pop(S["id"]); c.close()
+    c = _conns.pop(S["id"], None)
+    if c:
+        c.close()
     shutil.copy(DATA / f"{S['id']}.{name}.ckpt", DATA / f"{S['id']}.duckdb")
     cp = S["checkpoints"][name]
     keep = {"checkpoints": S["checkpoints"], "audit": S["audit"]}
