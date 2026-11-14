@@ -39,8 +39,9 @@ def test_assignment_authorization_requires_basis_and_separation(env):
     body = {"learner": me, "role": "data_engineer", "scope": "교육용 PoC 모듈"}
     r = env["c"].post("/api/assignment-authorizations", headers=env["R"], json=body)
     assert r.status_code == 409 and r.json()["error"]["code"] == "NO_BASIS_GRADE"                  # 공식 자격/학습 완료만으로는 부여 불가
-    ev = env["c"].post("/api/lab-evidence", headers=env["L"], json=evidence_for("LAB-CORE-01")).json()
-    env["c"].post(f"/api/lab-evidence/{ev['evidence_id']}/review", headers=env["R"], json={"decision": "approve", "original_checked": True})
+    from test_labs import submit as _submit, approve as _approve
+    ev = _submit(env, "L", evidence_for("LAB-CORE-01")).json()
+    assert _approve(env, ev).json()["status"] == "APPROVED"
     g = env["c"].post("/api/grade-decisions", headers=env["R"], json={"learner": me, "track": "DE-A", "grade": "L2", "scores": {"practical": 90, "explain": 90}}).json()
     assert g["status"] == "APPROVED"
     assert env["c"].post("/api/assignment-authorizations", headers=env["L"], json=body).status_code == 403

@@ -94,10 +94,8 @@ def test_desktop_app_manifest_download_and_doc_exclusion(env):
     assert ver == sysinfo.SHELL_VERSION                                                      # 앱 버전과 서버가 알리는 최신 앱 버전이 일치
     m = c.get("/api/app/manifest").json()                                                    # 로그인 전(시작 화면)에도 조회 가능
     assert m["shell_version"] == ver and m["download"] == "/download/app" and "sha256" in m
-    if m["available"]:
-        r = c.get("/download/app"); assert r.status_code == 200 and len(r.content) == m["size"] and r.content[:2] == b"MZ"
-    else:
-        assert c.get("/download/app").status_code == 404
+    assert m["retired"] is True and m["available"] is False                                   # 접속형(껍데기) 앱은 배포 중단
+    r = c.get("/download/app"); assert r.status_code == 410 and r.json()["error"]["code"] == "APP_RETIRED" and r.json()["error"]["use"] == "/download/standalone"
     assert c.get("/api/system/document", headers=env["A"]).status_code == 200               # 웹에서는 admin에게 시스템 문서 제공
     d = c.get("/api/system/document", headers={**env["A"], "User-Agent": "Mozilla/5.0 DBXDesktop/1.0.0"})
     assert d.status_code == 403 and "## 1. 한눈에 보기" not in d.text                            # PC 앱에는 제외

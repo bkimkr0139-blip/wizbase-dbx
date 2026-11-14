@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import FastAPI, Header, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -897,11 +897,44 @@ class LabRev(BaseModel):
     original_checked: bool = False
     note: str = ""
     rubric_scores: dict[str, int] = {}
+    checked_statements: dict[str, str] = {}
 
 
 @app.post("/api/lab-evidence/{eid}/review")
 def lab_review(eid: str, b: LabRev, authorization: Optional[str] = Header(None)):
-    return v11.lab_review(A(authorization), eid, b.decision, b.original_checked, b.note, b.rubric_scores)
+    return v11.lab_review(A(authorization), eid, b.decision, b.original_checked, b.note, b.rubric_scores, b.checked_statements)
+
+
+@app.post("/api/labs/{lab_id}/attempt")
+def lab_attempt(lab_id: str, authorization: Optional[str] = Header(None)):
+    """실전 수행 시도 ID 발급(1회용). adapter의 --attempt-id로 사용."""
+    return v11.lab_attempt_issue(A(authorization), lab_id)
+
+
+@app.get("/api/real-flow/{exam}")
+def real_flow(exam: str, learner: Optional[str] = None, authorization: Optional[str] = Header(None)):
+    """사전훈련 → 실제 DBX 수행 → 증거 검토·등급 반영 흐름 상태. 직원은 learner 지정 가능."""
+    a = A(authorization)
+    if exam not in v11.C.EXAM_PROFILES or exam == "DE-P-WEB":
+        raise ApiError(400, "BAD_EXAM", "DE-A | DE-P | GEN-A")
+    who = a["user_id"]
+    if learner and learner != who:
+        staff_only(a, "reviewer", "instructor")
+        who = learner
+    return v11.real_flow(who, exam)
+
+
+@app.get("/download/adapter")
+def download_adapter():
+    """실제 DBX 증거 수집기(adapter) 묶음 — 토큰 등 비밀 없음. 학습자 PC에서 실행."""
+    import io, zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in ("README.md", "dbx_lab_runner.py", "dbx_lab_common.py"):
+            p = ROOT / "adapter" / f
+            if p.exists():
+                z.write(p, "wizbase-dbx-adapter/" + f)
+    return Response(buf.getvalue(), media_type="application/zip", headers={"Content-Disposition": 'attachment; filename="wizbase-dbx-adapter.zip"'})
 
 
 @app.get("/api/lab-evidence")
@@ -1186,7 +1219,9 @@ def review_queue(authorization: Optional[str] = Header(None)):
             "items": {"total": len(items), "by_status": {k: sum(1 for i in items if i["status"] == k) for k in sorted({i["status"] for i in items})},
                       "queue": [{"id": i["item_id"], "exam": i["exam"], "status": i["status"], "next": nxt.get(i["status"]), "tech_reviewer": i.get("technical_reviewer")} for i in items if i["status"] in nxt][:15]},
             "features": {"total": len(core.FEATURES), "not_workspace_checked": [{"id": f["feature_id"], "status": f.get("status")} for f in feats]},
-            "lab_evidence_pending": sum(1 for e in V["lab_evidence"].values() if e.get("status") not in ("APPROVED", "REJECTED")),
+            "lab_evidence_pending": sum(1 for e in V["lab_evidence"].values() if e.get("status") == "SUBMITTED"),
+            "lab_queue": v11.review_lab_queue(),
+            "lab_held": sum(1 for e in V["lab_evidence"].values() if e.get("status") in ("ON_HOLD", "NEEDS_ORIGINAL")),
             "matrix_rows": len(V.get("verification_matrix", [])),
             "note": "문항 기술 검토와 출제 검토는 서로 다른 사람이어야 합니다 — 컨설턴트 1인이 기술 검토, 다른 직원(강사)이 출제 검토를 수행하세요."}
 
@@ -1345,10 +1380,9 @@ def usage_installs(days: int = 30, q: str = "", offset: int = 0, limit: int = 15
 
 @app.get("/download/app")
 def download_app(request: Request):
-    _dl_log(request, "windows_shell")
-    if not sysinfo.APP_FILE.is_file():
-        raise ApiError(404, "APP_NOT_BUILT", "설치 파일이 아직 준비되지 않았습니다.")
-    return FileResponse(str(sysinfo.APP_FILE), media_type="application/octet-stream", filename=sysinfo.APP_FILE.name)
+    """접속형 PC 앱(껍데기)은 더 이상 배포하지 않는다 — 단독 설치형(/download/standalone)만 제공."""
+    _dl_log(request, "windows_shell_blocked")
+    raise ApiError(410, "APP_RETIRED", "접속형 PC 앱은 더 이상 제공하지 않습니다. 시작 화면의 ‘단독 설치형 다운로드(.exe)’를 사용하세요.", use="/download/standalone")
 
 
 @app.get("/api/system/document")

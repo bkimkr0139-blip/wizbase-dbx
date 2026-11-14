@@ -1,7 +1,7 @@
 """v1.1 professional-track modules (spec 27-40): exam profiles, objectives, item bank, exam center,
 readiness / grade gates, labs evidence, credentials, learning plan, tutor. All gates are server-side."""
 from __future__ import annotations
-import copy, json, os, re, threading, time, uuid
+import copy, json, os, re, secrets, threading, time, uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -123,7 +123,7 @@ def refresh_objectives():
 
 
 def _lab_ok(lab_id):
-    return any(e["lab_id"] == lab_id and e["status"] == "APPROVED" for e in V["lab_evidence"].values())
+    return any(e["lab_id"] == lab_id and _approved_current(e) for e in V["lab_evidence"].values())
 
 
 def coverage(exam_id):
@@ -518,6 +518,52 @@ def required_labs(exam_id):
     return sorted({f"LAB-{x}" for d in p["domains"] for x in d["packs"]})
 
 
+ADAPTER_MIN = (1, 1)          # 이보다 낮은 adapter는 SQL 자동 대조 증거를 받지 않는다(시도 표식·doctor 도입 버전)
+ATTEMPT_TTL = 72 * 3600
+
+
+def _pretrain(learner, lab_id):
+    """사전훈련 상태: 이 실습이 속한 영역의 연습/모의 문항 숙련도(최소 5문항, 70%). 권고 신호이며 실전 증거 수령을 막지는 않는다."""
+    lab = L.LABS.get(lab_id)
+    pack = lab["pack"] if lab else lab_id.replace("LAB-", "")
+    doms = {(ex, d["key"]) for ex, p in C.EXAM_PROFILES.items() for d in p["domains"] if pack in d["packs"]}
+    n = ok = 0
+    for a in V["attempts"].values():
+        if a["learner"] != learner or a["status"] == "IN_PROGRESS":
+            continue
+        for p in a["result"]["per_item"]:
+            if (a["exam_id"], p["domain"]) in doms:
+                n += 1; ok += p["correct"]
+    pct = round(100 * ok / n) if n else None
+    state = "NONE" if n == 0 else ("PASSED" if n >= 5 and pct >= 70 else "IN_PROGRESS")
+    return {"state": state, "answered": n, "pct": pct, "rule": "영역 문항 5개 이상·정답률 70% 이상 = 사전훈련 통과(권고 기준)"}
+
+
+def lab_attempt_issue(actor, lab_id):
+    """실전 수행 1회분 시도 ID 발급. adapter가 모든 SQL 끝에 이 표식을 주석으로 붙이므로 Query History에서 검색된다. 1회용·72시간."""
+    lab = L.LABS.get(lab_id)
+    if not lab:
+        raise ApiError(404, "NO_LAB", lab_id)
+    A_ = V.setdefault("lab_attempts", {})
+    now_ = now()
+    for k in [k for k, x in A_.items() if x["used_at"] is None and now_ - x["issued_ts"] > 30 * 86400]:
+        A_.pop(k)                                  # 오래된 미사용 시도 정리
+    aid = "wzA-" + secrets.token_hex(6)
+    A_[aid] = {"attempt_id": aid, "learner": actor["user_id"], "lab_id": lab_id, "pack_hash": lab["pack_hash"], "issued_at": _iso(), "issued_ts": now_, "used_at": None, "evidence_id": None}
+    audit(actor, "LAB_ATTEMPT_ISSUED", aid, lab_id)
+    save()
+    pt = _pretrain(actor["user_id"], lab_id)
+    return {"attempt_id": aid, "lab_id": lab_id, "pack_hash": lab["pack_hash"], "expires_hours": ATTEMPT_TTL // 3600, "pretrain": pt,
+            "command": (f"python dbx_lab_runner.py run --pack {lab_id}.pack.json --catalog <교육용 catalog> --warehouse-id <id> --workspace-ref ws-***1234 --cloud aws --region ap-northeast-2 "
+                        f"--attempt-id {aid} --cleanup" if lab["kind"] == "machine" else None),
+            "note": "시도 ID는 1회용입니다. 이 ID가 없거나 다른 사람·다른 실습의 것이면 증거를 받지 않습니다." + ("" if pt["state"] == "PASSED" else " (사전훈련 미통과 — 권고: 시뮬레이터에서 같은 영역을 먼저 연습하세요)")}
+
+
+def _adapter_ver(v):
+    m = re.match(r"(\d+)\.(\d+)", str(v or ""))
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
 def lab_submit(actor, body):
     for k in body:
         if re.search(r"(token|password|secret|credential)", k, re.I):
@@ -533,11 +579,21 @@ def lab_submit(actor, body):
     e["task_results"] = body.get("task_results") if isinstance(body.get("task_results"), dict) else None
     e["statement_ids"] = [str(x)[:64] for x in (body.get("statement_ids") or [])][:50]
     e["cli_version"] = body.get("cli_version"); e["validate_exit"] = body.get("validate_exit"); e["auto_check"] = None
+    e["adapter_version"] = str(body.get("adapter_version") or "")[:12] or None
+    e["attempt_id"] = str(body.get("attempt_id") or "")[:20] or None
+    e["pack_hash"] = (body.get("pack_hash") or (lab["pack_hash"] if lab else None))
+    e["attempt_state"] = "N/A"
+    is_machine = bool(lab and lab["kind"] == "machine")
     missing = [k for k in REQ_LAB_FIELDS if not body.get(k)]
     if missing:
         e["status"] = "NEEDS_ORIGINAL"; e["reason"] = f"자기 신고만으로 통과 불가. 누락 필드: {missing}"
     elif body.get("claimed_runtime_version") and body["claimed_runtime_version"] != body["observed_runtime_version"]:
         e["status"] = "REJECTED_INCONSISTENT"; e["reason"] = "주장한 버전과 실행 증거의 버전이 불일치 — 실제 검증 증거 불인정, 재확인 필요"
+    elif is_machine and not (_adapter_ver(e["adapter_version"]) and _adapter_ver(e["adapter_version"]) >= ADAPTER_MIN):
+        e["status"] = "NEEDS_ORIGINAL"; e["auto_check"] = {"state": "ADAPTER_OLD"}
+        e["reason"] = f"adapter 버전 {e['adapter_version'] or '불명'} — {ADAPTER_MIN[0]}.{ADAPTER_MIN[1]} 이상이 필요합니다. 최신 adapter를 다시 받아 `doctor` 후 재실행하세요."
+    elif is_machine and not _claim_attempt(e, actor):
+        pass
     elif lab and lab["kind"] == "machine":
         _auto_check_machine(e, lab_id, body)
     elif lab and lab["kind"] == "cli":
@@ -556,6 +612,26 @@ def lab_submit(actor, body):
     audit(actor, "LAB_SUBMITTED", e["evidence_id"], e["status"])
     save()
     return e
+
+
+def _claim_attempt(e, actor):
+    """시도 ID 검증·소진. 실패하면 e의 상태를 정하고 False."""
+    a = V.setdefault("lab_attempts", {}).get(e["attempt_id"] or "")
+    if not a:
+        e["status"] = "REJECTED_ATTEMPT"; e["attempt_state"] = "UNKNOWN"; e["reason"] = "시도 ID가 없거나 발급된 적 없는 값입니다. UI-22에서 시도 ID를 발급받아 --attempt-id로 다시 실행하세요."
+    elif a["learner"] != actor["user_id"] or a["lab_id"] != e["lab_id"]:
+        e["status"] = "REJECTED_ATTEMPT"; e["attempt_state"] = "MISMATCH"; e["reason"] = "시도 ID가 다른 사람 또는 다른 실습에 발급된 것입니다."
+    elif a["used_at"]:
+        e["status"] = "REJECTED_ATTEMPT"; e["attempt_state"] = "REUSED"; e["reason"] = "이미 사용된 시도 ID입니다(1회용). 새 시도 ID를 발급받아 다시 수행하세요."
+    elif now() - a["issued_ts"] > ATTEMPT_TTL:
+        e["status"] = "REJECTED_ATTEMPT"; e["attempt_state"] = "EXPIRED"; e["reason"] = "시도 ID가 만료되었습니다(72시간). 새로 발급받으세요."
+    elif a["pack_hash"] != L.LABS[e["lab_id"]]["pack_hash"]:
+        e["status"] = "REJECTED_PACK_STALE"; e["attempt_state"] = "STALE_PACK"; e["reason"] = "시도 발급 이후 실습 팩이 바뀌었습니다. 새 시도로 다시 수행하세요."
+    else:
+        a["used_at"] = _iso(); a["evidence_id"] = e["evidence_id"]; e["attempt_state"] = "OK"
+        return True
+    e["auto_check"] = {"state": "ATTEMPT_" + e["attempt_state"]}
+    return False
 
 
 def _ver_tuple(v):
@@ -580,7 +656,7 @@ def _auto_check_machine(e, lab_id, body):
     for x in (e["task_results"] or {}).values():
         if isinstance(x, dict) and x.get("statement_id"):
             sids.add(str(x["statement_id"]))
-    dup = [o["evidence_id"] for o in V["lab_evidence"].values() if o["learner"] != e["learner"] and sids & set(o.get("statement_ids", []))]
+    dup = [o["evidence_id"] for o in V["lab_evidence"].values() if o["learner"] != e["learner"] and o.get("attempt_state") != "REUSED" and o.get("status") != "REJECTED_ATTEMPT" and sids & set(o.get("statement_ids", []))]   # 시도 검증에 실패한 남의 제출이 원래 주인을 막지 못하게 한다
     if res["state"] == "PACK_STALE":
         e["status"] = "REJECTED_PACK_STALE"; e["reason"] = res["reason"]
     elif dup:
@@ -594,43 +670,140 @@ def _auto_check_machine(e, lab_id, body):
         e["status"] = "SUBMITTED"; e["reason"] = "자동 대조 일치(MATCHED). 검토자의 원본(Query History statement_id) 확인 대기"
 
 
-def lab_review(actor, eid, decision, original_checked=False, note="", rubric_scores=None):
+def _compare_sids(e):
+    """검토자가 Query History에서 대조해야 하는 compare task의 statement_id (task_id -> id)."""
+    lab = L.LABS.get(e["lab_id"])
+    if not lab or lab["kind"] != "machine":
+        return {}
+    ids = {t["id"] for t in lab["tasks"] if t.get("compare")}
+    return {k: str((x or {}).get("statement_id") or "") for k, x in (e.get("task_results") or {}).items() if k in ids}
+
+
+def lab_review(actor, eid, decision, original_checked=False, note="", rubric_scores=None, checked_statements=None):
     need_staff(actor)
     e = V["lab_evidence"].get(eid)
     if not e:
         raise ApiError(404, "NO_EVIDENCE", eid)
     if e["learner"] == actor["user_id"]:
         raise ApiError(403, "SELF_REVIEW", "본인 증거를 승인할 수 없습니다.")
-    if decision == "approve":
-        if e["status"] != "SUBMITTED":
-            raise ApiError(409, "NOT_APPROVABLE", f"상태 {e['status']}: 승인 불가")
-        if not original_checked:
-            raise ApiError(400, "ORIGINAL_NOT_CHECKED", "원본(실행 내보내기·코드·결과) 확인 없이 승인할 수 없습니다.")
-        lab = L.LABS.get(e["lab_id"])
-        if lab and lab["kind"] == "manual":
-            rs = rubric_scores or {}
-            items = {r["item"]: r["max"] for r in lab["rubric"]}
-            if set(rs) != set(items) or any(not isinstance(rs[k], int) or rs[k] < 0 or rs[k] > items[k] for k in items):
-                raise ApiError(400, "RUBRIC_INCOMPLETE", f"루브릭 전 항목(0~최대)을 채점해야 합니다: {list(items)}")
-            total = sum(rs.values())
-            e["rubric_scores"], e["rubric_total"] = rs, total
-            if total < lab["pass_score"]:
-                e["status"] = "ON_HOLD"; e["reviewer"], e["note"] = actor["user_id"], note or f"루브릭 {total} < {lab['pass_score']}"
-                audit(actor, "LAB_REVIEW", eid, "ON_HOLD"); save()
-                return e
-        e["status"] = "APPROVED"; e["evidence_level"] = "DBX_VERIFIED_REVIEWED"
-    else:
-        e["status"] = "ON_HOLD"
-    e["reviewer"], e["note"] = actor["user_id"], note
+    if decision not in ("approve", "hold", "reject"):
+        raise ApiError(400, "BAD_DECISION", "approve | hold | reject")
+    note = (note or "").strip()
+    if decision in ("hold", "reject"):
+        if len(note) < 4:
+            raise ApiError(400, "NOTE_REQUIRED", "보류·반려는 사유(4자 이상)를 적어야 학습자가 무엇을 고칠지 알 수 있습니다.")
+        if e["status"] not in ("SUBMITTED", "ON_HOLD"):
+            raise ApiError(409, "NOT_REVIEWABLE", f"상태 {e['status']}: 검토 대상이 아닙니다(검토 대기 SUBMITTED / 보류 ON_HOLD만).")
+        e["status"] = "ON_HOLD" if decision == "hold" else "REJECTED_BY_REVIEWER"
+        e["reviewer"], e["note"], e["reviewed_at"] = actor["user_id"], note, _iso()
+        audit(actor, "LAB_REVIEW", eid, e["status"]); save()
+        return e
+    if e["status"] != "SUBMITTED":
+        raise ApiError(409, "NOT_APPROVABLE", f"상태 {e['status']}: 승인 불가")
+    if not original_checked:
+        raise ApiError(400, "ORIGINAL_NOT_CHECKED", "원본(실행 내보내기·코드·결과) 확인 없이 승인할 수 없습니다.")
+    lab = L.LABS.get(e["lab_id"])
+    if lab and e.get("pack_hash") and e["pack_hash"] != lab["pack_hash"]:
+        raise ApiError(409, "PACK_CHANGED", "증거 제출 이후 실습 팩이 바뀌었습니다. 학습자가 새 팩으로 다시 수행해야 합니다.")
+    need = _compare_sids(e)
+    if need:                                   # 구조화된 원본 확인: Query History에서 본 statement_id 전체를 task별로 입력
+        cs = checked_statements or {}
+        if set(cs) != set(need):
+            raise ApiError(400, "STATEMENT_CHECK_REQUIRED", f"Query History에서 확인한 statement_id를 task별로 모두 입력해야 합니다: {sorted(need)}")
+        bad = [k for k in need if str(cs[k]).strip() != need[k]]
+        if bad:
+            audit(actor, "LAB_REVIEW_STATEMENT_MISMATCH", eid, "blocked", {"tasks": bad})
+            raise ApiError(409, "STATEMENT_MISMATCH", f"입력한 statement_id가 제출된 증거와 다릅니다: {bad}. Query History의 값을 다시 확인하세요(다르면 반려 사유로 기록).")
+        e["checked_statements"] = sorted(need)
+    if lab and lab["kind"] == "manual":
+        rs = rubric_scores or {}
+        items = {r["item"]: r["max"] for r in lab["rubric"]}
+        if set(rs) != set(items) or any(not isinstance(rs[k], int) or rs[k] < 0 or rs[k] > items[k] for k in items):
+            raise ApiError(400, "RUBRIC_INCOMPLETE", f"루브릭 전 항목(0~최대)을 채점해야 합니다: {list(items)}")
+        total = sum(rs.values())
+        e["rubric_scores"], e["rubric_total"] = rs, total
+        if total < lab["pass_score"]:
+            e["status"] = "ON_HOLD"; e["reviewer"], e["note"], e["reviewed_at"] = actor["user_id"], note or f"루브릭 {total} < {lab['pass_score']}", _iso()
+            audit(actor, "LAB_REVIEW", eid, "ON_HOLD"); save()
+            return e
+    e["status"] = "APPROVED"; e["evidence_level"] = "DBX_VERIFIED_REVIEWED"
+    e["reviewer"], e["note"], e["reviewed_at"] = actor["user_id"], note, _iso()
     audit(actor, "LAB_REVIEW", eid, e["status"])
     refresh_objectives(); save()
     return e
 
 
+def _approved_current(e):
+    """승인됐고 현재 팩과 같은 팩으로 수행된 증거만 등급·준비 판정에 반영한다."""
+    if e["status"] != "APPROVED":
+        return False
+    lab = L.LABS.get(e["lab_id"])
+    return not (lab and e.get("pack_hash") and e["pack_hash"] != lab["pack_hash"])
+
+
+def review_lab_queue():
+    """검토 센터용: 검토 대기 증거를 판단에 필요한 정보와 함께 반환(기대값·전체 statement_id는 포함하지 않음)."""
+    out = []
+    t = now()
+    for e in V["lab_evidence"].values():
+        if e["status"] != "SUBMITTED":
+            continue
+        lab = L.LABS.get(e["lab_id"]) or {}
+        sub_ts = datetime.fromisoformat(e["submitted_at"]).timestamp()
+        need = _compare_sids(e)
+        out.append({"evidence_id": e["evidence_id"], "learner": e["learner"], "lab_id": e["lab_id"], "title": lab.get("title", ""), "kind": e["lab_kind"], "exam_id": e.get("exam_id"),
+                    "auto_check": (e.get("auto_check") or {}).get("state"), "per_task": (e.get("auto_check") or {}).get("per_task"),
+                    "attempt_id": e.get("attempt_id"), "attempt_state": e.get("attempt_state"), "adapter_version": e.get("adapter_version"), "workspace_ref": e.get("workspace_ref"),
+                    "cloud": e.get("cloud"), "region": e.get("region"), "runtime_version": e.get("observed_runtime_version"),
+                    "tasks_to_check": {k: {"statement_prefix": s[:8], "observed_head": ((e.get("task_results") or {}).get(k) or {}).get("observed_head")} for k, s in need.items()},
+                    "observed": {k: x.get("observed_head") for k, x in (e.get("task_results") or {}).items() if isinstance(x, dict) and x.get("observed_head")},
+                    "artifacts": e.get("artifacts"), "rubric": lab.get("rubric"), "pass_score": lab.get("pass_score"),
+                    "pretrain": _pretrain(e["learner"], e["lab_id"]), "waiting_hours": round((t - sub_ts) / 3600, 1), "reason": e.get("reason"),
+                    "pack_current": not (e.get("pack_hash") and lab and e["pack_hash"] != lab.get("pack_hash"))})
+    out.sort(key=lambda x: -x["waiting_hours"])
+    return out
+
+
+def real_flow(learner, exam_id):
+    """사전훈련 → 시도 발급 → 증거 제출 → 자동 대조 → 검토 → 등급 반영 상태를 실습별로 계산한다."""
+    rows = []
+    attempts = V.setdefault("lab_attempts", {})
+    for lab_id in required_labs(exam_id):
+        lab = L.LABS.get(lab_id)
+        evs = [e for e in V["lab_evidence"].values() if e["learner"] == learner and e["lab_id"] == lab_id]
+        evs.sort(key=lambda e: e["submitted_at"])
+        best = next((e for e in reversed(evs) if _approved_current(e)), None) or (evs[-1] if evs else None)
+        has_attempt = any(a["learner"] == learner and a["lab_id"] == lab_id for a in attempts.values())
+        if not lab:
+            stage, label = "NOT_AUTHORED", "실습 팩 미작성"
+        elif best and _approved_current(best):
+            stage, label = "GRADE_READY", "승인됨 — 등급·준비 판정에 반영"
+        elif best and best["status"] == "APPROVED":
+            stage, label = "STALE", "승인 후 팩이 바뀜 — 새 팩으로 재수행"
+        elif best and best["status"] == "SUBMITTED":
+            stage, label = "IN_REVIEW", "검토자 원본 확인 대기"
+        elif best and best["status"] in ("ON_HOLD", "NEEDS_ORIGINAL"):
+            stage, label = "ON_HOLD", (best.get("note") or best.get("reason") or "보완 필요")[:80]
+        elif best:
+            stage, label = "REJECTED", (best.get("note") or best.get("reason") or "반려")[:80]
+        elif has_attempt:
+            stage, label = "ATTEMPT_ISSUED", "시도 발급됨 — 내 PC에서 adapter 실행 후 증거 제출"
+        else:
+            pt = _pretrain(learner, lab_id)
+            stage, label = ("READY_FOR_REAL", "사전훈련 통과 — 실전 수행 가능") if pt["state"] == "PASSED" else ("PRETRAIN", "사전훈련 권장(시뮬레이터에서 해당 영역 연습)")
+        rows.append({"lab_id": lab_id, "title": (lab or {}).get("title", "(미작성)"), "kind": (lab or {}).get("kind"), "stage": stage, "label": label,
+                     "pretrain": _pretrain(learner, lab_id)["state"], "evidence_id": best["evidence_id"] if best else None, "est_minutes": (lab or {}).get("est_minutes")})
+    done = sum(1 for r in rows if r["stage"] == "GRADE_READY")
+    return {"exam_id": exam_id, "rows": rows, "done": done, "total": len(rows),
+            "flow": ["사전훈련(시뮬레이터)", "시도 발급", "내 PC에서 실제 DBX 수행(adapter)", "자동 대조", "검토자 원본 확인", "등급·준비 판정 반영"],
+            "note": "승인 0건 = 실제 DBX 검증 0건. 승인된 증거도 검토자의 원본 확인 기록이며 Databricks 공식 인증이 아닙니다."}
+
+
 def labs_status(learner, exam_id):
     req = required_labs(exam_id)
-    ok = {e["lab_id"] for e in V["lab_evidence"].values() if e["learner"] == learner and e["status"] == "APPROVED"}
-    return {"required": req, "approved": sorted(ok & set(req)), "missing": sorted(set(req) - ok),
+    ok = {e["lab_id"] for e in V["lab_evidence"].values() if e["learner"] == learner and _approved_current(e)}
+    stale = {e["lab_id"] for e in V["lab_evidence"].values() if e["learner"] == learner and e["status"] == "APPROVED" and not _approved_current(e)} - ok
+    return {"required": req, "approved": sorted(ok & set(req)), "missing": sorted(set(req) - ok), "stale": sorted(stale & set(req)),
             "authored": sorted(set(req) & set(L.LABS)), "not_authored": sorted(set(req) - set(L.LABS)),
             "note": "미작성 실습은 팩 콘텐츠가 아직 없어 수행할 수 없으며 해당 준비 판정은 차단된다."}
 
@@ -832,7 +1005,7 @@ def learner_profile(actor, learner):
             latest[g["track"]] = g
     recert = {t: ("재평가 필요(12개월 경과)" if g["valid_until"] < datetime.now(timezone.utc).date().isoformat() else "유효") for t, g in latest.items()}
     return {"learner": learner, "internal_grades": latest, "internal_reassessment": recert, "official_credentials": creds or [{"status": "NONE_RECORDED"}],
-            "readiness": {r["exam_id"]: r["label"] for r in ready}, "labs_approved": [e["lab_id"] for e in V["lab_evidence"].values() if e["learner"] == learner and e["status"] == "APPROVED"],
+            "readiness": {r["exam_id"]: r["label"] for r in ready}, "labs_approved": [e["lab_id"] for e in V["lab_evidence"].values() if e["learner"] == learner and _approved_current(e)],
             "assignment_authorization": "별도 승인(자동 부여 없음)", "separation_note": "내부 등급·공식 자격·응시준비·실제 검증·투입 승인은 서로 다른 필드입니다.", "disclaimer": DISCLAIMER}
 
 
@@ -842,7 +1015,7 @@ def partner_dashboard():
     for l in learners:
         creds = [c for c in V["credentials"] if c["learner"] == l]
         rows.append({"learner": l, "grades": sorted({g["grade"] for g in V["grades"] if g["learner"] == l and g["status"] == "APPROVED"}),
-                     "official_credentials": [cred_status(c)["status"] for c in creds] or ["NONE_RECORDED"], "labs_approved": len([e for e in V["lab_evidence"].values() if e["learner"] == l and e["status"] == "APPROVED"])})
+                     "official_credentials": [cred_status(c)["status"] for c in creds] or ["NONE_RECORDED"], "labs_approved": len([e for e in V["lab_evidence"].values() if e["learner"] == l and _approved_current(e)])})
     return {"company_program": {"partner_status": "Databricks 파트너(위즈베이스 제공 정보 — Partner Portal 원본 확인은 회사가 수행)", "poc": "실제 PoC 준비 중", "purpose": "파트너 레벨 상향을 위한 인증 시험 준비 지원 환경", "tier": "현재 레벨 미기재(상향 목표)", "academy_access": "회사 계정 기준 — 시스템이 확인하지 않음", "portal_confirmed_at": None},
             "note": "이 환경은 위즈베이스(Databricks 파트너)가 실제 PoC를 준비하며 파트너 레벨 상향을 위한 인증 시험 준비를 지원하는 내부 훈련 환경이며, Databricks 공식 제품·교육·시험이 아닙니다. 현재 파트너 tier·인증 인원은 이 시스템이 가정하지 않습니다. 인증 인원만으로 tier가 충족된다고 계산하지 않습니다. KB: Partner Portal 인증 연결은 회사 이메일·Academy 계정 연결 확인 필요.",
             "learners": rows, "kb_url": "https://kb.databricks.com/training/why-isn%E2%80%99t-my-certification-showing-in-the-partner-portal"}

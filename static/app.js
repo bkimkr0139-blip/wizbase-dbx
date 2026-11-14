@@ -212,20 +212,41 @@ async function pollUpdate(manual) {
   if (!TOKEN || !SYS) return null;
   try {
     const u = await api("/api/system/update-check?build=" + encodeURIComponent(CLIENT_BUILD || ""));
-    const shell = IS_APP && u.app && (u.app.update_available !== undefined ? u.app.update_available : verCmp(u.app.shell_version, APP_VER) > 0);
+    const shell = IS_APP && u.app && (IS_SA ? (u.app.update_available !== undefined ? u.app.update_available : verCmp(u.app.shell_version, APP_VER) > 0) : true);   // 접속형 앱은 항상 이전 안내
     if (!manual) {
-      const key = (u.update_available ? u.server_build : "") + "|" + (shell ? u.app.shell_version : "");
+      const key = (u.update_available ? u.server_build : "") + "|" + (shell ? (IS_SA ? u.app.shell_version : "retired") : "");
       if (key === "|" || key === UPD_SHOWN) return u; UPD_SHOWN = key;
       SYSPOP = updateCardHtml(u, shell); render(true);
     }
     return u;
   } catch { return null }
 }
+const retireHtml = () => `<div class="updbox"><b>접속형 PC 앱은 더 이상 제공되지 않습니다</b><div class="sub">지금 쓰는 이 앱은 사이트를 창으로 여는 접속형입니다. <b>내 PC에서 직접 실행되는 ‘단독 설치형’</b>을 새로 받아 쓰세요.<ol style="margin:6px 0 6px 18px;padding:0"><li>[브라우저에서 사이트 열기]를 눌러 ${esc(location.origin)} 에 접속합니다.</li><li>시작 화면(또는 도움말 메뉴)의 <b>단독 설치형 다운로드 (.exe)</b>를 내려받아 설치합니다.</li><li>설치한 뒤에는 이 접속형 앱을 삭제해도 됩니다.</li></ol>내 학습 기록은 사이트 계정에 있어 그대로 유지됩니다. 단독 설치형은 처음 실행할 때 수십 초가 걸릴 수 있습니다.</div><p><button class="primary" data-a="siteopen">브라우저에서 사이트 열기</button> <button data-a="syspopclose">나중에</button></p></div>`;
+const PT = { PASSED: ["사전훈련 통과", "ok"], IN_PROGRESS: ["사전훈련 진행 중", "w"], NONE: ["사전훈련 기록 없음", "bad"] };
+const labQueueHtml = q => {
+  const rows = q.lab_queue || [];
+  const head = `<div class="card"><b>① 실제 DBX 증거 검토 큐</b> <span class="b ${rows.length ? "w" : "ok"}">대기 ${rows.length}건</span> <span class="mute">보류·보완 ${q.lab_held || 0}건</span>
+    <div class="sub">흐름: 사전훈련(앱) → 실제 DBX 수행(학습자 PC adapter) → <b>여기서 증거 검토</b> → 등급·준비 판정 반영. 승인은 <b>Query History에서 직접 본 statement_id</b>를 task별로 입력해야 열립니다. 승인 전에는 어떤 실습도 '실제 검증'으로 세지 않습니다.</div>`;
+  if (!rows.length) return head + `<p class="mute">검토 대기 중인 증거가 없습니다.</p></div>`;
+  return head + rows.map(x => {
+    const pt = PT[x.pretrain.state] || PT.NONE;
+    const tasks = Object.entries(x.tasks_to_check);
+    const manual = x.kind === "manual";
+    return `<div class="card" style="margin-top:8px"><b>${esc(x.evidence_id)} · ${esc(x.lab_id)} ${esc(x.title)}</b> <span class="b w">${esc(x.kind)}</span> <span class="b ${pt[1]}">${pt[0]}${x.pretrain.pct != null ? " " + x.pretrain.pct + "%" : ""}</span> <span class="b ${x.pack_current ? "ok" : "bad"}">${x.pack_current ? "현재 팩" : "팩 변경됨"}</span> <span class="mute">제출자 ${esc(x.learner)} · 대기 ${x.waiting_hours}시간</span>
+      <div class="sub">자동 대조 <b>${esc(x.auto_check || "-")}</b> · 시도 ${esc(x.attempt_id || "-")}(${esc(x.attempt_state || "-")}) · adapter ${esc(x.adapter_version || "-")} · ${esc(x.cloud || "")} ${esc(x.region || "")} · ws ${esc(x.workspace_ref || "")} · 런타임 ${esc(x.runtime_version || "-")}<br>${esc(x.reason || "")}</div>
+      ${tasks.length ? `<div class="sub"><b>Query History 대조</b> — 검색창에 시도 ID <code>${esc(x.attempt_id || "")}</code>를 넣으면 이 증거의 모든 SQL이 나옵니다. 아래 task마다 statement_id(앞 8자가 표시된 것)를 전체 복사해 입력하세요.</div>
+      <div class="row" style="flex-direction:column;align-items:stretch">${tasks.map(([k, t]) => `<label>${esc(k)} <small class="mute">${esc(t.statement_prefix)}…</small> <input data-st="${esc(x.evidence_id)}" data-task="${esc(k)}" placeholder="statement_id 전체" style="width:360px"></label>`).join("")}</div>` : ""}
+      ${Object.keys(x.observed || {}).length ? `<div class="sub"><b>관찰용 task 결과(상위 몇 행)</b> ${Object.entries(x.observed).map(([k, h]) => `<div><code>${esc(k)}</code> ${esc(JSON.stringify(h))}</div>`).join("")}</div>` : ""}
+      ${manual ? `<div class="sub"><b>산출물 해시</b> ${esc(Object.keys(x.artifacts || {}).join(", "))}<br>루브릭(합격 ${x.pass_score}점): ${(x.rubric || []).map(r => esc(r.item) + " ≤" + r.max).join(" · ")}</div><input id="rb_${esc(x.evidence_id)}" style="width:100%" placeholder='루브릭 점수 JSON 예: ${esc(JSON.stringify(Object.fromEntries((x.rubric || []).slice(0, 2).map(r => [r.item, r.max]))))} …'>` : ""}
+      <div class="row"><label><input type="checkbox" id="rc_${esc(x.evidence_id)}"> 원본(Query History 코드·결과·실행 시각)을 직접 확인함</label></div>
+      <div class="row"><input id="rn_${esc(x.evidence_id)}" placeholder="검토 의견 — 보류·반려는 사유 필수(학습자에게 그대로 표시)" style="flex:1"><button data-a="labreview2" data-id="${esc(x.evidence_id)}" data-dec="approve">승인</button><button class="sec" data-a="labreview2" data-id="${esc(x.evidence_id)}" data-dec="hold">보류</button><button class="ghost" data-a="labreview2" data-id="${esc(x.evidence_id)}" data-dec="reject">반려</button></div></div>`;
+  }).join("") + `</div>`;
+};
 function updateCardHtml(u, shell) {
   const parts = [];
   if (u.update_available) parts.push(`<div class="updbox"><b>사이트가 업데이트되었습니다</b> (서버 v${esc(u.server_version)} · 빌드 <code>${esc(u.server_build)}</code>)<div class="sub">지금 적용하면 화면을 새로 불러와 최신 기능을 사용합니다. 진행 중 입력은 저장 후 적용하세요.</div><p><button class="primary" data-a="sysreload">지금 적용</button> <button data-a="syspopclose">나중에</button></p></div>`);
   if (shell && IS_SA) parts.push(`<div class="updbox"><b>${u.app.kind === "pack" ? "기능 업데이트" : "새 버전"} ${esc(u.app.latest_version || "")}이(가) 있습니다</b> (현재 ${esc(APP_VER)})<div class="sub">${u.app.kind === "pack" ? `필요한 부분만 내려받아(약 ${Math.max(1, Math.round((u.app.size || 0) / 1024))}KB) 적용하고 앱을 자동으로 다시 시작합니다.` : "운영자 서버에서 새 설치 파일을 내려받아 교체합니다."} <b>내 학습 데이터는 유지</b>됩니다.</div><p><button class="primary" data-a="appupdate">지금 업데이트</button> <button data-a="syspopclose">나중에</button></p></div>`);
-  else if (shell) parts.push(`<div class="updbox"><b>PC 앱 새 버전 ${esc(u.app.shell_version)}</b> (현재 ${esc(APP_VER)})<div class="sub">앱 자체(실행 파일)가 갱신되었습니다. 내려받아 실행하면 기존 앱을 교체 설치합니다.</div><p><button class="primary" data-a="appdl">새 버전 내려받기</button> <button data-a="syspopclose">나중에</button></p></div>`);
+  else if (shell) parts.push(retireHtml());
   return `<h3 style="margin-top:0">업데이트 알림</h3>${parts.join("")}`;
 }
 function nextBar() {
@@ -477,8 +498,13 @@ window.H = {
   keyhelp() {
     SYSPOP = `<h3 style="margin-top:0">단축키 안내</h3>${table(["키", "동작"], [["F10", "메뉴 바 활성화(첫 메뉴 열기)"], ["Alt + 1 ~ 7", "해당 번호의 메뉴 열기/닫기 (7 = 도움말)"], ["↑ ↓ ← →", "열린 메뉴 안에서 항목·메뉴 이동"], ["숫자 1 ~ 9", "열린 메뉴의 해당 번호 항목 실행"], ["Enter / Esc", "항목 실행 / 메뉴 닫기"], ["F1", "사용 안내(HELP) 열기·닫기"], ["Alt + Shift + A", "AI 지원"], ["Alt + Shift + F", "피드백 보내기(AXOS 탭)"], ["Alt + Shift + U", "업데이트 확인"], ["Alt + Shift + I", "시스템 정보"], ["Alt + Shift + K", "단축키 안내"], ...(IS_APP || ME?.role !== "admin" ? [] : [["Alt + Shift + D", "시스템문서.md 다운로드(admin)"]])])}`; render(true)
   },
+  siteopen() {
+    SYSPOP = ""; const u = location.origin;
+    if (window.pywebview?.api?.open_external) window.pywebview.api.open_external(u); else window.open(u, "_blank");
+    render(true)
+  },
   appdl(d) {
-    const MAP = { standalone: ["/download/standalone", "WIZBASE-DBX-Standalone.exe"], shell: ["/download/app", "WIZBASE-DBX-Rehearsal.exe"], "mac-arm64": ["/download/standalone-mac-arm64", "WIZBASE-DBX-Standalone-mac-arm64.zip"], "mac-x64": ["/download/standalone-mac-x64", "WIZBASE-DBX-Standalone-mac-x64.zip"] };
+    const MAP = { standalone: ["/download/standalone", "WIZBASE-DBX-Standalone.exe"], "mac-arm64": ["/download/standalone-mac-arm64", "WIZBASE-DBX-Standalone-mac-arm64.zip"], "mac-x64": ["/download/standalone-mac-x64", "WIZBASE-DBX-Standalone-mac-x64.zip"] };
     if (IS_SA) { H.appupdate(); return }
     if (IS_MACOS && (!d || !d.k)) {   // 메뉴에서 눌렀을 때: Mac은 CPU 종류를 고르게 한다
       SYSPOP = `<h3 style="margin-top:0">Mac 설치형 앱 다운로드</h3><p>사용 중인 Mac의 CPU를 선택하세요. (  메뉴 > 이 Mac에 관하여 에서 확인: "칩 Apple M…"이면 Apple Silicon, "프로세서 Intel…"이면 Intel)</p><p><button class="primary" data-a="appdl" data-k="mac-arm64">Apple Silicon (M1 이상)</button> <button data-a="appdl" data-k="mac-x64">Intel Mac</button></p><div class="sub">내려받은 zip을 풀고 "WIZBASE DBX Rehearsal"을 응용 프로그램 폴더로 옮긴 뒤, 처음에는 우클릭 > 열기로 실행하세요(서명되지 않은 앱이라 보안 경고가 표시됩니다).</div>`; render(true); return
@@ -497,7 +523,7 @@ window.H = {
     const u = await api("/api/system/update-check?build=" + encodeURIComponent(CLIENT_BUILD || ""));
     let tel = null; if (IS_SA) { try { tel = await api("/api/app/telemetry-setting") } catch { } }
     SYSPOP = IS_SA ? `<h3 style="margin-top:0">단독 설치형 앱 정보</h3>${table(["항목", "값"], [["앱 버전", APP_VER], ["최신 버전", u.app.offline ? "(확인 불가 — 오프라인)" : (u.app.latest_version || "?")], ["내 데이터 폴더", SYS.data_dir || "-"], ["서버", "이 PC 안(127.0.0.1)에서만 실행"], ["설치 ID", tel ? tel.install + "…" : "-"]])}${tel ? `<div class="sub" style="margin-top:8px"><b>운영 서버로 보내는 신호:</b> ${tel.enabled ? "켜짐" : "꺼짐"} — 설치 ID(무작위 값)·앱 버전·OS 이름·실행/업데이트 결과를 보냅니다(인터넷 연결 시). 서버는 IP 일부(마지막 자리 숨김)와 함께 설치 PC를 구분해 기록하며, 학습 데이터·SQL은 보내지 않습니다. 앱 다운로드·업데이트 확인·AXOS 피드백 전달에는 구분 헤더가 함께 갑니다.<p><button data-a="telemset" data-on="${tel.enabled ? "0" : "1"}">${tel.enabled ? "신호 전송 끄기" : "신호 전송 켜기"}</button></p></div>` : ""}<div class="sub">서버가 앱에 포함되어 있어 인터넷 없이도 학습할 수 있습니다. 인터넷이 연결되면 새 버전 확인과 AXOS 피드백 전달이 이루어집니다. 시스템 문서와 admin 기능은 포함되지 않습니다.</div>${u.app.update_available ? `<p><button class="primary" data-a="appupdate">지금 업데이트</button></p>` : ""}`
-      : `<h3 style="margin-top:0">PC 앱 정보</h3>${table(["항목", "값"], [["앱 버전", APP_VER], ["최신 앱 버전", u.app ? u.app.shell_version : "?"], ["접속 주소", location.origin], ["서버 버전", u.server_version]])}<div class="sub">이 앱은 ${esc(location.origin)} 사이트를 PC 창으로 여는 접속형 앱입니다.</div>${u.app && verCmp(u.app.shell_version, APP_VER) > 0 ? `<p><button class="primary" data-a="appdl" data-k="shell">새 앱 내려받기</button></p>` : ""}`; render(true)
+      : `<h3 style="margin-top:0">PC 앱 정보</h3>${table(["항목", "값"], [["앱 버전", APP_VER], ["접속 주소", location.origin], ["서버 버전", u.server_version]])}${retireHtml()}`; render(true)
   },
   async sysinfo() {
     SYS = await api("/api/system/info"); const c = SYS.counts;
@@ -626,6 +652,20 @@ window.H = {
   async labjsonsubmit() { let ev; try { ev = JSON.parse(val("labjson")) } catch { return toast("evidence JSON 형식 오류") } ev.exam_id = val("labx"); await api("/api/lab-evidence", { body: ev }).then(r => log("증거 상태: " + r.status + " — " + (r.reason || ""), r.status.startsWith("REJECTED"))).catch(e => log("✗ " + e.message, true)); render(true) },
   labexam() { LAST.labexam = val("labex2"); render(true) },
   async labsubmit() { const b = {}; ["lab_id", "exam_id", "workspace_ref", "cloud", "region", "run_id", "source_hash", "result_checksum", "runtime_version", "observed_runtime_version", "claimed_runtime_version"].forEach(k => { const v = val("lb_" + k); if (v) b[k] = v }); await api("/api/lab-evidence", { body: b }).then(r => log("증거 상태: " + r.status + " " + (r.reason || ""))).catch(e => log("✗ " + e.message, true)); render(true) },
+  async labreview2(d) {   // 검토 센터: 승인/보류/반려 (승인은 Query History에서 본 statement_id를 task별로 입력)
+    const e = d.id, body = { decision: d.dec, note: val("rn_" + e) };
+    if (d.dec === "approve") {
+      body.original_checked = !!$("#rc_" + e)?.checked;
+      body.checked_statements = {}; document.querySelectorAll(`[data-st="${e}"]`).forEach(i => { body.checked_statements[i.dataset.task] = i.value.trim() });
+      const rb = val("rb_" + e); if (rb) { try { body.rubric_scores = JSON.parse(rb) } catch { return toast("루브릭 JSON 형식 오류") } }
+    }
+    await api(`/api/lab-evidence/${e}/review`, { body }).then(r => { log(`증거 ${e} → ${r.status}`, r.status !== "APPROVED"); toast({ APPROVED: "승인했습니다", ON_HOLD: "보류했습니다", REJECTED_BY_REVIEWER: "반려했습니다" }[r.status] || r.status); return true }).catch(x => { log("✗ " + x.message, true, x.data); toast(x.message); return false }).then(ok => { if (ok) render(true) })   // 실패하면 입력값을 지우지 않는다
+  },
+  async labattempt(d) {
+    const r = await api(`/api/labs/${d.id}/attempt`, { body: {} }).catch(x => { toast(x.message); return null });
+    if (r) { LAST.attempt = r; log(`시도 ID 발급 ${r.attempt_id} (${d.id})`) }
+    render(true)
+  },
   async labreview(d) { await api(`/api/lab-evidence/${d.id}/review`, { body: { decision: d.dec, original_checked: !!($("#lbchk") && $("#lbchk").checked), rubric_scores: (() => { try { return JSON.parse(val("rubric") || "{}") } catch { return {} } })() } }).then(() => log("검토 완료")).catch(e => log("✗ " + e.message, true)); render(true) },
   async readiness() { LAST.ready = await api("/api/readiness-decisions", { body: { exam_id: val("rdx") } }); render(true) },
   async credadd() { await api("/api/credentials", { body: { name: val("crn") } }); render(true) },
@@ -1027,6 +1067,7 @@ const V = {
     if (!staff()) return `<h2>검토 센터</h2><p class="mute">검토자/강사 전용입니다.</p>`;
     const q = await api("/api/review/queue");
     return `<h2>검토 센터 <small class="mute">컨설턴트 자체 검토</small></h2><div class="sub">실제 Databricks 교육용 워크스페이스에서 직접 확인한 것만 기록하세요. 문서로만 본 것은 기록하지 않습니다. ${esc(q.note)}</div>
+    ${labQueueHtml(q)}
     <div class="card"><b>검토자 매뉴얼</b> <button data-a="rvmanual">검토자_매뉴얼.md 다운로드</button><div class="sub">준비물 · 기능 재확인 · 원문 대조 · 문항 검수 · 실습 21개 절차 · 기록 규칙이 들어 있습니다.</div></div>
     <div class="grid2"><div class="card"><b>원문 대조</b> ${q.objectives.verified}/${q.objectives.total}${table(["목표", "시험", "요약", ""], q.objectives.unverified_sample.map(o => [o.id, o.exam, o.summary, `<button data-a="objverify" data-id="${o.id}">PDF와 대조함</button>`]))}</div>
     <div class="card"><b>문항 검수</b> ${esc(Object.entries(q.items.by_status).map(([k, v]) => k + " " + v).join(" · "))}${table(["문항", "시험", "상태", "다음"], q.items.queue.map(i => [i.id, i.exam, i.status, `<button data-a="itemrev" data-id="${i.id}" data-stage="${i.next}">${i.next} 통과</button>`]))}</div></div>
@@ -1327,20 +1368,30 @@ order version: 주문 변경마다 +1 (낙관적 잠금)</pre><div class="sub">g
     <div class="card"><div class="row"><select id="exid">${profs.map(p => `<option ${p.domains.length && p.exam_id !== "DE-P-WEB" ? "" : "disabled"}>${p.exam_id}</option>`).join("")}</select><select id="exk"><option value="practice">연습(해설 제공)</option><option value="sealed">봉인 모의시험(제출 전 정답 비공개)</option></select> 최대 문항 <input id="exmax" type="number" style="width:60px"><button data-a="examstart">시작</button></div><div class="sub">프로필·가이드·언어·시간이 시작 시 고정됩니다. DE-P 웹 프로필은 혼합 금지로 시작할 수 없습니다.</div></div>${body}`;
   },
   async lab() {
-    const [cat, ev, req] = await Promise.all([api("/api/labs"), api("/api/lab-evidence"), api("/api/required-labs/" + (LAST.labexam || "DE-A"))]);
+    const [cat, ev, req, flow] = await Promise.all([api("/api/labs"), api("/api/lab-evidence"), api("/api/required-labs/" + (LAST.labexam || "DE-A")), api("/api/real-flow/" + (LAST.labexam || "DE-A"))]);
     const mine = id => { const x = ev.filter(e => e.lab_id === id && (e.learner === ME.user_id)); const best = x.find(e => e.status === "APPROVED") || x[x.length - 1]; return best ? best.status : "미제출" };
     const ex = LAST.labexam || "DE-A";
     const stTone = s => s === "APPROVED" ? "ok" : (s === "SUBMITTED" ? "w" : (s === "미제출" ? "" : "bad"));
     const evRows = ev.slice().reverse().map(e => [e.evidence_id, e.learner === ME.user_id ? "나" : e.learner, e.lab_id, `<span class="b ${stTone(e.status)}">${esc(e.status)}</span>`,
       e.auto_check ? (e.auto_check.per_task ? Object.entries(e.auto_check.per_task).map(([k, v]) => `${k}:${v}`).join(" ") : e.auto_check.state) : "—", (e.reason || "").slice(0, 110),
-      ["reviewer", "instructor"].includes(ME.role) && e.status === "SUBMITTED" ? `<a href="#" data-a="labreview" data-id="${e.evidence_id}" data-dec="approve">원본 확인 후 승인</a>` : ""]);
+      ["reviewer", "instructor"].includes(ME.role) && e.status === "SUBMITTED" ? `<a href="#" data-a="nav" data-v="rvw">검토 센터에서 검토</a>` : ""]);
+    const STG = { PRETRAIN: ["사전훈련 권장", "w"], READY_FOR_REAL: ["실전 수행 가능", "ok"], ATTEMPT_ISSUED: ["시도 발급됨", "w"], IN_REVIEW: ["검토 대기", "w"], ON_HOLD: ["보완 필요", "bad"], REJECTED: ["반려", "bad"], STALE: ["팩 변경 — 재수행", "bad"], GRADE_READY: ["등급 반영", "ok"], NOT_AUTHORED: ["팩 미작성", ""] };
+    const flowHtml = `<div class="card"><b>내 실전 진행 현황 (${esc(ex)})</b> <span class="mute">승인·반영 ${flow.done}/${flow.total}</span>
+      <div class="sub">${flow.flow.map((s, i) => `<b>${i + 1}</b> ${esc(s)}`).join(" → ")}</div>
+      ${table(["실습", "제목", "단계", "상태 설명", "사전훈련", ""], flow.rows.map(r => [r.lab_id, r.title, `<span class="b ${(STG[r.stage] || ["", ""])[1]}">${esc((STG[r.stage] || [r.stage])[0])}</span>`, esc(r.label), { PASSED: "통과", IN_PROGRESS: "진행 중", NONE: "기록 없음" }[r.pretrain], ["NOT_AUTHORED", "GRADE_READY", "IN_REVIEW"].includes(r.stage) ? "" : (r.kind === "machine" ? `<a href="#" data-a="labattempt" data-id="${r.lab_id}">시도 ID 발급</a>` : `<a href="#" data-a="labpack" data-id="${r.lab_id}">안내 내려받기</a>`)]))}
+      ${LAST.attempt ? `<div class="banner">시도 ID <b>${esc(LAST.attempt.attempt_id)}</b> (${esc(LAST.attempt.lab_id)}, ${LAST.attempt.expires_hours}시간·1회용). ${esc(LAST.attempt.note)}${LAST.attempt.command ? `<pre>${esc(LAST.attempt.command)}</pre>` : ""}</div>` : ""}
+      <div class="sub">${esc(flow.note)}</div></div>`;
     return `<h2>UI-22 실제 실습 증거함</h2><div class="sub">실제 교육용 Databricks에서 수행한 실습을 증거로 제출하고 자동 대조·검토를 거칩니다. <b>이 서버는 Databricks 토큰·호스트·비밀번호를 받지 않습니다.</b></div>
     <div class="banner">경로(C-검토형): ① 팩 내려받기 → ② <b>내 PC</b>에서 adapter 실행(내 Databricks CLI 프로필 사용, 지정 스키마 wz_lab_* 안에서만 실행) → ③ 출력된 evidence JSON(체크섬·statement ID만 포함)을 여기에 제출 → ④ 서버가 기대 결과와 자동 대조 → ⑤ 검토자가 Query History에서 statement ID로 원본 확인 후 승인. 스크린샷·자기 신고만으로는 통과되지 않습니다. <br>adapter는 이 환경에서 <b>가짜 Statement API로만 검증</b>되었고 실제 Databricks 워크스페이스 대상 실행은 아직 검증되지 않았습니다(첫 실사용 시 검토자와 함께 확인).</div>
+    ${flowHtml}
     <div class="card"><b>실습 카탈로그</b> <span class="mute">작성 ${cat.authored} / 지시서 팩 ${cat.total_packs_in_spec}개 — ${esc(cat.status_note)}</span>
     ${table(["실습", "제목", "방식", "시험", "예상", "내 상태", ""], cat.labs.map(l => [l.lab_id, l.title, { machine: "자동 대조(SQL)", cli: "CLI 증거", manual: "수동(검토자 면담)" }[l.kind], l.exam.join(","), l.est_minutes + "분", `<span class="b ${stTone(mine(l.lab_id))}">${esc(mine(l.lab_id))}</span>`, `<a href="#" data-a="labpack" data-id="${l.lab_id}">팩/안내 내려받기</a>`]))}
     <details style="margin-top:10px"><summary>단계별 안내 보기</summary>${cat.labs.map(l => `<h3>${l.lab_id} ${esc(l.title)}</h3><div class="sub">${esc(l.goal)}</div><ol>${l.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>${l.required_artifacts.length ? `<div class="sub"><b>필수 산출물(해시 제출):</b> ${l.required_artifacts.map(esc).join(", ")}<br><b>루브릭(합격 ${l.pass_score}점):</b> ${l.rubric.map(r => esc(r.item) + " " + r.max).join(" · ")}</div>` : ""}`).join("")}</details></div>
-    <div class="card"><b>내 PC에서 실행 (adapter)</b><pre>python dbx_lab_runner.py run --pack LAB-CORE-01.pack.json --catalog &lt;교육용 catalog&gt; --warehouse-id &lt;SQL warehouse id&gt; \\
-    --workspace-ref ws-***1234 --cloud aws --region ap-northeast-2 --profile &lt;CLI 프로필&gt; --cleanup
+    <div class="card"><b>내 PC에서 실행 (adapter v1.1)</b> <a href="/download/adapter">adapter 내려받기 (.zip)</a><pre># 0) 처음 한 번: 사전 점검 — CLI 버전·로그인·warehouse·catalog 쓰기 권한을 확인하고 실패 원인을 알려 줍니다
+python dbx_lab_runner.py doctor --catalog &lt;교육용 catalog&gt; --warehouse-id &lt;SQL warehouse id&gt; --profile &lt;CLI 프로필&gt;
+# 1) 위 표에서 [시도 ID 발급] → 2) 실행(모든 SQL 끝에 시도 ID가 주석으로 붙어 Query History에서 검색됩니다)
+python dbx_lab_runner.py run --pack LAB-CORE-01.pack.json --catalog &lt;교육용 catalog&gt; --warehouse-id &lt;SQL warehouse id&gt; \\
+    --workspace-ref ws-***1234 --cloud aws --region ap-northeast-2 --profile &lt;CLI 프로필&gt; --attempt-id wzA-xxxxxxxxxxxx --cleanup
 python dbx_lab_runner.py bundle-evidence --dir &lt;bundle 경로&gt; --workspace-ref ws-***1234 --cloud aws --region ap-northeast-2</pre>
     <div class="sub">필요: Python 3.9+, Databricks CLI ≥ 0.218.0(인증 완료), 교육용 워크스페이스의 SQL warehouse와 쓰기 가능한 catalog. 고객 운영 catalog/실데이터 사용 금지. adapter는 GRANT/ALTER/범위 밖 객체 SQL을 실행 전에 거부합니다. 파일: adapter/dbx_lab_runner.py, adapter/dbx_lab_common.py</div></div>
     <div class="card"><b>증거 제출</b><div class="row">시험 <select id="labx"><option>DE-A</option><option>DE-P</option><option>GEN-A</option></select></div>

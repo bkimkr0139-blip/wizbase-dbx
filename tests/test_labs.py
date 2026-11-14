@@ -103,8 +103,20 @@ def test_evidence_contains_no_credentials():
 
 
 # ---- 서버 자동 대조
-def submit(env, who, ev):
-    return env["c"].post("/api/lab-evidence", headers=env[who], json=ev)
+def submit(env, who, ev, fresh=False):
+    """machine 팩은 서버가 발급한 1회용 시도 ID가 필요하다 — 없으면 이 헬퍼가 발급해 붙인다."""
+    h = env[who] if isinstance(who, str) else who
+    if labs.LABS.get(ev["lab_id"], {}).get("kind") == "machine" and (fresh or "attempt_id" not in ev or not ev["attempt_id"]):
+        ev = {**ev, "attempt_id": env["c"].post(f"/api/labs/{ev['lab_id']}/attempt", headers=h).json()["attempt_id"]}
+    return env["c"].post("/api/lab-evidence", headers=h, json=ev)
+
+
+def approve(env, r, **kw):
+    """승인: machine 팩은 compare task의 statement_id 전체를 입력해야 한다."""
+    from backend import v11
+    need = v11._compare_sids(v11.V["lab_evidence"][r["evidence_id"]])
+    body = {"decision": "approve", "original_checked": True, **({"checked_statements": need} if need else {}), **kw}
+    return env["c"].post(f"/api/lab-evidence/{r['evidence_id']}/review", headers=env["R"], json=body)
 
 
 def test_matching_evidence_flow_and_review(env):
@@ -113,7 +125,7 @@ def test_matching_evidence_flow_and_review(env):
     assert r["status"] == "SUBMITTED" and r["auto_check"]["state"] == "MATCHED" and set(r["auto_check"]["per_task"].values()) == {"MATCH"}
     assert "expected" not in json.dumps(r).lower()
     assert env["c"].post(f"/api/lab-evidence/{r['evidence_id']}/review", headers=env["R"], json={"decision": "approve"}).status_code == 400       # 원본 확인 필수
-    done = env["c"].post(f"/api/lab-evidence/{r['evidence_id']}/review", headers=env["R"], json={"decision": "approve", "original_checked": True}).json()
+    done = approve(env, r).json()
     assert done["status"] == "APPROVED" and done["evidence_level"] == "DBX_VERIFIED_REVIEWED"
     me = env["c"].get("/api/me", headers=env["L"]).json()["user_id"]
     from backend import v11
@@ -127,7 +139,7 @@ def test_wrong_results_are_rejected_without_leaking_expected(env):
     r = submit(env, "L", ev).json()
     assert r["status"] == "REJECTED_RESULT_MISMATCH" and r["auto_check"]["per_task"]["available"] == "MISMATCH" and r["auto_check"]["per_task"]["count"] == "MATCH"
     assert labs.expected("LAB-CORE-01")["available"][0] not in json.dumps(r)      # 틀린 task의 기대값은 응답에 없음(맞게 제출한 task 값은 본인 제출값의 반향)
-    assert env["c"].post(f"/api/lab-evidence/{r['evidence_id']}/review", headers=env["R"], json={"decision": "approve", "original_checked": True}).status_code == 409
+    assert approve(env, r).status_code == 409
 
 
 def test_stale_pack_missing_task_and_missing_statement_id(env):
@@ -143,7 +155,8 @@ def test_evidence_reuse_by_another_learner_rejected(env):
     ev = evidence_for("LAB-DE-03")
     assert submit(env, "L", ev).json()["status"] == "SUBMITTED"
     other = login(env["c"], "learner", "copycat")
-    r = env["c"].post("/api/lab-evidence", headers=other, json=ev).json()
+    ev2 = {k: v for k, v in ev.items() if k != "attempt_id"}
+    r = submit(env, other, ev2).json()
     assert r["status"] == "REJECTED_DUPLICATE"
 
 

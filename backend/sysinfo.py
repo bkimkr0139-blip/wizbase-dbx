@@ -6,7 +6,7 @@ from pathlib import Path
 from . import core, labs, pack, transfer, v11
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.5.0"
+VERSION = "0.6.0"
 RELEASED = "2026-11-12"
 SHELL_VERSION = "0.1.1"  # PC 앱(desktop/dbx_app.py APP_VERSION)의 최신 버전 — 새 exe를 배포할 때 함께 올린다
 APP_FILE = ROOT / "dist_app" / "release" / "WIZBASE-DBX-Rehearsal.exe"
@@ -58,6 +58,13 @@ def central_manifest():
 PURPOSE = ("WIZBASE(Databricks 파트너)의 실제 PoC 준비와 파트너 레벨 상향을 위한 인증 시험 준비를 지원하는 교육·훈련 환경. "
            "Databricks 공식 제품·교육·시험이 아니며 합격·자격·투입을 보증하지 않음.")
 CHANGELOG = [
+    {"version": "0.6.0", "date": "2026-11-14", "notes": ["운영 흐름 강화: 앱에서 사전훈련 → 실제 DBX에서 수행(학습자 PC adapter) → 앱에서 증거 검토·등급 판정",
+                                                      "검토 센터에 ‘실제 DBX 증거 검토 큐’ 신설: 자동 대조 결과·시도 ID·관찰 결과·사전훈련 상태를 한 카드에서 보고 승인·보류·반려(보류·반려는 사유 필수)",
+                                                      "승인은 검토자가 Query History에서 직접 본 statement_id를 task별로 입력해 제출값과 일치할 때만 열림(체크박스 하나로 승인하던 방식 폐지)",
+                                                      "1회용 시도 ID(wzA-…) 도입: adapter가 모든 SQL 끝에 주석으로 붙여 Query History에서 검색 가능, 다른 사람·다른 실습·재사용·만료 증거 거부",
+                                                      "adapter 1.1: `doctor` 사전 점검(CLI 버전·인증·warehouse·catalog 쓰기), 1.1 미만은 SQL 증거 거부, /download/adapter 로 내려받기",
+                                                      "실습 증거 팩이 바뀌면 이전 승인은 STALE — 등급·준비 판정에서 제외, UI-22에 내 실전 진행 현황(사전훈련→시도→검토→반영) 표시",
+                                                      "버그 수정: 검토 대기 건수가 검토할 수 없는 증거(자동 대조 불일치 등)까지 세던 문제, 시도 검증에 실패한 남의 제출이 원래 주인을 중복으로 막던 문제"]},
     {"version": "0.5.0", "date": "2026-11-12", "notes": ["실제 Databricks Free Edition 워크스페이스를 읽기 전용으로 조회한 결과(FIELD_SURVEY_2026-11-12.md)를 바탕으로 한 개선",
                                                       "Query History 화면(UI-05b): 상태·구문·소스·주체·기간·소요시간·텍스트 필터, 실패 쿼리 펼치면 오류 해결 안내, SQL Editor에서 다시 열기",
                                                       "Catalog 테이블 상세를 Overview·Sample Data·Details·Permissions·History·Lineage·Insights·Quality 8개 탭으로 개편",
@@ -146,7 +153,7 @@ def info():
 def app_manifest():
     ok = APP_FILE.is_file()
     sa = STANDALONE_FILE.is_file()
-    return {"shell_version": SHELL_VERSION, "available": ok, "size": APP_FILE.stat().st_size if ok else 0, "filename": APP_FILE.name,
+    return {"shell_version": SHELL_VERSION, "retired": True, "available": False, "size": APP_FILE.stat().st_size if ok else 0, "filename": APP_FILE.name,
             "sha256": _sha(APP_FILE) if ok else "", "download": "/download/app", "server_version": VERSION, "server_build": build_id(),
             "standalone": {"available": sa, "version": VERSION, "size": STANDALONE_FILE.stat().st_size if sa else 0, "filename": STANDALONE_FILE.name,
                            "sha256": _sha(STANDALONE_FILE) if sa else "", "download": "/download/standalone", "compat": STANDALONE_COMPAT},
@@ -227,6 +234,7 @@ def system_document():
           f"8. **설치형 앱(Windows·macOS)**: ① **단독 설치형(권장, Windows .exe / macOS .app)** — 서버(FastAPI)와 DuckDB가 앱 안에 포함되어 내 PC(127.0.0.1)에서만 실행. 학습 데이터는 `%LOCALAPPDATA%\\WIZBASE\\DBXRehearsal-Standalone\\data`에 저장되며 인터넷·운영자 PC가 없어도 학습 가능. 인터넷이 연결되면 업데이트 확인(알림 → 선택 시 적용, 데이터 유지)과 AXOS 피드백 전달(운영자 개발큐 접수·처리 상태 반영, 오프라인이면 보류 후 자동 전송)이 이루어짐. **업데이트는 두 종류**: (가) **콘텐츠 팩**(화면·서버 코드 변경, 수백 KB, 재빌드 불필요 — 운영 서버가 저장소 파일에서 즉석 생성, 앱이 내려받아 SHA-256과 파일별 해시를 검증해 `overlay/current`에 두고 자동 재시작, 새 팩이 서버를 못 띄우면 자동으로 폐기하고 내장 버전으로 복구), (나) **앱 전체 교체**(새 라이브러리·앱 껍데기 변경 시 `STANDALONE_COMPAT`가 바뀐 경우: Windows는 내려받아 SHA-256 검증 후 교체, macOS는 새 .app 다운로드 후 사용자가 교체). macOS 앱은 Apple Silicon·Intel 별도 빌드, 코드 서명·공증이 없어 처음에는 우클릭 > 열기가 필요. admin 기능·시스템 문서는 포함되지 않고 접근 코드는 PC마다 무작위 생성. ② **접속형** — 운영자 서버 사이트를 PC 창으로 여는 앱(서버 부하·오프라인 제약은 웹과 동일).\n          8-1. **Windows PC 앱(접속형)**(현재 {SHELL_VERSION}): 시작 화면에서 내려받는 설치용 exe(WebView2, Windows 10/11 64비트, 코드 서명 없음 — SmartScreen 경고 가능). 사이트가 갱신되면 적용 여부 알림, 앱 신버전도 알림. 시스템 문서는 포함되지 않으며 서버도 앱 요청에는 문서를 내주지 않음.",
           "9. **거버넌스**: 투입 승인(본인 승인 금지·만료), Academy 이력 확인대기, 개인정보 열람/삭제, 감사 로그.",
           "10. **Databricks 공식 서비스 체계 확장(v0.5.0, 모두 교육용 시뮬레이션)**: ① 내 전용 카탈로그(CREATE/DROP CATALOG)·UC Volume·COPY INTO·Delta 버전 이력(DESCRIBE HISTORY·VERSION AS OF·RESTORE)·Free Edition 프로필(서버리스 자동 시작) ② 선언형 파이프라인(스트리밍 테이블·구체화 뷰·expectations·AUTO CDC SCD1·이벤트 로그·전체 새로고침)과 Lakeflow Designer ③ Dashboards(데이터셋·위젯 4종·필터·게시)·SQL Editor의 Genie Code(규칙 기반)·Query History·Catalog 8개 탭 ④ ML(순수 파이썬 모델 3종·실험 추적·UC 모델 버전/별칭·특성 테이블)·생성형 AI(Playground·BM25 AI Search·RAG 에이전트·평가)·Model Serving(슬롯 2개) ⑤ Academy 역할별 학습 경로 대응(제목 단위·실습 자동 확인). 화면 UI-05b/05c/05d/07b/08b/08c/09c/28/29/30. HELP·AI 지원에 모두 반영.", "",
+          "11. **실제 DBX 증거 흐름(v0.6.0)**: 앱에서 사전훈련(시뮬레이터) → 학습자 PC의 adapter가 본인 교육용 Databricks에서 실습 수행 → 앱에서 증거 검토·등급 판정. ① 시도 ID(1회용·72시간)를 UI-22에서 발급해 `--attempt-id`로 실행하면 모든 SQL 끝에 주석 표식이 붙어 Query History에서 검색됩니다. ② 서버는 결과 체크섬·pack_hash·adapter 버전(1.1 이상)·시도 ID를 자동 대조하고 기대값은 공개하지 않습니다. ③ 검토자는 검토 센터 큐에서 Query History의 statement_id를 task별로 입력해야 승인할 수 있고, 보류·반려는 사유가 필수입니다. ④ 승인된 증거도 팩이 바뀌면 STALE이 되어 등급·준비 판정에서 빠집니다. ⑤ 사전훈련 상태(영역 문항 5개 이상·정답률 70%)는 권고 신호이며 실전 증거 수령을 막지는 않습니다. **서버는 Databricks 자격증명을 받지 않으며, 실제 워크스페이스 검증(DBX_VERIFIED)은 검토자가 승인한 건수만 의미합니다(현재 0건이 정상).**",
           "## 4. 역할", "", "| 역할 | 권한 |", "|---|---|", "| learner | 본인 세션(선택 삭제 가능)·실습·시험 |", "| instructor | 강사: 정답표·수료·검토 (admin 고유 기능 접근 불가) |",
           "| reviewer | 검토자(위즈베이스 DB 컨설턴트): 검수·재확인·대조표 |", "| admin | **수퍼유저**: 시스템 문서, 피드백 관리·개발큐, 도메인 신청 포함 모든 요구사항·피드백 관리 (별도 admin 접근 코드 필요 — staff·instructor 코드로는 로그인 불가) |", "",
           "## 5. 구성", "", "- 서버: Python FastAPI(`backend/`), 화면: 정적 HTML/JS(`static/`), 데이터: `data/`(세션·v11.json), 학습자 PC adapter: `adapter/`.",
@@ -246,6 +254,7 @@ def system_document():
           "- macOS 앱은 이 개발 환경(Windows)에서 빌드·시험하지 못해 Mac 또는 GitHub Actions(`build-standalone-mac`)에서 빌드해야 하며, 실제 Mac 실행은 미검증. 콘텐츠 팩은 새 라이브러리 추가·앱 껍데기 변경을 담을 수 없음(앱 전체 교체 필요).",
           "- 단독 설치형: 업데이트·피드백 전달은 운영자 서버가 켜져 있고 인터넷이 연결될 때만 가능. 설치 파일은 약 46MB, 코드 서명 없음(SmartScreen 경고 가능). 단독형은 PC별 데이터가 분리되어 사용자 간 협업 기능(팀)·중앙 검토는 이용할 수 없음.",
           "- 피드백 → 개발은 자동 개발이 아님(개발큐 지시서를 운영자가 처리). PC 앱 exe는 코드 서명 없음.",
+          "- v0.6.0 adapter·시도 ID·statement_id 대조는 가짜 Statement API(DuckDB)로만 검증했고 **실제 Databricks 워크스페이스 실행은 아직 검증하지 못했습니다**. `doctor` 출력과 첫 실행 결과를 검토자와 함께 확인해야 합니다. 시도 ID 표식과 statement_id 대조는 자기 보고를 어렵게 할 뿐 위조 불가능을 보증하지 않으며, 최종 판단은 검토자의 원본 확인입니다.",
           "- v0.5.0 확장 기능(ML·생성형 AI·Model Serving·Genie Code·Designer)은 실제 MLflow·LLM·벡터 임베딩이 아닌 **규칙·순수 파이썬 시뮬레이션**이다. 모델·서빙·에이전트에는 별도 ACL이 없고 세션 소유자만 접근한다. 세션 JSON에 실행 이력·감사 기록이 계속 쌓인다(일부만 상한). COPY INTO 다중 파일 중간 실패는 원자적이지 않다. 미지원: SCD2, IGNORE NULL UPDATES, read_files, AI 함수, Agent Bricks 상세, Genie One, system 테이블. Academy 대응은 레슨 제목 단위.",
           "- Python 격리 실행기 미구성(AT-16은 차단 방식). 파트너 tier·Portal 연결은 회사가 직접 확인.", "", "## 7. 변경 이력", ""]
     for r in CHANGELOG:
@@ -258,7 +267,7 @@ def reviewer_manual():
     L = [f"# 검토자 매뉴얼 (WIZBASE DB 컨설턴트용) — v{VERSION}", "",
          "이 매뉴얼은 위즈베이스 DB 컨설턴트가 **실제 Databricks 교육용 워크스페이스**에서 스스로 대조·검토하고 그 결과를 시스템에 기록하는 절차입니다. 합성 데이터만 사용하고 고객 운영 데이터는 쓰지 않습니다.", "",
          "## 0. 준비", "", "1. 본인 소유 Databricks 교육용(비운영) 워크스페이스, SQL Warehouse 1개, Unity Catalog 사용 가능한 catalog/schema.",
-         "2. 이 시스템에 `reviewer` 로그인(직원 코드).", "3. 학습자 PC adapter 설치: `adapter/README.md` 참고(실행 결과를 증거 해시로 제출).",
+         "2. 이 시스템에 `reviewer` 로그인(직원 코드).", "3. 학습자 PC adapter: UI-22의 [adapter 내려받기]로 받아 `doctor`로 사전 점검한 뒤 시도 ID와 함께 실행(자세한 절차는 4-0).",
          "4. 모든 확인은 **본인이 화면에서 본 것**만 기록. 문서만 본 것은 DOC_CHECKED로 남기고 WORKSPACE_CHECKED로 올리지 않습니다.", "",
          "## 1. 기능 재확인(WORKSPACE_CHECKED)", "", "1. 검토 센터의 기능 목록에서 항목 선택 → 실제 워크스페이스에서 해당 메뉴 경로를 직접 연다.",
          "2. 보이는 메뉴·옵션·오류 문구를 기록하고 `현장 대조표`에 행을 추가(14열: 기대/실제/차이/심각도 등).",
@@ -268,7 +277,15 @@ def reviewer_manual():
          "2. 이상 없으면 '원문 대조 완료' 기록(검토자 ID·일시 저장). 요약이 틀리면 이슈로 남긴다.", "3. `한국어 가이드` 화면의 차이표로 영문과 다른 영역/개수를 먼저 확인.", "",
          "## 3. 문항 검수(2단계 분리)", "",
          "1. 기술 검토: 정답·오답 근거가 현재 공식 문서·실측과 맞는지. 2. 출제 검토: 모호성·중복·난이도. 두 단계는 **서로 다른 사람**이 수행(한 사람이 둘 다 하면 ACTIVE 불가).",
-         "3. 두 단계 통과 시에만 ACTIVE. 의심되면 recall.", "", "## 4. 실습 팩별 실제 워크스페이스 절차", ""]
+         "3. 두 단계 통과 시에만 ACTIVE. 의심되면 recall.", "", "## 4. 실습 팩별 실제 워크스페이스 절차", "",
+         "### 4-0. 증거 검토 절차 (검토 센터 ‘실제 DBX 증거 검토 큐’)", "",
+         "1. 큐 카드에서 자동 대조(MATCHED), 시도 ID 상태(OK), adapter 버전, 사전훈련 상태, 팩이 현재 버전인지 먼저 확인합니다. 자동 대조가 불일치이거나 시도 ID가 거부된 증거는 큐에 올라오지 않습니다(학습자에게 사유가 표시됨).",
+         "2. 교육용 워크스페이스의 Query History(또는 SQL Warehouse의 쿼리 기록)에서 카드의 **시도 ID**(예: wzA-0123456789ab)를 검색합니다. 이 증거의 모든 SQL이 검색되어야 합니다.",
+         "3. 카드의 task마다 Query History에 보이는 **statement_id 전체**를 입력합니다(카드에는 앞 8자만 표시). 하나라도 다르면 승인되지 않고 감사 기록이 남습니다 — 다르면 반려 사유로 기록합니다.",
+         "4. SQL 본문과 결과가 팩과 일치하는지, 실행 시각이 제출 시각 이전인지, 다른 사람 계정·워크스페이스가 아닌지 확인한 뒤 ‘원본 확인’ 체크 후 승인합니다. 수동 실습은 산출물 원본을 본 뒤 루브릭 점수 JSON을 입력합니다.",
+         "5. 판단이 어려우면 **보류**(사유 필수 — 학습자가 고쳐서 새 시도로 재제출), 명백한 문제(남의 증거·불일치)면 **반려**(확정, 되돌리지 않음). 본인 증거는 승인할 수 없습니다.",
+         "6. 승인 후 실습 팩이 개정되면 그 승인은 STALE이 되어 등급 판정에 반영되지 않습니다. 학습자가 새 팩으로 다시 수행해야 합니다.",
+         "7. 이 환경은 실제 Databricks에서 한 번도 실행해 보지 못했습니다. **첫 실행은 학습자와 함께** `doctor` 출력과 Statement API 결과(날짜·소수 형식 포함)를 확인하세요. 문제가 있으면 현장 대조표에 기록합니다.", ""]
     for lid, l in sorted(labs.LABS.items()):
         L += [f"### {lid} — {l['title']}", "", f"- 목표: {l.get('goal', '')}"]
         if l.get("steps"):

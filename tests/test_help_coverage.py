@@ -22,6 +22,8 @@ QA = [
     ("Generative AI engineers", "Academy"), ("Ctrl+P 빠른 검색", "Ctrl+P"), ("데이터 품질 탭", "탭"), ("계보 lineage", "탭"),
     ("시뮬레이션이 실제와 뭐가 달라?", "시뮬레이션"), ("AI 함수 ai_query", "지원하지 않"), ("read_files 지원해?", "지원하지 않"),
     ("SQL_TOO_LONG", "20,000"), ("SQL이 너무 길어요", "20,000"),
+    ("시도 ID 가 뭐야?", "wzA"), ("adapter doctor 어떻게 써?", "warehouse"), ("adapter 다운로드 어디서 해?", "adapter"),
+    ("statement_id 로 증거 승인하는 법", "Query History"), ("사전훈련 후 실제 DBX 수행 흐름", "승인된 증거만"), ("증거 승인은 어떻게 해?", "statement_id"),
 ]
 
 
@@ -63,3 +65,11 @@ def test_system_document_covers_v050(env):
 def test_start_keyword_still_opens_first_steps():
     r = A.answer(None, {"role": "learner"}, "시작")
     assert "환경 점검" in r["answer"]
+
+
+def test_help_lab_and_review_describe_real_dbx_flow():
+    h = open("static/help.js", encoding="utf-8").read()
+    for w in ("시도 ID", "doctor", "statement_id", "사전훈련", "팩 변경", "보류"):
+        assert w in h, w
+    s = A.SCR["lab"][2] if A.SCR.get("lab") else []
+    assert any("시도 ID" in x for x in s)
