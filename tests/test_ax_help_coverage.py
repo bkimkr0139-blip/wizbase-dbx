@@ -90,7 +90,7 @@ def test_help_counts_match_code():
     n_golden = len(ax.GOLDEN) + len(ax.GOLDEN_TOOLS)
     assert n_golden == 24
     assert f"golden {n_golden}건" in help_entry("ax")
-    assert f"golden {n_golden}건" in sysinfo.CHANGELOG[0]["notes"][4]
+    assert f"golden {n_golden}건" in " ".join(next(c for c in sysinfo.CHANGELOG if c["version"] == "0.7.0")["notes"])
 
 
 def test_every_ui_tab_is_in_help_or_ai(env):
@@ -108,7 +108,7 @@ def test_every_ui_tab_is_in_help_or_ai(env):
 # ---- 시스템 문서·변경 이력
 def test_system_document_covers_v070(env):
     doc = sysinfo.system_document()
-    assert sysinfo.VERSION == "0.7.0"
+    assert sysinfo.VERSION.startswith("0.7.")
     for w in ("AX 프로젝트 스튜디오", "서버 자원 관리", "자동 구축", "AUTO_POLICY", "PostgreSQL 16.16", "MySQL 8.4.13", "Oracle 26ai", "NATIVE_FIXTURE", "SPEC_ONLY",
               "WZ_SECRET_", "WZ_AX_ALLOW_DIRECT_DB", "WZ_AX_DB_HOSTS", "WZ_AX_DOC_DIRS", "WZ_AX_EMBED", "DBX_NO_OPS_WARM", "WZ_AX_REAL", "psutil", "pypdf", "AX_ADAPTER_VERIFICATION.md",
               "connector agent", "SHACL", "신호", "hybrid", "golden 24건", "보안 11건", "고객 개발 DB"):
@@ -117,8 +117,8 @@ def test_system_document_covers_v070(env):
 
 
 def test_changelog_has_v070_entry_with_all_themes():
-    c = sysinfo.CHANGELOG[0]
-    assert c["version"] == "0.7.0" and c["version"] == sysinfo.VERSION
+    assert sysinfo.CHANGELOG[0]["version"] == sysinfo.VERSION
+    c = next(x for x in sysinfo.CHANGELOG if x["version"] == "0.7.0")
     t = " ".join(c["notes"])
     for w in ("AX 프로젝트 스튜디오", "ERD", "온톨로지", "native", "PostgreSQL 16.16", "MySQL 8.4.13", "Oracle 26ai", "매출", "매입", "문서 검색", "서버 자원 관리", "자동 구축", "한계"):
         assert w in t, w
@@ -137,6 +137,6 @@ def test_every_operational_env_var_in_code_is_documented(env):
 def test_limitations_are_not_overstated(env):
     doc = sysinfo.system_document()
     for w in ("미검증", "비신경망", "OCR", "현업 정답"):
-        assert w in doc or w in " ".join(sysinfo.CHANGELOG[0]["notes"]) or w in HELP_JS, w
+        assert w in doc or w in " ".join(next(c for c in sysinfo.CHANGELOG if c["version"] == "0.7.0")["notes"]) or w in HELP_JS, w
     assert "SQL_PREPARED_NOT_EXECUTED" not in doc          # 더 이상 실행하지 않은 상태로 적혀 있으면 안 됨
     assert not any(x["status"] == "SQL_PREPARED_NOT_EXECUTED" for x in ax.SUPPORT)

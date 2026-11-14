@@ -324,8 +324,58 @@ def _suggest(view, role):
     return out[:4]
 
 
+# ---------------------------------------------------------------- 자동 반영(수작업 없이 시스템 정보를 따라간다)
+STOP = {"어떻게", "무엇", "뭐야", "뭔가", "알려줘", "알려", "설명", "하는", "있어", "있나요", "이란", "대해", "관련", "어디", "얼마", "그리고", "그런", "이거", "저거", "방법", "해줘", "주세요", "합니다"}
+
+
+def sync_menu():
+    """시스템 메뉴(sysinfo.MENU)에 새 화면이 생기면 화면 안내·별칭을 자동 생성한다(수동 항목이 있으면 그대로 둔다)."""
+    for _, _, its in sysinfo.MENU:
+        for v, label, desc in its:
+            if v not in SCR:
+                SCR[v] = (label, desc, ["메뉴에서 이 화면을 열어 안내에 따라 진행합니다."], None, "이 화면 안내는 시스템 메뉴 정보에서 자동 생성되었습니다. 자세한 사용법은 시스템 문서를 확인하세요.")
+            ALIAS.setdefault(v, [label.lower()])
+
+
+def _whatsnew(q):
+    """변경 이력(sysinfo.CHANGELOG)에서 새 기능·변경 사항을 자동으로 답한다."""
+    if not has(q, "새 기능", "새로운 기능", "변경 내용", "변경 사항", "변경사항", "뭐가 바뀌", "무엇이 바뀌", "바뀐 점", "릴리스 노트", "릴리즈 노트", "changelog", "이번 버전", "최근 변경", "업데이트 내용", "업데이트 된 내용", "무엇이 달라", "달라진"):
+        return None
+    m = re.search(r"(\d+\.\d+\.\d+)", q)
+    ch = sysinfo.CHANGELOG
+    sel = [c for c in ch if m and c["version"] == m.group(1)] or ch[:1]
+    out = []
+    for c in sel:
+        out.append(f"**v{c['version']}** ({c['date']})\n" + "\n".join(f"- {n}" for n in c["notes"]))
+    return "\n\n".join(out) + f"\n\n(변경 이력에서 자동으로 가져온 내용입니다. 현재 서버 버전 v{sysinfo.VERSION}, 더 이전 버전은 '0.6.0 변경 내용'처럼 물어보세요.)"
+
+
+def _doc_search(q, limit=2):
+    """시스템 문서(sysinfo.system_document) 본문에서 질문과 겹치는 줄을 그대로 인용한다(요약·추측 아님).
+    문서가 갱신되면 코드 수정 없이 AI 지원이 그 내용을 답한다."""
+    try:
+        doc = sysinfo.system_document()
+    except Exception:
+        return []
+    toks = {t for t in re.findall(r"[가-힣A-Za-z0-9_\.]{2,}", q.lower()) if t not in STOP}
+    if len(toks) < 1:
+        return []
+    scored = []
+    for ln in doc.split("\n"):
+        low = ln.lower()
+        hit = [t for t in toks if t in low]
+        if len(hit) >= 2 or (len(hit) == 1 and len(hit[0]) >= 5):
+            scored.append((sum(len(t) for t in hit), len(hit), ln.strip()))
+    scored.sort(key=lambda x: (-x[1], -x[0]))
+    return [ln for _, _, ln in scored[:limit]]
+
+
+sync_menu()
+
+
 def answer(S, actor, message, mode_real=False, view=None):
     q = norm(message)
+    sync_menu()
     role = (actor or {}).get("role", "learner")
     view = view if view in SCR else None
     sc, intent = [], "fallback"
@@ -350,6 +400,9 @@ def answer(S, actor, message, mode_real=False, view=None):
     if q in ("시작", "시작해", "시작할래", "시작하자", "처음", "처음이야", "처음이에요", "도와줘", "도와주세요", "help"):
         t0 = HOW[0]
         return out(f"**{t0[1]}**\n\n" + "\n".join(t0[2]), [G.nav(l, v) for l, v in t0[3]], "howto")
+    wn = _whatsnew(q)
+    if wn:
+        return out(wn, [G.nav("시스템 정보 열기", "env")][:0], "whatsnew", sug=False)
     # 2) 오류 코드 직접 언급
     code = _err_code(message)
     if code and not has(q, "화면", "열어"):
@@ -458,6 +511,9 @@ def answer(S, actor, message, mode_real=False, view=None):
     if hit:
         t = "\n\n".join(f"**{k['title']}** — {k['text']}" for k in hit[:2]) + "\n\n" + "\n".join(f"근거: {k['url']} (확인일 {C.BASIS})" for k in hit[:2])
         return out(t, [S and G.journey(S)["next"] and not mode_real and G.journey(S)["next"]["shortcut"]] if False else [], "kb")
+    dl = _doc_search(q)
+    if dl:
+        return out("**시스템 문서에서 찾은 내용**(자동 검색 — 요약·추측이 아니라 문서 본문 인용입니다)\n\n" + "\n\n".join(f"> {x[:420]}" for x in dl) + "\n\n정확한 맥락은 시스템 문서(Alt+Shift+I)에서 확인하세요.", [], "doc")
     # 8) 모르는 질문 — 지어내지 않고 가까운 화면·질문을 제안
     near = _screens_in(q)[:3]
     t = ("승인된 근거에서 정확한 답을 찾지 못했습니다 — **확인 필요**로 두고 임의로 확정하지 않겠습니다.\n\n"

@@ -6,7 +6,7 @@ from pathlib import Path
 from . import core, labs, pack, transfer, v11
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.7.0"
+VERSION = "0.7.1"
 RELEASED = "2026-11-14"
 SHELL_VERSION = "0.1.1"  # PC 앱(desktop/dbx_app.py APP_VERSION)의 최신 버전 — 새 exe를 배포할 때 함께 올린다
 APP_FILE = ROOT / "dist_app" / "release" / "WIZBASE-DBX-Rehearsal.exe"
@@ -58,6 +58,10 @@ def central_manifest():
 PURPOSE = ("WIZBASE(Databricks 파트너)의 실제 PoC 준비와 파트너 레벨 상향을 위한 인증 시험 준비를 지원하는 교육·훈련 환경. "
            "Databricks 공식 제품·교육·시험이 아니며 합격·자격·투입을 보증하지 않음.")
 CHANGELOG = [
+    {"version": "0.7.1", "date": "2026-11-14", "notes": ["HELP·AI 지원 자동 반영: 변경 이력(CHANGELOG)에 항목을 넣으면 AI 지원이 '새 기능이 뭐야'·'0.6.0 변경 내용'에 자동으로 답하고, HELP 패널에 '이번 버전 변경'이 자동 표시됨",
+                                                      "시스템 메뉴(MENU)에 새 화면을 추가하면 AI 지원의 화면 안내·이동 별칭과 HELP 기본 도움말이 자동 생성됨(수동 항목이 있으면 그대로 사용)",
+                                                      "AI 지원이 모르는 질문일 때 시스템 문서 본문에서 겹치는 줄을 그대로 인용해 답함(요약·추측 아님, 근거가 없으면 '확인 필요')",
+                                                      "릴리스 점검 자동화: tools/release_check.py + git pre-push 훅(.githooks) — 기능 코드가 바뀌었는데 변경 이력이 그대로이거나 안내 누락 시험이 실패하면 푸시를 막음(비상 우회 SKIP_RELEASE_CHECK=1)"]},
     {"version": "0.7.0", "date": "2026-11-14", "notes": ["AX 프로젝트 스튜디오 신설(개발 지시서 v1.0의 P0~P2 + 첫 vertical slice): 프로젝트·구성원 역할·tenant/거래처 범위, 연결 단계별 테스트(비밀은 secret 참조만), 구조 수집·snapshot·diff·전체성 표시",
 "통합 ERD 부분모델(선언 FK·승인 논리 관계·점선 후보), 관계 후보 추론(표본 포함률, 자동 승인 없음)·검토, 표본 profile(민감 컬럼 마스킹·full scan 차단)",
 "온톨로지 release: 내부 shape 검증(SHACL 아님)·승인 registry 참조만·작성자 자기 승인 금지·원천 변경 시 STALE, native 파이프라인 실제 실행, DBX는 SQL 컴파일까지(실제 배포 미검증, 가상 성공 금지)",
@@ -246,6 +250,7 @@ def system_document():
           f"8. **설치형 앱(Windows·macOS)**: ① **단독 설치형(권장, Windows .exe / macOS .app)** — 서버(FastAPI)와 DuckDB가 앱 안에 포함되어 내 PC(127.0.0.1)에서만 실행. 학습 데이터는 `%LOCALAPPDATA%\\WIZBASE\\DBXRehearsal-Standalone\\data`에 저장되며 인터넷·운영자 PC가 없어도 학습 가능. 인터넷이 연결되면 업데이트 확인(알림 → 선택 시 적용, 데이터 유지)과 AXOS 피드백 전달(운영자 개발큐 접수·처리 상태 반영, 오프라인이면 보류 후 자동 전송)이 이루어짐. **업데이트는 두 종류**: (가) **콘텐츠 팩**(화면·서버 코드 변경, 수백 KB, 재빌드 불필요 — 운영 서버가 저장소 파일에서 즉석 생성, 앱이 내려받아 SHA-256과 파일별 해시를 검증해 `overlay/current`에 두고 자동 재시작, 새 팩이 서버를 못 띄우면 자동으로 폐기하고 내장 버전으로 복구), (나) **앱 전체 교체**(새 라이브러리·앱 껍데기 변경 시 `STANDALONE_COMPAT`가 바뀐 경우: Windows는 내려받아 SHA-256 검증 후 교체, macOS는 새 .app 다운로드 후 사용자가 교체). macOS 앱은 Apple Silicon·Intel 별도 빌드, 코드 서명·공증이 없어 처음에는 우클릭 > 열기가 필요. admin 기능·시스템 문서는 포함되지 않고 접근 코드는 PC마다 무작위 생성. ② **접속형** — 운영자 서버 사이트를 PC 창으로 여는 앱(서버 부하·오프라인 제약은 웹과 동일).\n          8-1. **Windows PC 앱(접속형)**(현재 {SHELL_VERSION}): 시작 화면에서 내려받는 설치용 exe(WebView2, Windows 10/11 64비트, 코드 서명 없음 — SmartScreen 경고 가능). 사이트가 갱신되면 적용 여부 알림, 앱 신버전도 알림. 시스템 문서는 포함되지 않으며 서버도 앱 요청에는 문서를 내주지 않음.",
           "9. **거버넌스**: 투입 승인(본인 승인 금지·만료), Academy 이력 확인대기, 개인정보 열람/삭제, 감사 로그.",
           "10. **Databricks 공식 서비스 체계 확장(v0.5.0, 모두 교육용 시뮬레이션)**: ① 내 전용 카탈로그(CREATE/DROP CATALOG)·UC Volume·COPY INTO·Delta 버전 이력(DESCRIBE HISTORY·VERSION AS OF·RESTORE)·Free Edition 프로필(서버리스 자동 시작) ② 선언형 파이프라인(스트리밍 테이블·구체화 뷰·expectations·AUTO CDC SCD1·이벤트 로그·전체 새로고침)과 Lakeflow Designer ③ Dashboards(데이터셋·위젯 4종·필터·게시)·SQL Editor의 Genie Code(규칙 기반)·Query History·Catalog 8개 탭 ④ ML(순수 파이썬 모델 3종·실험 추적·UC 모델 버전/별칭·특성 테이블)·생성형 AI(Playground·BM25 AI Search·RAG 에이전트·평가)·Model Serving(슬롯 2개) ⑤ Academy 역할별 학습 경로 대응(제목 단위·실습 자동 확인). 화면 UI-05b/05c/05d/07b/08b/08c/09c/28/29/30. HELP·AI 지원에 모두 반영.", "",
+          "15. **안내 자동 반영 체계(v0.7.1)**: AI 지원은 변경 이력(CHANGELOG)·시스템 메뉴(MENU)·시스템 문서 본문을 실행 시점에 읽어 새 기능·새 화면·문서 내용을 코드 수정 없이 답하고, HELP 패널은 이번 버전 변경을 자동 표시하며 HELP 항목이 없는 새 화면의 기본 도움말을 메뉴 정보로 만듭니다. 화면별 상세 안내(HELP 항목·AI 방법 안내)와 오류 코드 안내는 기능 추가 시 직접 작성해야 하며, 누락은 시험(test_help_coverage·test_ax_help_coverage·test_auto_reflection)과 푸시 전 점검(`python tools/release_check.py --install` 로 훅 설치, 우회 SKIP_RELEASE_CHECK=1)이 잡아냅니다.",
           "14. **AX·자원 관리 운영 설정(서버 환경변수)**: `WZ_SECRET_<이름>=사용자:비밀번호`(DB 연결 secret 참조 secret://<이름> 의 실제 값, 저장·표시하지 않음), `WZ_AX_ALLOW_DIRECT_DB=1`(서버의 직접 DB 접속 허용, 개발 전용), `WZ_AX_DB_HOSTS`(직접 접속 host allowlist, 쉼표 구분), `WZ_AX_DOC_DIRS`(서버 폴더 문서 소스 허용 경로, 경로 구분자로 여러 개), `WZ_AX_EMBED=ollama`(신경망 임베딩 사용, 기본은 해시 n-gram), `DBX_NO_OPS_WARM=1`(시작 시 프로세스 표 미리 조회 끄기, 시험용), `WZ_AX_REAL=pg,mysql,oracle`(실제 DB 컨테이너 시험 실행, 기본은 건너뜀). 필요한 선택 패키지: psutil(자원 모니터링), pypdf(PDF 파싱), psycopg2-binary·PyMySQL·oracledb(실제 DB 접속, requirements-dev.txt). 시험 DB 재현·결과는 AX_ADAPTER_VERIFICATION.md.",
           "13. **서버 자원 관리·자동 구축(v0.7.0, 개발 중)**: 관리자가 서버 CPU·메모리·SSD/HDD·프로세스 점유를 보고 작업 전 자원을 판단하며, 부족하면 항목별로 승인해 정리합니다. 사용자가 DB 연결·비정형 문서를 제공하고 사전작업·확인에 동의한 뒤 '자동 구축 승인'을 하면 분석·파싱·임베딩·온톨로지·에이전트 구축을 자동으로 진행합니다(자동 승인은 사용자가 정한 정책 범위 안이며 AUTO_POLICY로 표시). 자동 평가는 구조·접근·검색 검사이며 업무 정답 검증이 아닙니다. 원천 변경 명령은 자동 실행하지 않습니다. 비정형 문서는 txt·md·csv·json·html·docx·pdf(텍스트)를 파싱하며(파일 5MB·본문 20만자 한도, 실행 파일·암호화 문서 거부) 스캔 이미지 PDF 의 글자는 OCR 을 지원하지 않아 경고합니다.",
           "12. **AX 프로젝트 스튜디오(v0.7.0, 개발 중)**: 개발 지시서 v1.0의 첫 범위. 프로젝트·역할·범위 → 연결(비밀은 참조만) → 구조 수집·ERD·관계 검토 → 온톨로지 승인 → native 파이프라인·결정적 도구 에이전트(매출 4·매입 4 시나리오) → 문서 검색·신호 inbox → 제안·승인·멱등 업무 명령 → golden·보안 평가·배포·rollback. **합성 fixture(SQLite)와 Docker 시험 DB(PostgreSQL 16.16·MySQL 8.4.13·Oracle 26ai Free)에서 실제로 실행한 범위**입니다. 모든 실행 결과에는 증거 수준을 표시합니다: NATIVE_FIXTURE(합성 fixture·시험 DB에서 실제 실행, 고객 DB·DBX 실제 배포 증거가 아님), SPEC_ONLY(SQL 산출물 컴파일만). 아직 하지 않은 것: 고객 개발 DB·DBX 실제 배포·실제 LLM/신경망 임베딩·SHACL 검증기·부하 시험은 하지 않았습니다.",

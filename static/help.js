@@ -258,8 +258,20 @@ function helpFlow(view) {
   const f = FLOW_CORE.includes(view) ? FLOW_CORE : FLOW_PRO.includes(view) ? FLOW_PRO : null; if (!f) return [null, null];
   const i = f.indexOf(view); return [i > 0 ? f[i - 1] : null, i < f.length - 1 ? f[i + 1] : null];
 }
+
+/* 시스템 메뉴 정보(SYS.menu)만 있으면 HELP 항목이 없는 새 화면도 기본 도움말을 자동으로 만든다. */
+function autoHelp(view) {
+  let it = null;
+  ((SYS && SYS.menu) || []).forEach(g => g.items.forEach(x => { if (x.view === view) it = x }));
+  if (!it) return HELP.env;
+  return { t: it.label, step: [], overview: it.desc || "이 화면의 설명은 시스템 문서를 확인하세요.", features: [it.desc || it.label], status: () => [], todo: () => [[`${it.label} 화면의 안내에 따라 진행`, false, null]], caution: "이 도움말은 시스템 메뉴 정보에서 자동 생성되었습니다. 자세한 사용법은 시스템 문서를 확인하세요." };
+}
+function helpWhatsNew() {
+  const c = SYS && SYS.changelog && SYS.changelog[0]; if (!c) return "";
+  return `<section><h4>이번 버전 변경 (v${esc(c.version)} · 자동)</h4><ul class="feat">${c.notes.slice(0, 4).map(n => `<li>${esc(n.length > 90 ? n.slice(0, 90) + "…" : n)}</li>`).join("")}</ul><div class="mute">전체 내용은 시스템 정보(Alt+Shift+I)의 변경 이력에서 볼 수 있습니다.</div></section>`;
+}
 function helpHtml() {
-  const h = HELP[VIEW] || HELP.env;
+  const h = HELP[VIEW] || autoHelp(VIEW);
   const [prev, next] = helpFlow(VIEW);
   const st = (h.status() || []).filter(Boolean);
   const todo = h.todo();
@@ -277,6 +289,7 @@ function helpHtml() {
     ${steps.length ? `<section><h4>연관 진행 단계</h4>${steps.map(s => `<div class="rel ${s.status}"><b>${s.no}단계 · ${esc(s.title)}</b><small>${s.done}/${s.total} 항목 · ${s.status === "done" ? "완료" : s.status === "current" ? "진행 중" : "대기"}</small></div>`).join("")}</section>` : ""}
     <section><h4>이전 · 다음</h4><div class="pn"><button class="sec" ${prev ? `data-a="nav" data-v="${prev}"` : "disabled"}><small>이전 화면</small>${prev ? esc(nm(prev)) : "—"}</button><button class="sec" ${next ? `data-a="nav" data-v="${next}"` : "disabled"}><small>다음 화면</small>${next ? esc(nm(next)) : "—"}</button></div>
       ${GUIDE && GUIDE.next ? `<div class="sub" style="margin-top:8px">전체 절차상 현재 위치: <b>${GUIDE.next.step_no}단계 ${esc(GUIDE.next.title)}</b></div>` : ""}</section>
+    ${helpWhatsNew()}
     <section><div class="note w">${esc(h.caution)}</div></section>
   </div>`;
 }
