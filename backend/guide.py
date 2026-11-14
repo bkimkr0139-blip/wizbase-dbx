@@ -216,6 +216,9 @@ ERR_HELP = {
     "GOLD_VIEW_BROKEN": "정책이 읽는 gold 재고 뷰가 깨졌습니다. 계약 산식으로 뷰를 복구하세요.",
 }
 
+from .ax_errors import AX_ERR  # noqa: E402  AX 스튜디오·자원 관리·자동 구축 오류 안내
+ERR_HELP.update(AX_ERR)
+
 
 def _last_failure(S):
     for e in reversed(S["audit"]):
