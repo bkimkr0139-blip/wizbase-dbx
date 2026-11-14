@@ -35,7 +35,8 @@
 - 모든 외부 호출은 `databricks` CLI를 인자 리스트로 호출(shell 미사용).
 
 ## 검증 상태 (정직한 한계)
-- 가짜 Statement API(DuckDB)로 파싱·체크섬·안전장치·시도 ID·doctor·서버 대조를 테스트했다.
-- **실제 Databricks 워크스페이스 대상 실행(doctor 포함)은 아직 검증하지 못했다.** `databricks api post /api/2.0/sql/statements` 응답 형식, `/api/2.0/preview/scim/v2/Me`, `/api/2.0/sql/warehouses/{id}`, `SELECT version()`, Delta MERGE 결과는 첫 실사용 시 검토자와 함께 확인해야 한다. TIMESTAMP/DATE 컬럼의 문자열 형식은 확인 전이라 현재 팩은 STRING 컬럼만 사용한다.
+- 가짜 Statement API(DuckDB)로 파싱·체크섬·안전장치·시도 ID·doctor·서버 대조를 테스트했고, 위 실환경 확인을 더했다.
+- **실환경 확인(2026-11-14, Free Edition 1곳, CLI 1.26.0)**: doctor 5개 항목 통과, LAB-CORE-01 실행 성공, count·available 체크섬이 서버 기대값과 일치, 시도 ID 주석이 Query History(`/api/2.0/sql/history/queries`)에 기록됨. `SELECT version()` 결과는 `4.2.0 …`.
+- **아직 확인하지 못한 것**: 다른 실습 팩(LAB-DE-02·03·05 등), 다른 워크스페이스·클라우드·리전, TIMESTAMP/DATE 컬럼의 문자열 형식(현재 팩은 STRING 컬럼만 사용), Delta MERGE·DESCRIBE HISTORY 결과.
 - 시도 ID·statement ID 대조는 자기 보고를 어렵게 할 뿐 위조 불가능을 보증하지 않는다. 최종 판단은 검토자의 원본 확인이다.
 - DESCRIBE HISTORY·SHOW TABLES 등 관찰용 task는 자동 대조하지 않고 검토자가 본다.
