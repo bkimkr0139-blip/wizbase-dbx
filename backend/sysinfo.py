@@ -6,7 +6,7 @@ from pathlib import Path
 from . import core, labs, pack, transfer, v11
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 RELEASED = "2026-11-12"
 SHELL_VERSION = "0.1.1"  # PC 앱(desktop/dbx_app.py APP_VERSION)의 최신 버전 — 새 exe를 배포할 때 함께 올린다
 APP_FILE = ROOT / "dist_app" / "release" / "WIZBASE-DBX-Rehearsal.exe"
@@ -58,6 +58,16 @@ def central_manifest():
 PURPOSE = ("WIZBASE(Databricks 파트너)의 실제 PoC 준비와 파트너 레벨 상향을 위한 인증 시험 준비를 지원하는 교육·훈련 환경. "
            "Databricks 공식 제품·교육·시험이 아니며 합격·자격·투입을 보증하지 않음.")
 CHANGELOG = [
+    {"version": "0.7.0", "date": "2026-11-14", "notes": ["AX 프로젝트 스튜디오 신설(개발 지시서 v1.0의 P0~P2 + 첫 vertical slice): 프로젝트·구성원 역할·tenant/거래처 범위, 연결 단계별 테스트(비밀은 secret 참조만), 구조 수집·snapshot·diff·전체성 표시",
+"통합 ERD 부분모델(선언 FK·승인 논리 관계·점선 후보), 관계 후보 추론(표본 포함률, 자동 승인 없음)·검토, 표본 profile(민감 컬럼 마스킹·full scan 차단)",
+"온톨로지 release: 내부 shape 검증(SHACL 아님)·승인 registry 참조만·작성자 자기 승인 금지·원천 변경 시 STALE, native 파이프라인 실제 실행, DBX는 SQL 컴파일까지(실제 배포 미검증, 가상 성공 금지)",
+"결정적 도구 에이전트(LLM 없음)로 ‘주문 20→35박스 증량’ 판정(추가 가용 12·부족 3), 제안→다른 사용자 승인→payload hash·멱등 키·원천 재검증 업무 명령, golden·보안 평가와 배포·rollback·내보내기(secret 제외)",
+"실제 DB adapter 검증(2026-11-14): Docker 시험 DB(PostgreSQL 16.16·MySQL 8.4.13·Oracle 26ai Free 23.26.3)에 같은 합성 fixture를 적재해 연결 7단계·구조 수집(복합키·self FK·한글 주석·뷰)·관계 후보·profile·질의·계정 분리(조회/명령)·승인형 명령·golden 24건·보안 11건을 확인. 검증 중 발견·수정: PostgreSQL 읽기 계정에서 PK가 안 보이던 문제(pg_catalog 사용), MySQL SHOW VIEW·잠금 조회 권한",
+"매출(납기 대안·단가 차이·미수금)·매입(추가 발주·공급처 변경·단가 급등·입고 차이) 도구 8종(JSON Schema 계약), 승인된 가중치·품질 제약, 외부 거래처·공급처 범위 분리, 신호 inbox(탐지·제안만, 중복 억제)",
+"지식 문서 검색: 버전·시행일·ACL·tenant 필터, keyword/vector/hybrid(RRF), 악성 지시문 격리, 모드 비교 평가(12문항 소규모)",
+"서버 자원 관리(관리자): CPU(코어별)·메모리·스왑·드라이브별 SSD/HDD·프로세스별 점유(명령줄 비밀 가림) 모니터링, 작업별 사전 판단(OK/CAUTION/BLOCK), 사용자 승인형 정리(후보 선택·확인 문구·실행 직전 재검증·감사 기록, 이 시스템이 만든 것만)",
+"자동 구축(사전 승인 기반): DB 연결·비정형 문서(txt/md/csv/json/html/docx/pdf) 제공 → 승인 → 구조 수집·profile·관계 추론(정책 자동 승인)·문서 청킹·임베딩 색인·지식 카드·온톨로지·파이프라인·자동 평가·에이전트 준비. 일반 스키마용 도메인 도구(entity_lookup·entity_related), 단계별 자원 확인·재개, 입력 변경 시 승인 무효",
+"한계: 고객 개발 DB·다른 DB 버전·MariaDB·TLS·RAC 미검증, DBX 실제 배포 미검증(컴파일까지), 임베딩은 해시 n-gram(비신경망, Ollama 선택), 신경망 reranker·graph 확장·SHACL 검증기·CDC·부하 시험·지속 계정(SSO)·고객 connector agent는 미구현"]},
     {"version": "0.6.0", "date": "2026-11-14", "notes": ["운영 흐름 강화: 앱에서 사전훈련 → 실제 DBX에서 수행(학습자 PC adapter) → 앱에서 증거 검토·등급 판정",
                                                       "검토 센터에 ‘실제 DBX 증거 검토 큐’ 신설: 자동 대조 결과·시도 ID·관찰 결과·사전훈련 상태를 한 카드에서 보고 승인·보류·반려(보류·반려는 사유 필수)",
                                                       "승인은 검토자가 Query History에서 직접 본 statement_id를 task별로 입력해 제출값과 일치할 때만 열림(체크박스 하나로 승인하던 방식 폐지)",
@@ -123,7 +133,8 @@ MENU = [
     ("AI·ML", "ai", [("ml", "ML·MLflow", "실험 추적·모델 학습·UC 모델 레지스트리·특성 테이블"), ("genai", "생성형 AI·RAG", "AI Playground·AI Search 인덱스·RAG 에이전트·평가(시뮬레이션)"), ("serve", "Model Serving", "엔드포인트 생성·질의(모델·에이전트, 무료 슬롯 2개)")]),
     ("인증 준비", "cert", [("prof", "역량·등급", "내부 등급"), ("plan", "학습계획", "목표 기반 계획"), ("map", "공식 목표", "목표 지도"), ("ko", "한국어 가이드", "한국어 공식 가이드 대조"),
                        ("tutor", "AI 튜터", "근거 기반 답변"), ("exam", "시험센터", "문항·모의시험"), ("lab", "실습 증거함", "21개 실습 팩 증거"), ("qual", "콘텐츠 품질", "문항 검수 상태")]),
-    ("검토·운영", "review", [("rvw", "검토 센터", "컨설턴트 자체 검토 큐·매뉴얼"), ("fbq", "피드백·개발큐", "AXOS 피드백 관리·개발큐(admin 전용)"), ("usage", "접속·사용 기록", "웹 접속·사용 기록과 차트(admin 전용)"), ("vmx", "현장 대조표", "V1~V6"), ("conf", "자료 충돌", "공식 자료 상충"),
+    ("AX 스튜디오", "ax", [("ax", "AX 프로젝트 스튜디오", "레거시 구조 수집·ERD·온톨로지·에이전트·승인형 업무 명령(합성 fixture 기준, 개발 중)")]),
+    ("검토·운영", "review", [("ops", "서버 자원 관리", "CPU·메모리·SSD/HDD·프로세스 모니터링, 작업 전 자원 판단, 승인형 정리(admin 전용)"), ("rvw", "검토 센터", "컨설턴트 자체 검토 큐·매뉴얼"), ("fbq", "피드백·개발큐", "AXOS 피드백 관리·개발큐(admin 전용)"), ("usage", "접속·사용 기록", "웹 접속·사용 기록과 차트(admin 전용)"), ("vmx", "현장 대조표", "V1~V6"), ("conf", "자료 충돌", "공식 자료 상충"),
                         ("partner", "파트너 인력", "인력·승인"), ("inst", "강사·수료", "수료 판정"), ("evid", "증거 보고서", "증거 요약")]),
 ]
 
@@ -235,6 +246,8 @@ def system_document():
           f"8. **설치형 앱(Windows·macOS)**: ① **단독 설치형(권장, Windows .exe / macOS .app)** — 서버(FastAPI)와 DuckDB가 앱 안에 포함되어 내 PC(127.0.0.1)에서만 실행. 학습 데이터는 `%LOCALAPPDATA%\\WIZBASE\\DBXRehearsal-Standalone\\data`에 저장되며 인터넷·운영자 PC가 없어도 학습 가능. 인터넷이 연결되면 업데이트 확인(알림 → 선택 시 적용, 데이터 유지)과 AXOS 피드백 전달(운영자 개발큐 접수·처리 상태 반영, 오프라인이면 보류 후 자동 전송)이 이루어짐. **업데이트는 두 종류**: (가) **콘텐츠 팩**(화면·서버 코드 변경, 수백 KB, 재빌드 불필요 — 운영 서버가 저장소 파일에서 즉석 생성, 앱이 내려받아 SHA-256과 파일별 해시를 검증해 `overlay/current`에 두고 자동 재시작, 새 팩이 서버를 못 띄우면 자동으로 폐기하고 내장 버전으로 복구), (나) **앱 전체 교체**(새 라이브러리·앱 껍데기 변경 시 `STANDALONE_COMPAT`가 바뀐 경우: Windows는 내려받아 SHA-256 검증 후 교체, macOS는 새 .app 다운로드 후 사용자가 교체). macOS 앱은 Apple Silicon·Intel 별도 빌드, 코드 서명·공증이 없어 처음에는 우클릭 > 열기가 필요. admin 기능·시스템 문서는 포함되지 않고 접근 코드는 PC마다 무작위 생성. ② **접속형** — 운영자 서버 사이트를 PC 창으로 여는 앱(서버 부하·오프라인 제약은 웹과 동일).\n          8-1. **Windows PC 앱(접속형)**(현재 {SHELL_VERSION}): 시작 화면에서 내려받는 설치용 exe(WebView2, Windows 10/11 64비트, 코드 서명 없음 — SmartScreen 경고 가능). 사이트가 갱신되면 적용 여부 알림, 앱 신버전도 알림. 시스템 문서는 포함되지 않으며 서버도 앱 요청에는 문서를 내주지 않음.",
           "9. **거버넌스**: 투입 승인(본인 승인 금지·만료), Academy 이력 확인대기, 개인정보 열람/삭제, 감사 로그.",
           "10. **Databricks 공식 서비스 체계 확장(v0.5.0, 모두 교육용 시뮬레이션)**: ① 내 전용 카탈로그(CREATE/DROP CATALOG)·UC Volume·COPY INTO·Delta 버전 이력(DESCRIBE HISTORY·VERSION AS OF·RESTORE)·Free Edition 프로필(서버리스 자동 시작) ② 선언형 파이프라인(스트리밍 테이블·구체화 뷰·expectations·AUTO CDC SCD1·이벤트 로그·전체 새로고침)과 Lakeflow Designer ③ Dashboards(데이터셋·위젯 4종·필터·게시)·SQL Editor의 Genie Code(규칙 기반)·Query History·Catalog 8개 탭 ④ ML(순수 파이썬 모델 3종·실험 추적·UC 모델 버전/별칭·특성 테이블)·생성형 AI(Playground·BM25 AI Search·RAG 에이전트·평가)·Model Serving(슬롯 2개) ⑤ Academy 역할별 학습 경로 대응(제목 단위·실습 자동 확인). 화면 UI-05b/05c/05d/07b/08b/08c/09c/28/29/30. HELP·AI 지원에 모두 반영.", "",
+          "13. **서버 자원 관리·자동 구축(v0.7.0, 개발 중)**: 관리자가 서버 CPU·메모리·SSD/HDD·프로세스 점유를 보고 작업 전 자원을 판단하며, 부족하면 항목별로 승인해 정리합니다. 사용자가 DB 연결·비정형 문서를 제공하고 사전작업·확인에 동의한 뒤 '자동 구축 승인'을 하면 분석·파싱·임베딩·온톨로지·에이전트 구축을 자동으로 진행합니다(자동 승인은 사용자가 정한 정책 범위 안이며 AUTO_POLICY로 표시). 자동 평가는 구조·접근·검색 검사이며 업무 정답 검증이 아닙니다. 원천 변경 명령은 자동 실행하지 않습니다.",
+          "12. **AX 프로젝트 스튜디오(v0.7.0, 개발 중)**: 개발 지시서 v1.0의 첫 범위. 프로젝트·역할·범위 → 연결(비밀은 참조만) → 구조 수집·ERD·관계 검토 → 온톨로지 승인 → native 파이프라인·결정적 도구 에이전트(매출 4·매입 4 시나리오) → 문서 검색·신호 inbox → 제안·승인·멱등 업무 명령 → golden·보안 평가·배포·rollback. **합성 fixture(SQLite)와 Docker 시험 DB(PostgreSQL 16.16·MySQL 8.4.13·Oracle 26ai Free)에서 실제로 실행한 범위**이며, 고객 개발 DB·DBX 실제 배포·실제 LLM/신경망 임베딩·SHACL 검증기·부하 시험은 하지 않았습니다.",
           "11. **실제 DBX 증거 흐름(v0.6.0)**: 앱에서 사전훈련(시뮬레이터) → 학습자 PC의 adapter가 본인 교육용 Databricks에서 실습 수행 → 앱에서 증거 검토·등급 판정. ① 시도 ID(1회용·72시간)를 UI-22에서 발급해 `--attempt-id`로 실행하면 모든 SQL 끝에 주석 표식이 붙어 Query History에서 검색됩니다. ② 서버는 결과 체크섬·pack_hash·adapter 버전(1.1 이상)·시도 ID를 자동 대조하고 기대값은 공개하지 않습니다. ③ 검토자는 검토 센터 큐에서 Query History의 statement_id를 task별로 입력해야 승인할 수 있고, 보류·반려는 사유가 필수입니다. ④ 승인된 증거도 팩이 바뀌면 STALE이 되어 등급·준비 판정에서 빠집니다. ⑤ 사전훈련 상태(영역 문항 5개 이상·정답률 70%)는 권고 신호이며 실전 증거 수령을 막지는 않습니다. **서버는 Databricks 자격증명을 받지 않으며, 실제 워크스페이스 검증(DBX_VERIFIED)은 검토자가 승인한 건수만 의미합니다.** 실환경 점검 결과(2026-11-14): 실제 Databricks Free Edition 워크스페이스 1곳에서 2026-11-14에 `doctor` 5개 항목 통과, LAB-CORE-01 실행 성공, 결과 체크섬이 서버 기대값과 일치(MATCHED), 시도 ID 주석이 실제 Query History에 남는 것까지 확인했습니다. 다른 실습 팩(LAB-DE-02·03·05 등), 다른 워크스페이스·클라우드·리전, DATE/TIMESTAMP 컬럼 형식은 아직 실제로 돌려 보지 않았습니다.",
           "## 4. 역할", "", "| 역할 | 권한 |", "|---|---|", "| learner | 본인 세션(선택 삭제 가능)·실습·시험 |", "| instructor | 강사: 정답표·수료·검토 (admin 고유 기능 접근 불가) |",
           "| reviewer | 검토자(위즈베이스 DB 컨설턴트): 검수·재확인·대조표 |", "| admin | **수퍼유저**: 시스템 문서, 피드백 관리·개발큐, 도메인 신청 포함 모든 요구사항·피드백 관리 (별도 admin 접근 코드 필요 — staff·instructor 코드로는 로그인 불가) |", "",
@@ -255,6 +268,7 @@ def system_document():
           "- macOS 앱은 이 개발 환경(Windows)에서 빌드·시험하지 못해 Mac 또는 GitHub Actions(`build-standalone-mac`)에서 빌드해야 하며, 실제 Mac 실행은 미검증. 콘텐츠 팩은 새 라이브러리 추가·앱 껍데기 변경을 담을 수 없음(앱 전체 교체 필요).",
           "- 단독 설치형: 업데이트·피드백 전달은 운영자 서버가 켜져 있고 인터넷이 연결될 때만 가능. 설치 파일은 약 46MB, 코드 서명 없음(SmartScreen 경고 가능). 단독형은 PC별 데이터가 분리되어 사용자 간 협업 기능(팀)·중앙 검토는 이용할 수 없음.",
           "- 피드백 → 개발은 자동 개발이 아님(개발큐 지시서를 운영자가 처리). PC 앱 exe는 코드 서명 없음.",
+          "- v0.7.0 AX 스튜디오: 합성 fixture와 Docker 시험 DB 3종(각 1개 버전)에서 검증했습니다. 고객 DB·다른 버전·MariaDB·TLS는 미검증이고 DBX 경로는 컴파일 산출물까지입니다. golden 24건·보안 11건은 지시서 목표(최소 120건·현업 정답·봉인 holdout)에 못 미치는 초기 세트입니다. 검색 임베딩은 비신경망 해시이며 평가는 12문항 소규모입니다. 서버의 직접 DB 접속은 개발 전용이고 운영 권장 구조인 고객망 connector agent는 없습니다. 지속 계정(SSO)·실제 LLM은 아직 없고 에이전트는 결정적 도구입니다.",
           "- v0.6.0 adapter·시도 ID·statement_id 대조는 가짜 Statement API(DuckDB)로 테스트했고, **실제 Databricks Free Edition 워크스페이스 1곳에서 2026-11-14에 `doctor` 5개 항목 통과, LAB-CORE-01 실행 성공, 결과 체크섬이 서버 기대값과 일치(MATCHED), 시도 ID 주석이 실제 Query History에 남는 것까지 확인했습니다**(검증 범위: 해당 워크스페이스·해당 실습 1건). 다른 실습 팩(LAB-DE-02·03·05 등), 다른 워크스페이스·클라우드·리전, DATE/TIMESTAMP 컬럼 형식은 아직 실제로 돌려 보지 않았습니다. 이 증거가 검토자 승인을 받기 전까지 승인된 실제 DBX 검증은 0건입니다. 시도 ID 표식과 statement_id 대조는 자기 보고를 어렵게 할 뿐 위조 불가능을 보증하지 않으며, 최종 판단은 검토자의 원본 확인입니다.",
           "- v0.5.0 확장 기능(ML·생성형 AI·Model Serving·Genie Code·Designer)은 실제 MLflow·LLM·벡터 임베딩이 아닌 **규칙·순수 파이썬 시뮬레이션**이다. 모델·서빙·에이전트에는 별도 ACL이 없고 세션 소유자만 접근한다. 세션 JSON에 실행 이력·감사 기록이 계속 쌓인다(일부만 상한). COPY INTO 다중 파일 중간 실패는 원자적이지 않다. 미지원: SCD2, IGNORE NULL UPDATES, read_files, AI 함수, Agent Bricks 상세, Genie One, system 테이블. Academy 대응은 레슨 제목 단위.",
           "- Python 격리 실행기 미구성(AT-16은 차단 방식). 파트너 tier·Portal 연결은 회사가 직접 확인.", "", "## 7. 변경 이력", ""]

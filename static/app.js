@@ -6,10 +6,11 @@ const ls = { get(k) { try { return localStorage.getItem(k) } catch { return null
 let TOKEN = ls.get("tok"), ME = null, SID = ls.get("sid"), ST = null, VIEW = ls.get("view") || "env", META = null, LASTLOG = "", PRINCIPAL = "", SIDE = true;
 let AI_SCROLL = "top", AI_KEEP = 0, SESSQ = { q: "", page: 0, size: 25, checked: new Set(), ids: [] }, REAL = null, LASTVIEW = "", PENDING_DEL = [], SYS = null, CLIENT_BUILD = null, RTAB = ls.get("rtab") || "", SYSPOP = "";
 const NAV = [
+  ["AX 스튜디오", [["ax", "AX 프로젝트 스튜디오(개발)"]]],
   ["AI·ML", [["ml", "UI-28 ML·MLflow"], ["genai", "UI-29 생성형 AI·RAG"], ["serve", "UI-30 Model Serving"]]],
   ["학습 환경", [["env", "UI-01 환경 점검"], ["req", "UI-02 착수·요구·계약"], ["ws", "UI-03 Workspace"], ["cat", "UI-04 Catalog Explorer"], ["sql", "UI-05 SQL Editor"], ["qh", "UI-05b Query History"], ["lib", "UI-05c 라이브러리"], ["dash", "UI-05d Dashboards"], ["nb", "UI-06 Notebook"], ["comp", "UI-07 Compute/Warehouses"], ["track", "프로젝트 트랙(8주)"], ["demo", "고객 시연 20분"], ["acad", "UI-07b Academy 경로 대응"]]],
   ["데이터 구축", [["conn", "UI-08 Connections/수집"], ["adddata", "UI-08b Add data"], ["vol", "UI-08c Volumes"], ["pipe", "UI-09 Jobs & Pipelines › Pipelines"], ["dpipe", "UI-09c 선언형 파이프라인"], ["designer", "UI-09d Lakeflow Designer"], ["cdc", "UI-09b CDC 재생"], ["jobs", "UI-10 Jobs & Pipelines › Jobs"], ["genie", "UI-11 의미모델·Genie Agents"], ["agent", "UI-12 Agent·승인"], ["trace", "UI-13 Tracing/평가"], ["bundle", "UI-14 Git/Bundle/CLI"], ["perm", "UI-15 권한·관리"]]],
-  ["운영", [["rvw", "검토 센터"], ["fbq", "피드백·개발큐"], ["usage", "접속·사용 기록"], ["ko", "한국어 가이드"], ["xfer", "전이 시드·협업"], ["real", "실제 환경 연결"], ["inst", "UI-16 강사·수료"], ["evid", "증거 보고서"]]],
+  ["운영", [["ops", "서버 자원 관리"], ["rvw", "검토 센터"], ["fbq", "피드백·개발큐"], ["usage", "접속·사용 기록"], ["ko", "한국어 가이드"], ["xfer", "전이 시드·협업"], ["real", "실제 환경 연결"], ["inst", "UI-16 강사·수료"], ["evid", "증거 보고서"]]],
   ["전문과정 v1.1", [["prof", "UI-17 역량·등급"], ["plan", "UI-18 목표·학습계획"], ["map", "UI-19 공식 목표 지도"], ["tutor", "UI-20 AI 튜터"], ["exam", "UI-21 시험센터"], ["lab", "UI-22 실제 실습 증거함"], ["qual", "UI-23 콘텐츠 품질"], ["partner", "UI-24 파트너 인력"], ["conf", "UI-25 자료 충돌"], ["vmx", "UI-26 현장 대조표"]]]
 ];
 
@@ -789,7 +790,7 @@ function autoLink(c) {
   if (!v && /^s_[0-9a-f]{8,}$/.test(c)) return `<a href="#" class="golink" data-a="opensess" data-id="${esc(c)}" title="이 세션 열기">${esc(c)} ›</a>`;
   return v && v !== VIEW && canGo(v) ? goLink(v, c) : null;
 }
-const NEXTV = { env: "req", req: "comp", ws: "cat", cat: "sql", sql: "qh", qh: "lib", lib: "perm", nb: "pipe", comp: "cat", conn: "adddata", adddata: "vol", vol: "pipe", pipe: "dpipe", dpipe: "designer", designer: "jobs", dash: "genie", ml: "serve", genai: "serve", serve: "trace", cdc: "jobs", jobs: "nb", genie: "agent", agent: "trace", trace: "bundle", bundle: "perm", perm: "sql", track: "acad", acad: "demo", demo: "evid", xfer: "prof", prof: "plan", plan: "map", map: "tutor", ko: "tutor", tutor: "exam", exam: "lab", lab: "qual", qual: "partner", partner: "conf", conf: "vmx", vmx: "rvw", rvw: "vmx", fbq: "usage", usage: "evid", real: "lab", inst: "evid", evid: "prof" };
+const NEXTV = { env: "req", req: "comp", ws: "cat", cat: "sql", sql: "qh", qh: "lib", lib: "perm", nb: "pipe", comp: "cat", conn: "adddata", adddata: "vol", vol: "pipe", pipe: "dpipe", dpipe: "designer", designer: "jobs", dash: "genie", ml: "serve", genai: "serve", serve: "trace", cdc: "jobs", jobs: "nb", genie: "agent", agent: "trace", trace: "bundle", bundle: "perm", perm: "sql", track: "acad", acad: "demo", demo: "evid", xfer: "prof", prof: "plan", plan: "map", map: "tutor", ko: "tutor", tutor: "exam", exam: "lab", lab: "qual", qual: "partner", partner: "conf", conf: "vmx", vmx: "rvw", rvw: "vmx", fbq: "usage", usage: "evid", real: "lab", inst: "evid", evid: "prof", ax: "rvw", ops: "ax" };
 function viewFooter(v) {
   let n = NEXTV[v]; if (n && !canGo(n)) n = ["evid", "prof", "env"].find(x => x !== v && canGo(x));
   const b = [];

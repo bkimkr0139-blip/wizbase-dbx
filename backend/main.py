@@ -1179,6 +1179,8 @@ def health():
 
 
 # ---------------------------------------------------------------- static
+from . import ax_api
+ax_api.register(app, A)
 app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
 
 

@@ -10,7 +10,7 @@ from . import content as C
 from . import guide as G
 from . import sysinfo
 
-ROLE_NAV = {"usage": ("admin",), "rvw": ("reviewer", "instructor", "admin"), "fbq": ("admin",), "vmx": ("reviewer", "instructor", "admin"), "inst": ("reviewer", "instructor", "admin"), "partner": ("reviewer", "instructor", "admin"), "conf": ("reviewer", "instructor", "admin")}
+ROLE_NAV = {"ops": ("admin",), "usage": ("admin",), "rvw": ("reviewer", "instructor", "admin"), "fbq": ("admin",), "vmx": ("reviewer", "instructor", "admin"), "inst": ("reviewer", "instructor", "admin"), "partner": ("reviewer", "instructor", "admin"), "conf": ("reviewer", "instructor", "admin")}
 
 
 _kb = G._kb
@@ -87,6 +87,8 @@ SCR = {
     "partner": ("UI-24 파트너 인력", "파트너 인력 현황과 투입 승인(고객 투입)을 관리하는 화면입니다(검토자·강사·admin용).", ["인력별 근거(등급·실습) 확인", "투입 승인 요청·승인(본인 승인 불가)"], "conf", "투입 승인은 내부 등급과 별개로 따로 부여합니다."),
     "conf": ("UI-25 자료 충돌", "공식 자료끼리 상충하는 항목과 우리의 처리 결정을 기록한 화면입니다.", ["충돌 항목과 출처 확인", "채택 기준 확인"], "vmx", "충돌이 해소되기 전에는 한쪽을 확정하지 않습니다."),
     "vmx": ("UI-26 현장 대조표", "실제 Databricks 화면과 이 시뮬레이터를 항목별로 대조한 기록(기대/실제/차이/심각도)을 보는 화면입니다(검토자용).", ["대조 행 추가", "차이와 심각도 기록"], "rvw", "문서만 보고 '실제 확인'으로 올리지 않습니다."),
+    "ops": ("서버 자원 관리", "서버의 CPU·메모리·SSD/HDD·프로세스별 점유를 보고 작업 전 자원을 판단하며, 부족하면 승인한 항목만 정리하는 관리자 전용 화면입니다.", ["실시간 자원 확인", "작업 전 판단(OK/CAUTION/BLOCK)", "정리 후보 승인·실행"], "ax", "다른 앱·증거 파일·원천 데이터는 정리 대상이 아니며 승인 없이는 아무것도 지우거나 종료하지 않습니다."),
+    "ax": ("AX 프로젝트 스튜디오", "레거시 DB 구조 수집 → ERD·관계 검토 → 온톨로지 승인 → 매출·매입 도구·문서 검색·승인형 업무 명령 → 평가·배포를 개발하는 화면입니다(합성 fixture·Docker 시험 DB 기준).", ["프로젝트 만들기·연결·구조 수집", "관계 후보 검토와 온톨로지 승인(다른 사용자)", "매출·매입 질문, 문서 검색, 신호 확인", "제안→승인→명령, 평가 실행"], "rvw", "고객 DB·DBX 실제 배포·LLM은 아직 검증하지 않았습니다. 고객 운영 DB·실데이터는 넣지 마세요."),
     "rvw": ("검토 센터", "위즈베이스 DB 컨설턴트(검토자)가 매뉴얼에 따라 실제 워크스페이스와 대조해 목표·문항·기능을 검수하는 화면입니다(검토자·강사·admin용).", ["검토 큐에서 항목 선택", "실제 워크스페이스에서 직접 확인", "재확인·검수 결과 기록"], "vmx", "기술 검토와 출제 검토는 서로 다른 사람이 해야 합니다."),
     "real": ("실제 환경 연결", "내 교육용(비운영) Databricks 워크스페이스나 테스트 DB에 연결해 실제 결과로 연습하는 방법을 안내하고, 설치형 앱에서는 내 SQL Warehouse에 직접 SQL을 실행하는 화면입니다.", ["준비 체크리스트(비운영 환경, SQL Warehouse, 짧은 유효기간 토큰) 확인", "워크스페이스 주소·Warehouse ID·토큰 입력 → 저장 → 연결 테스트로 내 계정 확인", "SQL 실행(읽기 전용 기본) → 결과 해시를 실습 증거함에 제출"], "lab", "웹에서는 직접 연결이 막혀 있고 설치형 앱에서만 쓸 수 있습니다. 운영 환경·고객 데이터는 연결하지 마세요."),
     "usage": ("접속·사용 기록", "웹 서버에 접속한 사용자의 로그인·화면 이동·명령 실행·오류·세션·피드백·다운로드를 기간별로 집계해 차트로 보여주는 화면입니다(admin 전용).", ["기간(최근 7/30/90일) 선택", "핵심 지표와 일별·시간대별 차트에서 추이 확인", "활동 많은 사용자와 최근 기록에서 세부 확인"], "evid", "접근 코드·SQL·입력 본문은 기록하지 않고 IP는 일부만 저장합니다(최대 180일)."),
@@ -96,6 +98,8 @@ SCR = {
 }
 
 ALIAS = {
+    "ops": ["서버 자원", "자원 모니터링", "cpu 사용량", "메모리 사용량", "디스크 사용량", "프로세스 점유", "자원 정리", "서버 상태"],
+    "ax": ["ax 스튜디오", "ax 프로젝트", "온톨로지", "erd", "레거시 db", "레거시 연결", "통합 erd"],
     "env": ["환경 점검", "환경점검", "세션 시작"], "req": ["요구", "계약", "인터뷰", "착수"], "ws": ["workspace", "워크스페이스"], "cat": ["catalog explorer", "카탈로그 탐색", "카탈로그 화면", "테이블 탐색"],
     "sql": ["sql editor", "sql 편집기", "쿼리", "sql 화면"], "qh": ["query history", "쿼리 이력", "쿼리 히스토리"], "adddata": ["add data", "데이터 추가", "파일 업로드", "csv 업로드"], "vol": ["volume", "볼륨"], "dpipe": ["declarative pipeline", "선언형 파이프라인", "streaming table", "스트리밍 테이블", "materialized view", "구체화 뷰", "expectations", "auto cdc"], "designer": ["lakeflow designer", "designer", "노코드", "no code"], "dash": ["dashboard", "대시보드"], "ml": ["mlflow", "머신러닝", "모델 학습", "실험 추적"], "genai": ["playground", "플레이그라운드", "rag", "ai playground", "생성형", "ai search", "벡터 검색 인덱스"], "serve": ["model serving", "모델 서빙", "엔드포인트"], "acad": ["academy", "아카데미", "학습 경로", "역할별 경로", "코스 대응"], "lib": ["라이브러리", "저장한 쿼리", "dashboards", "alerts", "discover", "marketplace", "achievements", "배지"], "nb": ["notebook", "노트북", "셀"], "comp": ["compute", "컴퓨트", "warehouse", "웨어하우스"], "conn": ["connection", "연결", "수집", "federation"],
     "pipe": ["pipeline", "파이프라인"], "cdc": ["cdc", "변경 로그", "변경로그"], "jobs": ["jobs", "잡", "스케줄", "run-as", "repair"], "genie": ["genie", "의미모델", "시맨틱"],
